@@ -18,7 +18,9 @@ async function main() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
 
-  const sql = postgres(url, { max: 1 });
+  // `if not exists` statements emit a NOTICE per skipped object, which on a
+  // no-op run buries the one line that matters under a wall of green.
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
   const db = drizzle(sql);
 
   await sql`create extension if not exists vector`;

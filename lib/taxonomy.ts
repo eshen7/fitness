@@ -150,6 +150,38 @@ export const MEASUREMENT_KINDS = [
 ] as const;
 export type MeasurementKind = (typeof MEASUREMENT_KINDS)[number];
 
+/**
+ * The performance tests. These are entered as a set of attempts in one sitting,
+ * which is what makes the noise floor and the best-versus-mean drift computable,
+ * so they are logged through the jump test form rather than one value at a time.
+ */
+export const TEST_KINDS = [
+  "standing_vertical",
+  "two_foot_approach_vertical",
+  "one_foot_approach_left",
+  "one_foot_approach_right",
+  "broad_jump",
+  "depth_jump_vertical",
+] as const;
+export type TestKind = (typeof TEST_KINDS)[number];
+
+/** Body composition, one value at a time, mostly daily. */
+export const BODY_KINDS = [
+  "bodyweight",
+  "lean_mass",
+  "body_fat_pct",
+  "reach_height",
+] as const;
+export type BodyKind = (typeof BODY_KINDS)[number];
+
+/**
+ * Display units. Everything is stored canonically in kilograms and centimetres,
+ * so a series stays comparable no matter what the owner was typing in that month;
+ * this only decides what the forms and charts speak.
+ */
+export const UNIT_SYSTEMS = ["imperial", "metric"] as const;
+export type UnitSystem = (typeof UNIT_SYSTEMS)[number];
+
 /** Provenance, so a manual entry never gets confused with a device import. */
 export const DATA_SOURCES = ["manual", "whoop", "derived"] as const;
 export type DataSource = (typeof DATA_SOURCES)[number];

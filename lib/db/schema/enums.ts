@@ -22,6 +22,7 @@ import {
   SESSION_KINDS,
   TAKEOFF_LEGS,
   TENDON_SITES,
+  UNIT_SYSTEMS,
   WHOOP_RECORD_TYPES,
 } from "@/lib/taxonomy";
 
@@ -52,5 +53,6 @@ export const memorySource = pgEnum("memory_source", MEMORY_SOURCES);
 export const jumperType = pgEnum("jumper_type", JUMPER_TYPES);
 export const armSwing = pgEnum("arm_swing", ARM_SWINGS);
 export const takeoffLeg = pgEnum("takeoff_leg", TAKEOFF_LEGS);
+export const unitSystem = pgEnum("unit_system", UNIT_SYSTEMS);
 export const mealSlot = pgEnum("meal_slot", MEAL_SLOTS);
 export const whoopRecordType = pgEnum("whoop_record_type", WHOOP_RECORD_TYPES);

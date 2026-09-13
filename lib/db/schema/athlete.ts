@@ -20,6 +20,7 @@ import {
   measurementKind,
   takeoffLeg,
   tendonSite,
+  unitSystem,
 } from "./enums";
 import { exercises } from "./exercises";
 
@@ -42,6 +43,8 @@ export const profile = pgTable("profile", {
     .notNull()
     .default("unknown"),
   jumperType: jumperType("jumper_type").notNull().default("unknown"),
+  /** Display only. Measurements are stored in kilograms and centimetres. */
+  unitSystem: unitSystem("unit_system").notNull().default("imperial"),
   preferredArmSwing: armSwing("preferred_arm_swing").notNull().default("unknown"),
   goals: text().array().notNull().default([]),
   /** Equipment actually reachable, intersected with per-exercise availability. */
@@ -67,6 +70,12 @@ export const measurements = pgTable(
     }),
     value: numeric({ precision: 8, scale: 2 }).notNull(),
     unit: text().notNull(),
+    /**
+     * Drop height for a depth jump attempt. A first-class column rather than a
+     * note, because the calibration insight fits jump height against box height
+     * and takes the vertex, which needs both numbers in the same row.
+     */
+    boxHeightCm: numeric("box_height_cm", { precision: 5, scale: 1 }),
     measuredAt: timestamp("measured_at", { withTimezone: true }).notNull(),
     testGroup: uuid("test_group"),
     attempt: smallint(),

@@ -3,6 +3,7 @@ import type {
   Equipment,
   ForceVelocity,
   Laterality,
+  MeasurementKind,
   MesocycleType,
   MotorAbility,
   MovementPattern,
@@ -10,6 +11,7 @@ import type {
   Plane,
   SessionKind,
   TendonSite,
+  UnitSystem,
 } from "@/lib/taxonomy";
 
 /**
@@ -153,6 +155,25 @@ export const sessionKindLabels = labels<SessionKind>({
   mobility: "Mobility",
   test: "Test",
   rest: "Rest",
+});
+
+export const measurementKindLabels = labels<MeasurementKind>({
+  bodyweight: "Bodyweight",
+  standing_vertical: "Standing vertical",
+  two_foot_approach_vertical: "Two foot approach",
+  one_foot_approach_left: "One foot approach, left",
+  one_foot_approach_right: "One foot approach, right",
+  broad_jump: "Broad jump",
+  depth_jump_vertical: "Depth jump",
+  estimated_1rm: "Estimated 1RM",
+  lean_mass: "Lean mass",
+  body_fat_pct: "Body fat",
+  reach_height: "Standing reach",
+});
+
+export const unitSystemLabels = labels<UnitSystem>({
+  imperial: "Pounds and inches",
+  metric: "Kilograms and centimetres",
 });
 
 /** 1 gentle to 5 severe, and 1 trivial to 5 highly technical. */

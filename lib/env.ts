@@ -21,6 +21,23 @@ const schema = z.object({
   /** Public origin used to build the OAuth redirect URI and webhook URL. */
   APP_URL: z.string().url().default("http://localhost:3000"),
 
+  /**
+   * IANA zone the training day is defined in. A set logged at 11pm belongs to
+   * that day and not to UTC's next one, and the server may well be in neither
+   * zone, so the boundary is configured rather than inferred.
+   */
+  APP_TIMEZONE: z
+    .string()
+    .default("America/New_York")
+    .refine((zone) => {
+      try {
+        new Intl.DateTimeFormat("en-CA", { timeZone: zone });
+        return true;
+      } catch {
+        return false;
+      }
+    }, "Not an IANA time zone name."),
+
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
 

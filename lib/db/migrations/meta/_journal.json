@@ -8,6 +8,27 @@
       "when": 1789324220426,
       "tag": "0000_bent_shadow_king",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789328072338,
+      "tag": "0001_loving_pyro",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789328149367,
+      "tag": "0002_sloppy_violations",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789328205524,
+      "tag": "0003_faithful_dazzler",
+      "breakpoints": true
     }
   ]
 }

@@ -55,6 +55,22 @@ h4 {
   letter-spacing: -0.018em;
 }
 
+/*
+  Native number spinners are removed everywhere rather than per field. They are
+  far too small to hit with a thumb, they only appear once the field is focused,
+  and the width they claim is taken from the digits, which are the part being
+  read. Every numeric field here is typed into, never nudged.
+*/
+input[type="number"] {
+  appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
 /* Numbers are read at arm's length mid-set, so they never reflow or wobble. */
 .tnum {
   font-variant-numeric: tabular-nums;

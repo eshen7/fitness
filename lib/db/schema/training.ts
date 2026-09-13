@@ -129,9 +129,15 @@ export const sessions = pgTable(
   "sessions",
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
-    microcycleId: integer("microcycle_id")
-      .notNull()
-      .references(() => microcycles.id, { onDelete: "cascade" }),
+    /**
+     * Null for an ad-hoc session: training that happened without a generated
+     * plan behind it. That is not only a phase-ordering convenience, it is the
+     * normal case for off-plan work, and those sets still have to count toward
+     * weekly volume, contact totals, and every analytic built on them.
+     */
+    microcycleId: integer("microcycle_id").references(() => microcycles.id, {
+      onDelete: "cascade",
+    }),
     day: date().notNull(),
     kind: sessionKind().notNull(),
     title: text(),

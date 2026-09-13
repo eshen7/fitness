@@ -1,0 +1,1 @@
+ALTER TABLE "measurements" ADD COLUMN "box_height_cm" numeric(5, 1);

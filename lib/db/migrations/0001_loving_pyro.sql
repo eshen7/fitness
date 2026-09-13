@@ -1,0 +1,1 @@
+ALTER TABLE "sessions" ALTER COLUMN "microcycle_id" DROP NOT NULL;

@@ -1,5 +1,14 @@
 import { Nav } from "@/components/nav";
 
+/**
+ * Every screen behind the passcode reads the database, and none of it is shared
+ * with anyone: the answer to "what did I do today" is different a minute later.
+ * Without this the whole group prerenders at build time and ships a snapshot of
+ * whatever the database held while the build ran, which looks like a working app
+ * right up to the moment it silently stops updating.
+ */
+export const dynamic = "force-dynamic";
+
 export default function AppLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
