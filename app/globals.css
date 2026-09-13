@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+/*
+  Gentle dark, WHOOP-adjacent: soft near-black surfaces, one restrained mint
+  accent, low-saturation status colours, no pure white and no pure black.
+  Carried over from the approved plan artifact so the app and the plan look like
+  the same product.
+*/
+@theme {
+  --color-surface: oklch(21.5% 0.008 255);
+  --color-surface-raised: oklch(26% 0.01 255);
+  --color-surface-sunken: oklch(16.5% 0.008 255);
+  --color-ink: oklch(92% 0.006 255);
+  --color-ink-muted: oklch(72% 0.008 255);
+  --color-ink-faint: oklch(56% 0.008 255);
+  --color-line: oklch(34% 0.008 255);
+
+  --color-accent: oklch(80% 0.128 168);
+  --color-accent-ink: oklch(22% 0.045 168);
+  --color-cool: oklch(74% 0.075 232);
+  --color-good: oklch(80% 0.125 162);
+  --color-warn: oklch(84% 0.1 82);
+  --color-bad: oklch(72% 0.13 22);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-display: var(--font-inter-tight), var(--font-inter), ui-sans-serif,
+    system-ui, sans-serif;
+
+  --radius-field: 0.625rem;
+  --radius-box: 1rem;
+}
+
+html {
+  color-scheme: dark;
+  background-color: var(--color-surface-sunken);
+  /* Keep the safe-area inset available to sticky gym-mode controls. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: var(--color-surface-sunken);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.018em;
+}
+
+/* Numbers are read at arm's length mid-set, so they never reflow or wobble. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+:where(p, li, td) {
+  line-height: 1.6;
+}
+
+:where(.grid, .flex) > * {
+  min-width: 0;
+}
+
+:where(img, svg, video) {
+  max-width: 100%;
+  height: auto;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

@@ -1,0 +1,1835 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Training app - implementation plan</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Inter+Tight:wght@500..700&display=swap" rel="stylesheet">
+<style>
+  /* ---- Theme: gentle dark, WHOOP-adjacent. Soft near-black surfaces, one restrained
+         mint accent, low-saturation status colors, no pure white and no pure black. ---- */
+  [data-theme="dark"] {
+    --color-base-100: oklch(21.5% 0.008 255);
+    --color-base-200: oklch(26% 0.010 255);
+    --color-base-300: oklch(16.5% 0.008 255);
+    --color-base-content: oklch(92% 0.006 255);
+    --color-primary: oklch(80% 0.128 168);
+    --color-primary-content: oklch(22% 0.045 168);
+    --color-secondary: oklch(74% 0.075 232);
+    --color-secondary-content: oklch(20% 0.03 232);
+    --color-accent: oklch(78% 0.09 196);
+    --color-accent-content: oklch(20% 0.03 196);
+    --color-neutral: oklch(31% 0.010 255);
+    --color-neutral-content: oklch(91% 0.006 255);
+    --color-info: oklch(76% 0.085 232);
+    --color-info-content: oklch(20% 0.03 232);
+    --color-success: oklch(80% 0.125 162);
+    --color-success-content: oklch(21% 0.04 162);
+    --color-warning: oklch(84% 0.100 82);
+    --color-warning-content: oklch(22% 0.04 82);
+    --color-error: oklch(72% 0.130 22);
+    --color-error-content: oklch(20% 0.04 22);
+    --radius-selector: 0.5rem;
+    --radius-field: 0.625rem;
+    --radius-box: 1rem;
+    --border: 1px;
+    --depth: 0;
+    --noise: 0;
+  }
+
+  html, body {
+    font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4, .card-title, .stat-value {
+    font-family: "Inter Tight", "Inter", ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.018em;
+  }
+  p, li, td { line-height: 1.65; }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, li, dd, td, th, .badge, .label) { overflow-wrap: anywhere; }
+  :where(img, svg, video) { max-width: 100%; height: auto; }
+
+  /* Figure palette, driven by the DaisyUI theme so SVG follows light/dark. */
+  .fig {
+    --ink: var(--color-base-content);
+    --surface: var(--color-base-100);
+    --surface-2: var(--color-base-200);
+    --line: color-mix(in oklch, var(--color-base-content) 22%, transparent);
+    --accent: var(--color-primary);
+    --warn: var(--color-warning);
+    --bad: var(--color-error);
+    --good: var(--color-success);
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .fig text { fill: var(--ink); font-family: "Inter", ui-sans-serif, system-ui, sans-serif; }
+  .fig .box { fill: var(--surface-2); stroke: var(--line); stroke-width: 1.5; }
+  .fig .box-accent { fill: color-mix(in oklch, var(--accent) 14%, transparent); stroke: var(--accent); stroke-width: 1.75; }
+  .fig .box-good { fill: color-mix(in oklch, var(--good) 14%, transparent); stroke: var(--good); stroke-width: 1.5; }
+  .fig .box-bad  { fill: color-mix(in oklch, var(--bad) 12%, transparent); stroke: var(--bad); stroke-width: 1.5; }
+  .fig .edge { stroke: var(--line); stroke-width: 2; fill: none; }
+  .fig .edge-accent { stroke: var(--accent); stroke-width: 2.25; fill: none; }
+  .fig .edge-bad { stroke: var(--bad); stroke-width: 2; fill: none; stroke-dasharray: 6 4; }
+  .fig .t-title { font-size: 15px; font-weight: 700; }
+  .fig .t-body { font-size: 12.5px; }
+  .fig .t-small { font-size: 11px; opacity: 0.72; }
+  .fig .t-label { font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; opacity: 0.66; }
+  .fig .muted { opacity: 0.72; }
+  .rule-src { font-size: 0.72rem; opacity: 0.6; }
+
+  /* Let the phone frames hug their content instead of DaisyUI's fixed display height. */
+  .mockup-phone { aspect-ratio: auto; height: auto; }
+  .mockup-phone .mockup-phone-display { height: auto; min-height: 0; aspect-ratio: auto; }
+</style>
+</head>
+<body class="bg-base-300 text-base-content">
+
+<main class="mx-auto max-w-6xl p-4 sm:p-6 lg:p-10 space-y-10">
+
+  <!-- ============ HERO ============ -->
+  <header class="space-y-5">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="badge badge-primary badge-soft">Implementation plan</span>
+      <span class="badge badge-ghost">Greenfield</span>
+      <span class="badge badge-ghost">Single user</span>
+    </div>
+    <h1 class="text-4xl sm:text-5xl font-bold leading-tight">
+      An all-in-one training app for vertical jump, athleticism, and upper body
+    </h1>
+    <p class="text-lg opacity-80 max-w-3xl">
+      Nutrition, an exercise directory, workout generation, and progress tracking in one app that
+      knows your history, your current state, and your preferences, and gets better at programming
+      for you the longer you use it.
+    </p>
+  </header>
+
+  <!-- ============ CURRENT STATE ============ -->
+  <section class="space-y-4">
+    <h2 class="text-2xl font-bold">Where things stand today</h2>
+    <div class="grid gap-4 md:grid-cols-3">
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-base">No application code</h3>
+          <p class="text-sm opacity-80">
+            The repo holds <code class="text-xs">AGENTS.md</code> (symlinked as
+            <code class="text-xs">CLAUDE.md</code>) and <code class="text-xs">thp.pdf</code>. Nothing else.
+            Every technical choice below is open rather than inherited.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-base">A real domain reference exists</h3>
+          <p class="text-sm opacity-80">
+            The condensed ebook distillation gives concrete, machine-checkable prescriptions:
+            set and rep ranges, rest windows, weekly frequencies, the rule of 60 percent, and a
+            four-phase tendon protocol.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-base">The domain fights naive tracking</h3>
+          <p class="text-sm opacity-80">
+            Vertical jump is <em>supposed</em> to drop mid-block. Each capacity has its own fatigue
+            curve. Plyometrics can make some athletes jump lower. This shapes the whole design.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LOCKED DECISIONS ============ -->
+  <section class="space-y-4">
+    <h2 class="text-2xl font-bold">Decisions you already made</h2>
+    <div class="overflow-x-auto rounded-box border border-base-content/10 bg-base-100">
+      <table class="table table-zebra">
+        <thead>
+          <tr><th class="w-40">Decision</th><th>Choice</th><th class="w-1/3">What it implies</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="font-semibold">Stack</td>
+            <td>Next.js App Router in TypeScript, Postgres via Drizzle, Vercel plus Neon, installable as a PWA</td>
+            <td class="text-sm opacity-80">One codebase for phone and laptop. Cloud sync. pgvector available for the memory layer.</td>
+          </tr>
+          <tr>
+            <td class="font-semibold">Nutrition</td>
+            <td>Plain-language food logging resolved to full macros, backed by a cached food library</td>
+            <td class="text-sm opacity-80">Low logging friction, and a repeated meal resolves identically instead of drifting.</td>
+          </tr>
+          <tr>
+            <td class="font-semibold">Autonomy</td>
+            <td>Claude proposes with visible reasoning, you approve or edit, every verdict feeds memory</td>
+            <td class="text-sm opacity-80">Your rejections become the highest-value training signal in the system.</td>
+          </tr>
+          <tr>
+            <td class="font-semibold">Inputs</td>
+            <td>Manual vertical jump entry, plus the WHOOP API for recovery, HRV, resting heart rate, sleep, and day strain</td>
+            <td class="text-sm opacity-80">No dependency on a force plate or velocity device. Schema leaves room for them later.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ============ THE CORE IDEA ============ -->
+  <section class="space-y-6">
+    <div class="space-y-3">
+      <span class="badge badge-primary">The load-bearing decision</span>
+      <h2 class="text-3xl font-bold">Claude proposes. A rule engine decides what ships.</h2>
+      <p class="opacity-80 max-w-3xl">
+        The obvious build is "ask a model for today's workout." That fails here for a specific reason:
+        one-foot jumping loads a single leg at up to fourteen times bodyweight, and the ebook says
+        plyometrics are the easiest thing to get wrong badly enough to make an athlete jump lower.
+        A model that drifts on plyometric dosage does not produce a slightly worse workout. It produces
+        a tendon injury that costs months.
+      </p>
+      <p class="opacity-80 max-w-3xl">
+        So the ebook's prescriptions become executable rules in plain TypeScript. But you raised the
+        right objection: a single gate with seventeen pass/fail rules in front of it would reject
+        constantly. So the rules are not all enforced the same way. Most of them are arranged so that
+        <em>there is nothing left to fail</em>.
+      </p>
+    </div>
+
+    <figure class="card card-border bg-base-100">
+      <div class="card-body">
+        <svg class="fig" viewBox="0 0 960 400" role="img" aria-labelledby="pipe-title pipe-desc">
+          <title id="pipe-title">Generation pipeline: pre-filter, propose, normalize, check, review</title>
+          <desc id="pipe-desc">Unsafe options are removed before the model sees them, mechanical fields
+          are filled in by code rather than judged, only five rules can actually reject a plan, and an
+          unrepairable plan degrades to the last accepted session rather than to nothing.</desc>
+
+          <defs>
+            <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/>
+            </marker>
+          </defs>
+
+          <!-- Stage 1: context + prefilter -->
+          <g id="stage-context">
+            <title>Stage 1: context assembly, with unsafe options removed before the model sees them</title>
+            <rect class="box" x="4" y="44" width="168" height="216" rx="12"/>
+            <text class="t-label" x="18" y="68">1 - Context</text>
+            <text class="t-title" x="18" y="90">Pre-filter</text>
+            <text class="t-small" x="18" y="108">cached prefix, 1h TTL</text>
+            <rect class="box-good" x="16" y="118" width="144" height="82" rx="8"/>
+            <text class="t-small" x="26" y="136" font-weight="700">removed up front</text>
+            <text class="t-small" x="26" y="154">sites in phase 1-2</text>
+            <text class="t-small" x="26" y="170">gear you do not have</text>
+            <text class="t-small" x="26" y="186">load above the cap</text>
+            <text class="t-small" x="18" y="222">then: profile, memory,</text>
+            <text class="t-small" x="18" y="238">insights, readiness</text>
+          </g>
+
+          <!-- Stage 2: model -->
+          <g id="stage-model">
+            <title>Stage 2: Claude Opus 5 chooses exercises and intent, not mechanical fields</title>
+            <rect class="box-accent" x="200" y="44" width="168" height="216" rx="12"/>
+            <text class="t-label" x="214" y="68">2 - Propose</text>
+            <text class="t-title" x="214" y="90">Claude Opus 5</text>
+            <text class="t-body" x="214" y="114">picks exercises</text>
+            <text class="t-body" x="214" y="134">sets the emphasis</text>
+            <text class="t-body" x="214" y="154">writes a rationale</text>
+            <line x1="214" y1="168" x2="354" y2="168" class="edge" stroke-opacity="0.45"/>
+            <text class="t-small" x="214" y="188">it does not set rest,</text>
+            <text class="t-small" x="214" y="204">order, or set counts</text>
+            <text class="t-small" x="214" y="234">read-only tools only</text>
+          </g>
+
+          <!-- Stage 3: normalizer -->
+          <g id="stage-normalize">
+            <title>Stage 3: deterministic normalizer, which fixes rather than rejects</title>
+            <rect class="box" x="396" y="44" width="168" height="216" rx="12"/>
+            <text class="t-label" x="410" y="68">3 - Normalize</text>
+            <text class="t-title" x="410" y="90">Code fills in</text>
+            <text class="t-body" x="410" y="114">session ordering</text>
+            <text class="t-body" x="410" y="134">rest windows</text>
+            <text class="t-body" x="410" y="154">set and rep clamps</text>
+            <text class="t-body" x="410" y="174">coupling-time labels</text>
+            <line x1="410" y1="190" x2="550" y2="190" class="edge" stroke-opacity="0.45"/>
+            <text class="t-small" x="410" y="212">6 rules that have one</text>
+            <text class="t-small" x="410" y="228">right answer, so they</text>
+            <text class="t-small" x="410" y="244">get fixed, not failed</text>
+          </g>
+
+          <!-- Stage 4: the small gate -->
+          <g id="stage-validator">
+            <title>Stage 4: the actual gate, only five rules can reject a plan</title>
+            <rect class="box-good" x="592" y="44" width="168" height="216" rx="12"/>
+            <text class="t-label" x="606" y="68">4 - Check</text>
+            <text class="t-title" x="606" y="90">5 blocking rules</text>
+            <text class="t-body" x="606" y="114">target count</text>
+            <text class="t-body" x="606" y="134">complex stability</text>
+            <text class="t-body" x="606" y="154">plyo frequency</text>
+            <text class="t-body" x="606" y="174">pattern spacing</text>
+            <text class="t-body" x="606" y="194">load-cap respected</text>
+            <line x1="606" y1="210" x2="746" y2="210" class="edge" stroke-opacity="0.45"/>
+            <text class="t-small" x="606" y="232">everything else is an</text>
+            <text class="t-small" x="606" y="248">advisory, never a block</text>
+          </g>
+
+          <!-- Stage 5: you -->
+          <g id="stage-review">
+            <title>Stage 5: you review the proposal, its rationale, and what the normalizer changed</title>
+            <rect class="box" x="788" y="44" width="168" height="216" rx="12"/>
+            <text class="t-label" x="802" y="68">5 - Review</text>
+            <text class="t-title" x="802" y="90">You decide</text>
+            <text class="t-body" x="802" y="114">accept, edit, reject</text>
+            <text class="t-body" x="802" y="134">see the rationale</text>
+            <text class="t-body" x="802" y="154">see what code changed</text>
+            <text class="t-body" x="802" y="174">see the advisories</text>
+            <line x1="802" y1="190" x2="942" y2="190" class="edge" stroke-opacity="0.45"/>
+            <text class="t-small" x="802" y="212">every verdict is written</text>
+            <text class="t-small" x="802" y="228">to the memory layer</text>
+          </g>
+
+          <!-- forward edges -->
+          <path class="edge" d="M172,140 L192,140" marker-end="url(#arw)"/>
+          <path class="edge-accent" d="M368,140 L388,140" marker-end="url(#arw)"/>
+          <path class="edge" d="M564,140 L584,140" marker-end="url(#arw)"/>
+          <path class="edge" d="M760,140 L780,140" marker-end="url(#arw)"/>
+
+          <!-- repair loop -->
+          <path class="edge-bad" d="M640,260 L640,296 Q640,308 624,308 L300,308 Q284,308 284,296 L284,266" marker-end="url(#arw)"/>
+          <text class="t-small" x="300" y="330" fill="var(--bad)">fail: structured repair request, up to 3 attempts</text>
+
+          <!-- graceful degradation -->
+          <g id="stage-fallback">
+            <title>If the repair loop cannot converge, the last accepted session ships with reduced load</title>
+            <path class="edge" d="M712,260 L712,290 L780,290" marker-end="url(#arw)" stroke-opacity="0.55"/>
+            <rect class="box" x="788" y="272" width="168" height="112" rx="10"/>
+            <text class="t-body" x="802" y="294" font-weight="700">Still failing after 3?</text>
+            <text class="t-small" x="802" y="314">the last accepted day of</text>
+            <text class="t-small" x="802" y="330">this type ships instead,</text>
+            <text class="t-small" x="802" y="346">load scaled down, flagged</text>
+            <text class="t-small" x="802" y="370" fill="var(--good)">never a blank screen</text>
+          </g>
+        </svg>
+        <figcaption class="text-sm opacity-70 mt-3">
+          Three of the four enforcement mechanisms cannot produce a rejection at all. Pre-filtering
+          removes unsafe options before the model can pick them, the normalizer fixes mechanical fields
+          instead of judging them, advisories only annotate. Only five rules sit on the gate, and even
+          they degrade to a real workout rather than to a blank screen.
+        </figcaption>
+      </div>
+    </figure>
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="alert alert-success alert-soft">
+        <div class="text-sm">
+          <strong>Why it will not fail constantly:</strong> mesocycle rules run when a block is declared and
+          again when a week is generated, never per session, so an individual day can only trip
+          session-scope rules and almost all of those are normalized rather than checked. Thresholds are
+          bands with slack, not exact numbers.
+        </div>
+      </div>
+      <div class="alert alert-warning alert-soft">
+        <div class="text-sm">
+          <strong>And it is measurable before it matters:</strong> the engine is built and unit-tested
+          before any generation code exists, so phase 5 logs the repair-attempt distribution over about
+          fifty generations. If the first-attempt pass rate is under 80 percent, the fix is the prompt
+          or the normalizer, not more rules.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ============ VALIDATOR RULES ============ -->
+  <section class="space-y-4">
+    <h2 class="text-2xl font-bold">The rules, made executable</h2>
+    <p class="opacity-80 max-w-3xl">
+      Every row is lifted from the domain reference. What changed after your question is the
+      <strong>Enforced by</strong> column. The same eighteen prescriptions are still honoured, but only
+      five of them are in a position to reject anything.
+    </p>
+
+    <div class="stats stats-vertical sm:stats-horizontal w-full shadow bg-base-100">
+      <div class="stat">
+        <div class="stat-title">Rules in the engine</div>
+        <div class="stat-value">18</div>
+        <div class="stat-desc">across four scopes</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Impossible to violate</div>
+        <div class="stat-value text-primary">9</div>
+        <div class="stat-desc">3 pre-filtered, 6 auto-fixed</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Can reject a plan</div>
+        <div class="stat-value text-error">5</div>
+        <div class="stat-desc">down from 17</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Advisory only</div>
+        <div class="stat-value text-warning">4</div>
+        <div class="stat-desc">annotate, never block</div>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto rounded-box border border-base-content/10 bg-base-100">
+      <table class="table table-sm table-pin-rows">
+        <thead>
+          <tr><th class="w-28">Scope</th><th>Rule</th><th class="w-32">Enforced by</th></tr>
+        </thead>
+        <tbody>
+          <tr class="bg-primary/5"><td><span class="badge badge-sm badge-primary">Tendon</span></td><td><strong>A site in protocol phase 1 or 2 blocks all plyometric loading of that site</strong></td><td><span class="badge badge-sm badge-primary">pre-filter</span></td></tr>
+          <tr class="bg-primary/5"><td><span class="badge badge-sm badge-ghost">Equipment</span></td><td>Only gear you actually have access to is eligible</td><td><span class="badge badge-sm badge-primary">pre-filter</span></td></tr>
+          <tr class="bg-primary/5"><td><span class="badge badge-sm badge-primary">Tendon</span></td><td><strong>Pain trending up over a rolling window sets a load cap on the affected pattern</strong></td><td><span class="badge badge-sm badge-primary">pre-filter</span></td></tr>
+
+          <tr><td><span class="badge badge-sm badge-ghost">Session</span></td><td>Highest intensity, highest coordination demand, most dynamic work ordered first</td><td><span class="badge badge-sm badge-secondary badge-soft">normalize</span></td></tr>
+          <tr><td><span class="badge badge-sm badge-ghost">Session</span></td><td>Main lifts before assistance, large muscle groups before small</td><td><span class="badge badge-sm badge-secondary badge-soft">normalize</span></td></tr>
+          <tr><td><span class="badge badge-sm badge-ghost">Session</span></td><td>Rest 4 to 5 minutes on heavy sets</td><td><span class="badge badge-sm badge-secondary badge-soft">normalize</span></td></tr>
+          <tr><td><span class="badge badge-sm badge-ghost">Plyometrics</span></td><td>8 to 12 reps, 3 to 6 sets</td><td><span class="badge badge-sm badge-secondary badge-soft">normalize</span></td></tr>
+          <tr><td><span class="badge badge-sm badge-ghost">Plyometrics</span></td><td>Rest 1 to 2 min standard, 30 to 60 s low intensity, 2 to 3 min shock method</td><td><span class="badge badge-sm badge-secondary badge-soft">normalize</span></td></tr>
+          <tr><td><span class="badge badge-sm badge-ghost">Plyometrics</span></td><td>Coupling time class respected, no shock-method labelling above 0.15 s</td><td><span class="badge badge-sm badge-secondary badge-soft">normalize</span></td></tr>
+
+          <tr class="bg-error/5"><td><span class="badge badge-sm badge-ghost">Mesocycle</span></td><td>At most 2 target motor abilities plus 1 technical focus</td><td><span class="badge badge-sm badge-error">block</span></td></tr>
+          <tr class="bg-error/5"><td><span class="badge badge-sm badge-ghost">Mesocycle</span></td><td>One stable complex of roughly ten exercises, each appearing at least twice per week</td><td><span class="badge badge-sm badge-error">block</span></td></tr>
+          <tr class="bg-error/5"><td><span class="badge badge-sm badge-ghost">Mesocycle</span></td><td>Load varies across microcycles, the exercise complex does not</td><td><span class="badge badge-sm badge-error">block</span></td></tr>
+          <tr class="bg-error/5"><td><span class="badge badge-sm badge-ghost">Microcycle</span></td><td>Plyometrics 2 to 3 days per week, inversely scaled against intensity</td><td><span class="badge badge-sm badge-error">block</span></td></tr>
+          <tr class="bg-error/5"><td><span class="badge badge-sm badge-ghost">Microcycle</span></td><td>No back-to-back sessions repeating the same muscle group or coordination pattern</td><td><span class="badge badge-sm badge-error">block</span></td></tr>
+
+          <tr><td><span class="badge badge-sm badge-ghost">Mesocycle</span></td><td>65 to 85 percent of volume on declared targets, ideal band 70 to 80</td><td><span class="badge badge-sm badge-warning badge-soft">advisory</span></td></tr>
+          <tr><td><span class="badge badge-sm badge-ghost">Microcycle</span></td><td>Lightest day volume near 60 percent of the heaviest day, 5 point slack</td><td><span class="badge badge-sm badge-warning badge-soft">advisory</span></td></tr>
+          <tr><td><span class="badge badge-sm badge-ghost">Microcycle</span></td><td>Strength work at least 3 sessions per week to gain, at least 2 of about 30 minutes to retain</td><td><span class="badge badge-sm badge-warning badge-soft">advisory</span></td></tr>
+          <tr><td><span class="badge badge-sm badge-ghost">Session</span></td><td>Roughly 20 sets maximum</td><td><span class="badge badge-sm badge-warning badge-soft">advisory</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="card card-border bg-base-100"><div class="card-body gap-1 p-4">
+        <h4 class="font-semibold text-sm text-primary">pre-filter</h4>
+        <p class="text-xs opacity-75">The option is deleted from the candidate set before the prompt is
+        built. The model cannot pick it, so the rule cannot be broken and never triggers a repair.</p>
+      </div></div>
+      <div class="card card-border bg-base-100"><div class="card-body gap-1 p-4">
+        <h4 class="font-semibold text-sm text-secondary">normalize</h4>
+        <p class="text-xs opacity-75">There is exactly one correct answer, so code computes it. The
+        model supplies exercise selection and intent; the engine sorts, clamps, and labels. The diff is
+        shown to you.</p>
+      </div></div>
+      <div class="card card-border bg-base-100"><div class="card-body gap-1 p-4">
+        <h4 class="font-semibold text-sm text-error">block</h4>
+        <p class="text-xs opacity-75">Genuine structural judgment that code cannot fix without
+        rewriting the plan. Triggers the repair loop. Four of the five are mesocycle or microcycle scope, so they
+        run at block declaration and weekly generation, not per session.</p>
+      </div></div>
+      <div class="card card-border bg-base-100"><div class="card-body gap-1 p-4">
+        <h4 class="font-semibold text-sm text-warning">advisory</h4>
+        <p class="text-xs opacity-75">Attached to the proposal as a note and to the memory layer as a
+        signal. Never blocks. If the same advisory keeps firing and you keep accepting, that is
+        information about you, not an error.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ============ TRACKING THAT MATCHES THE MODEL ============ -->
+  <section class="space-y-6">
+    <div class="space-y-3">
+      <h2 class="text-3xl font-bold">Progress tracking that does not lie to you</h2>
+      <p class="opacity-80 max-w-3xl">
+        This is a genuinely unusual requirement and worth calling out. The ebook says vertical jump
+        <em>should</em> drop during hard accumulation work, and that backing off at planned times is what
+        produces supercompensation. A plain line chart of vertical over time would therefore encourage
+        exactly the wrong reaction to a normal, healthy training response.
+      </p>
+    </div>
+
+    <figure class="card card-border bg-base-100">
+      <div class="card-body">
+        <h3 class="card-title text-base">Vertical jump, rendered with mesocycle context</h3>
+        <svg class="fig" viewBox="0 0 960 366" role="img" aria-labelledby="chart-title chart-desc">
+          <title id="chart-title">Vertical jump over time with shaded mesocycle bands</title>
+          <desc id="chart-desc">A line chart where training blocks are shaded and labelled by type, so a
+          mid-block dip in jump height reads as the expected response rather than as failure.</desc>
+
+          <!-- block bands -->
+          <g id="bands">
+            <title>Mesocycle bands, shaded and labelled by type</title>
+            <rect x="70" y="30" width="196" height="228" fill="color-mix(in oklch, var(--ink) 5%, transparent)"/>
+            <rect x="266" y="30" width="196" height="228" fill="color-mix(in oklch, var(--ink) 8%, transparent)"/>
+            <rect x="462" y="30" width="196" height="228" fill="color-mix(in oklch, var(--warn) 10%, transparent)"/>
+            <rect x="658" y="30" width="240" height="228" fill="color-mix(in oklch, var(--good) 13%, transparent)"/>
+
+            <text class="t-label" x="86" y="50">Accumulation 1</text>
+            <text class="t-label" x="282" y="50">Accumulation 2</text>
+            <text class="t-label" x="478" y="50">Transmutation</text>
+            <text class="t-label" x="674" y="50">Realization</text>
+
+            <!-- band boundaries, so adjacent same-type blocks stay distinguishable -->
+            <line x1="266" y1="30" x2="266" y2="258" stroke="var(--ink)" stroke-opacity="0.3" stroke-width="1"/>
+            <line x1="462" y1="30" x2="462" y2="258" stroke="var(--ink)" stroke-opacity="0.3" stroke-width="1"/>
+            <line x1="658" y1="30" x2="658" y2="258" stroke="var(--ink)" stroke-opacity="0.3" stroke-width="1"/>
+          </g>
+
+          <!-- axes -->
+          <line x1="70" y1="258" x2="898" y2="258" class="edge"/>
+          <line x1="70" y1="30" x2="70" y2="258" class="edge"/>
+          <text class="t-small" x="24" y="76">36 in</text>
+          <text class="t-small" x="24" y="146">32 in</text>
+          <text class="t-small" x="24" y="216">28 in</text>
+          <line x1="70" y1="70" x2="898" y2="70" class="edge" stroke-opacity="0.14"/>
+          <line x1="70" y1="140" x2="898" y2="140" class="edge" stroke-opacity="0.14"/>
+          <line x1="70" y1="210" x2="898" y2="210" class="edge" stroke-opacity="0.14"/>
+
+          <!-- week markers -->
+          <g id="week-axis">
+            <title>Week markers along the horizontal axis</title>
+            <text class="t-small" x="82" y="276">wk 1</text>
+            <text class="t-small" x="248" y="276">wk 4</text>
+            <text class="t-small" x="448" y="276">wk 8</text>
+            <text class="t-small" x="642" y="276">wk 12</text>
+            <text class="t-small" x="866" y="276">wk 16</text>
+          </g>
+
+          <!-- baseline -->
+          <line x1="70" y1="168" x2="898" y2="168" stroke="var(--ink)" stroke-opacity="0.35" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text class="t-small" x="742" y="162">block-start baseline</text>
+
+          <!-- the jump line -->
+          <path id="jump-line" class="edge-accent" stroke-width="2.75"
+                d="M92,168 L148,176 L204,190 L260,196
+                   L316,186 L372,200 L428,208 L462,198
+                   L518,178 L574,162 L630,150 L658,142
+                   L714,120 L770,104 L826,96 L882,92"/>
+          <g fill="var(--accent)">
+            <circle cx="92" cy="168" r="3.5"/><circle cx="148" cy="176" r="3.5"/>
+            <circle cx="204" cy="190" r="3.5"/><circle cx="260" cy="196" r="3.5"/>
+            <circle cx="316" cy="186" r="3.5"/><circle cx="372" cy="200" r="3.5"/>
+            <circle cx="428" cy="208" r="4.5"/><circle cx="462" cy="198" r="3.5"/>
+            <circle cx="518" cy="178" r="3.5"/><circle cx="574" cy="162" r="3.5"/>
+            <circle cx="630" cy="150" r="3.5"/><circle cx="658" cy="142" r="3.5"/>
+            <circle cx="714" cy="120" r="3.5"/><circle cx="770" cy="104" r="3.5"/>
+            <circle cx="826" cy="96" r="3.5"/><circle cx="882" cy="92" r="5"/>
+          </g>
+
+          <!-- the annotation that does the work -->
+          <g id="dip-annotation">
+            <title>The expected in-block dip, labelled rather than alarming</title>
+            <path class="edge" d="M428,222 L404,288" stroke-opacity="0.6"/>
+            <rect x="286" y="292" width="248" height="48" rx="8" class="box"/>
+            <text class="t-body" x="298" y="312" font-weight="700">Expected in-block dip</text>
+            <text class="t-small" x="298" y="329">deep accumulation, fatigue masking fitness</text>
+          </g>
+
+          <g id="peak-annotation">
+            <title>Supercompensation above the block-start baseline</title>
+            <path class="edge" d="M882,104 L858,132" stroke-opacity="0.6"/>
+            <rect x="700" y="196" width="196" height="46" rx="8" class="box-good"/>
+            <text class="t-body" x="712" y="216" font-weight="700">Supercompensation</text>
+            <text class="t-small" x="712" y="232">+4.2 in over baseline</text>
+          </g>
+        </svg>
+        <figcaption class="text-sm opacity-70 mt-3">
+          Same data, different framing. The dip at week 7 is the deepest point of an accumulation block
+          and is labelled as such. Without the band shading and the annotation, that point looks like
+          three weeks of wasted training.
+        </figcaption>
+      </div>
+    </figure>
+
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-1">
+          <h4 class="font-bold text-sm">Depth jump calibration</h4>
+          <p class="text-xs opacity-75">
+            Implements the ebook protocol directly: test standing vertical, raise box height until
+            measured vertical drops below it, record the matched height as a derived insight the
+            generator then uses.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-1">
+          <h4 class="font-bold text-sm">Pain against contact volume</h4>
+          <p class="text-xs opacity-75">
+            Tendon pain plotted against weekly high-impact ground contacts. This correlation is the
+            main early warning signal you get before something becomes reactive tendinopathy.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-1">
+          <h4 class="font-bold text-sm">Relative strength trend</h4>
+          <p class="text-xs opacity-75">
+            Key lifts divided by bodyweight, not absolute load, because relative strength is what the
+            ebook ties to jumping. Absolute numbers get secondary billing.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-1">
+          <h4 class="font-bold text-sm">Prescription calibration</h4>
+          <p class="text-xs opacity-75">
+            Logged RPE and completion against what was prescribed. If generated plans run consistently
+            too hard or too easy, this is where it shows up.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ============ UI MOCKS ============ -->
+  <section class="space-y-6">
+    <h2 class="text-2xl font-bold">What using it looks like</h2>
+    <p class="opacity-80 max-w-3xl">
+      Two screens carry the concept. The daily session shows the proposal with its reasoning attached,
+      and the logger has to be usable one-handed between sets.
+    </p>
+
+    <div class="grid gap-6 lg:grid-cols-2">
+      <!-- Today screen -->
+      <div class="space-y-3">
+        <h3 class="font-bold">Today, awaiting your approval</h3>
+        <div class="mockup-phone border-base-content/20 mx-auto">
+          <div class="mockup-phone-camera"></div>
+          <div class="mockup-phone-display bg-base-200 text-base-content">
+            <div class="p-4 pt-12 pb-6 space-y-3 text-left">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-[10px] uppercase tracking-wide opacity-60">Week 3 of 4 - Accumulation</div>
+                  <div class="text-lg font-bold">Lower, reactive</div>
+                </div>
+                <span class="badge badge-xs badge-warning badge-soft">proposed</span>
+              </div>
+
+              <div class="alert alert-error alert-soft p-2 text-[10px] gap-1">
+                <span><strong>Left patellar phase 2.</strong> Depth jumps removed, isometrics kept.</span>
+              </div>
+
+              <div class="card card-border card-xs bg-base-100">
+                <div class="card-body gap-1">
+                  <div class="flex justify-between items-baseline">
+                    <span class="font-semibold text-xs">1. Pogo hops</span>
+                    <span class="text-[10px] opacity-60">4 x 10</span>
+                  </div>
+                  <div class="text-[10px] opacity-60">short SSC - 60 s rest</div>
+                </div>
+              </div>
+              <div class="card card-border card-xs bg-base-100">
+                <div class="card-body gap-1">
+                  <div class="flex justify-between items-baseline">
+                    <span class="font-semibold text-xs">2. Trap bar deadlift</span>
+                    <span class="text-[10px] opacity-60">4 x 5 @ 275</span>
+                  </div>
+                  <div class="text-[10px] opacity-60">4 min rest - up 10 lb</div>
+                </div>
+              </div>
+              <div class="card card-border card-xs bg-base-100">
+                <div class="card-body gap-1">
+                  <div class="flex justify-between items-baseline">
+                    <span class="font-semibold text-xs">3. Split squat</span>
+                    <span class="text-[10px] opacity-60">3 x 8 / leg</span>
+                  </div>
+                  <div class="text-[10px] opacity-60">frontal plane emphasis</div>
+                </div>
+              </div>
+              <div class="card card-border card-xs bg-base-100">
+                <div class="card-body gap-1">
+                  <div class="flex justify-between items-baseline">
+                    <span class="font-semibold text-xs">4. Spanish squat iso</span>
+                    <span class="text-[10px] opacity-60">5 x 45 s</span>
+                  </div>
+                  <div class="text-[10px] opacity-60">tendon phase 1 protocol</div>
+                </div>
+              </div>
+
+              <div tabindex="0" class="collapse collapse-arrow bg-base-100 border border-base-content/10">
+                <div class="collapse-title text-[11px] font-semibold py-2 min-h-0">Why this session</div>
+                <div class="collapse-content text-[10px] opacity-75">
+                  <p>Sleep 5.2 h and left patellar pain up to 4 of 10, so reactive volume is cut and depth
+                  jumps are blocked outright. Trap bar progresses because last session hit all reps at RPE 7.
+                  Split squat stays in the complex per the stable-complex rule.</p>
+                </div>
+              </div>
+
+              <div class="flex gap-2 pt-1">
+                <button class="btn btn-primary btn-xs flex-1">Accept</button>
+                <button class="btn btn-ghost btn-xs">Edit</button>
+                <button class="btn btn-ghost btn-xs">Reject</button>
+              </div>
+              <p class="text-[9px] opacity-50 text-center">Cleared the gate - 2 advisories</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Logger screen -->
+      <div class="space-y-3">
+        <h3 class="font-bold">Logging, between sets</h3>
+        <div class="mockup-phone border-base-content/20 mx-auto">
+          <div class="mockup-phone-camera"></div>
+          <div class="mockup-phone-display bg-base-200 text-base-content">
+            <div class="p-4 pt-12 pb-6 space-y-3 text-left">
+              <div class="flex items-center justify-between">
+                <div class="text-lg font-bold">Trap bar deadlift</div>
+                <span class="badge badge-xs badge-ghost">set 3 / 4</span>
+              </div>
+              <div class="text-[10px] opacity-60">Target 5 reps at 275 lb</div>
+
+              <div class="grid grid-cols-2 gap-2">
+                <div class="card card-border bg-base-100 card-xs">
+                  <div class="card-body items-center gap-0 py-3">
+                    <div class="text-[9px] uppercase opacity-60">weight</div>
+                    <div class="text-2xl font-bold">275</div>
+                  </div>
+                </div>
+                <div class="card card-border bg-base-100 card-xs">
+                  <div class="card-body items-center gap-0 py-3">
+                    <div class="text-[9px] uppercase opacity-60">reps</div>
+                    <div class="text-2xl font-bold">5</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="space-y-1">
+                <div class="text-[10px] uppercase opacity-60">RPE</div>
+                <div class="flex gap-1">
+                  <button class="btn btn-xs btn-ghost flex-1">6</button>
+                  <button class="btn btn-xs btn-ghost flex-1">7</button>
+                  <button class="btn btn-xs btn-primary flex-1">8</button>
+                  <button class="btn btn-xs btn-ghost flex-1">9</button>
+                  <button class="btn btn-xs btn-ghost flex-1">10</button>
+                </div>
+              </div>
+
+              <button class="btn btn-primary btn-block btn-sm">Log set</button>
+
+              <div class="rounded-box bg-base-100 border border-base-content/10 p-2 space-y-1">
+                <div class="text-[10px] uppercase opacity-60">Completed</div>
+                <div class="flex justify-between text-[11px]"><span>Set 1</span><span class="opacity-70">275 x 5 - RPE 7</span></div>
+                <div class="flex justify-between text-[11px]"><span>Set 2</span><span class="opacity-70">275 x 5 - RPE 7.5</span></div>
+              </div>
+
+              <div class="flex items-center gap-2 text-[10px] opacity-60">
+                <span class="status status-warning status-xs"></span>
+                <span>2 sets queued offline, will sync</span>
+              </div>
+
+              <div class="rounded-box bg-base-100 border border-base-content/10 p-2">
+                <div class="text-[10px] uppercase opacity-60 mb-1">Rest</div>
+                <div class="flex items-center gap-2">
+                  <progress class="progress progress-primary flex-1" value="62" max="100"></progress>
+                  <span class="text-[11px] font-mono">1:32</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ============ DATA MODEL ============ -->
+  <section class="space-y-6">
+    <h2 class="text-2xl font-bold">Data model</h2>
+    <p class="opacity-80 max-w-3xl">
+      The exercise directory is the part worth dwelling on. It encodes the ebook's own taxonomy rather
+      than generic gym metadata, because those attributes are precisely what the generator needs in
+      order to reason instead of pattern-match on exercise names.
+    </p>
+
+    <figure class="card card-border bg-base-100">
+      <div class="card-body">
+        <h3 class="card-title text-base">The periodization hierarchy</h3>
+        <svg class="fig" viewBox="0 0 960 240" role="img" aria-labelledby="hier-title hier-desc">
+          <title id="hier-title">Periodization structural units, macrocycle down to sets</title>
+          <desc id="hier-desc">Nested containers from macrocycle through mesocycle, microcycle,
+          session, and blocks, down to prescribed and logged sets.</desc>
+
+          <rect class="box" x="10" y="20" width="940" height="200" rx="12"/>
+          <text class="t-label" x="24" y="42">Macrocycle</text>
+          <text class="t-small" x="120" y="42">one season</text>
+
+          <rect class="box" x="26" y="54" width="908" height="152" rx="10"/>
+          <text class="t-label" x="40" y="76">Mesocycle</text>
+          <text class="t-small" x="130" y="76">2-6 weeks - accumulation, transmutation, or realization - 1-2 targets + 1 technical focus</text>
+
+          <rect class="box-accent" x="42" y="88" width="876" height="104" rx="9"/>
+          <text class="t-label" x="56" y="110">Microcycle</text>
+          <text class="t-small" x="150" y="110">one week - load varies, exercise complex does not</text>
+
+          <g>
+            <rect class="box" x="58" y="122" width="200" height="56" rx="8"/>
+            <text class="t-body" x="70" y="144" font-weight="700">Session</text>
+            <text class="t-small" x="70" y="162">blocks, prescribed sets</text>
+          </g>
+          <g>
+            <rect class="box" x="270" y="122" width="200" height="56" rx="8"/>
+            <text class="t-body" x="282" y="144" font-weight="700">Session</text>
+            <text class="t-small" x="282" y="162">logged sets, RPE, notes</text>
+          </g>
+          <g>
+            <rect class="box" x="482" y="122" width="200" height="56" rx="8"/>
+            <text class="t-body" x="494" y="144" font-weight="700">Session</text>
+            <text class="t-small" x="494" y="162">rest day or light day</text>
+          </g>
+          <g>
+            <rect class="box" x="694" y="122" width="208" height="56" rx="8"/>
+            <text class="t-body" x="706" y="144" font-weight="700">Exercise complex</text>
+            <text class="t-small" x="706" y="162">~10 exercises, stable</text>
+          </g>
+        </svg>
+        <figcaption class="text-sm opacity-70 mt-3">
+          The nesting is not decorative. Two validator rules operate on the microcycle as a whole
+          (rule of 60 percent, no back-to-back pattern repeats) and three operate on the mesocycle,
+          so the schema has to make those aggregates cheap to compute.
+        </figcaption>
+      </div>
+    </figure>
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-base">Exercise directory</h3>
+          <p class="text-sm opacity-80">
+            Per exercise: muscle group, movement pattern, position on the force velocity curve,
+            equipment, unilateral or bilateral, plane of motion, coupling time class for plyos,
+            tendon load rating, coaching cues, progression and regression links, and a technical
+            complexity score used for session ordering.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-base">Athlete state</h3>
+          <p class="text-sm opacity-80">
+            Profile including dominant takeoff leg, jumper type, and arm swing style, since the ebook
+            says not to switch a trained jumper's strategy. Plus measurement time series, per-site
+            tendon status with protocol phase, and readiness check-ins.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-base">Proposals and verdicts</h3>
+          <p class="text-sm opacity-80">
+            Every generated plan is stored with its rationale, the exact inputs it saw, the validator
+            report, and your verdict with a reason. This is both the audit trail and the primary
+            signal the memory layer learns from.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-base">Memory and insights</h3>
+          <p class="text-sm opacity-80">
+            Typed facts with embeddings, a source distinguishing what you said from what was inferred,
+            confidence, and a supersedes pointer so corrections replace rather than pile up. Separately,
+            derived insights computed by analytics rather than asserted by a model.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert alert-info alert-soft">
+      <div class="text-sm">
+        <strong>Tendon tracking caveat, straight from the source:</strong> structure does not equal pain.
+        Some athletes have severely degenerated tendons and no pain, others the reverse. So the schema
+        tracks function and pain only, and no screen ever implies structural damage.
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ============ MEMORY ============ -->
+  <section class="space-y-4">
+    <h2 class="text-2xl font-bold">How it gets smarter</h2>
+    <p class="opacity-80 max-w-3xl">
+      "AI-forward" only means something if knowledge accumulates. Three separate mechanisms, and they
+      are worth keeping distinct because they have different failure modes.
+    </p>
+    <div class="grid gap-4 md:grid-cols-3">
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-2">
+          <div class="badge badge-sm badge-primary badge-soft">1</div>
+          <h3 class="card-title text-base">Stated preferences</h3>
+          <p class="text-sm opacity-80">
+            Things you tell it directly. Highest confidence, never overwritten by inference. Retrieved
+            into the cached context prefix on every generation.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-2">
+          <div class="badge badge-sm badge-primary badge-soft">2</div>
+          <h3 class="card-title text-base">Inferred patterns</h3>
+          <p class="text-sm opacity-80">
+            A reflection job reads each logged session against what was prescribed, plus your notes, and
+            proposes memory writes. Low-risk facts auto-commit. Anything that would change future
+            programming asks first.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-2">
+          <div class="badge badge-sm badge-primary badge-soft">3</div>
+          <h3 class="card-title text-base">Computed insights</h3>
+          <p class="text-sm opacity-80">
+            Analytics, not model output. Your calibrated depth jump height. The weekly contact count
+            above which patellar pain rises. Your actual rate of strength progression per block type.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ============ WHOOP ============ -->
+  <section class="space-y-5">
+    <div class="space-y-3">
+      <span class="badge badge-primary badge-soft">Data source</span>
+      <h2 class="text-3xl font-bold">WHOOP is the objective input layer</h2>
+      <p class="opacity-80 max-w-4xl">
+        This replaces the Apple Health route, and it is a straight upgrade. WHOOP exposes a real
+        server-to-server API with OAuth and webhooks, so there is no third-party export app in the path and
+        no phone that has to be awake for data to arrive. It also gives higher-quality inputs than
+        HealthKit would have: recovery score, HRV as rmssd, resting heart rate, sleep stage composition,
+        and day strain, all already normalised against your own baseline by WHOOP.
+      </p>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-3">
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-base">Connection</h3>
+          <p class="text-sm opacity-80">
+            OAuth 2.0 authorization code flow against
+            <code class="text-xs">api.prod.whoop.com/oauth/oauth2/auth</code> and
+            <code class="text-xs">/token</code>, with scopes
+            <code class="text-xs">read:recovery</code>, <code class="text-xs">read:cycles</code>,
+            <code class="text-xs">read:sleep</code>, <code class="text-xs">read:workout</code>,
+            <code class="text-xs">read:body_measurement</code>, and
+            <code class="text-xs">offline</code>. Access tokens last an hour, and
+            <strong>refreshing rotates the refresh token and invalidates the old access token</strong>, so
+            the pair is stored in one row and replaced in one transaction. Since the app is single-user,
+            this connects once and then lives as a server-side background job.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-base">Ingest</h3>
+          <p class="text-sm opacity-80">
+            Webhooks at <code class="text-xs">/api/whoop/webhook</code> for
+            <code class="text-xs">sleep.updated</code>, <code class="text-xs">recovery.updated</code>, and
+            <code class="text-xs">workout.updated</code> plus their deletes, verified as
+            <code class="text-xs">base64(HMAC-SHA256(timestamp + rawBody, clientSecret))</code> against
+            the <code class="text-xs">X-WHOOP-Signature</code> header with a timestamp freshness window.
+            The payload carries only an id and type, so each event triggers a fetch of that record from
+            the v2 API. Day strain and body measurements have no webhook, so a nightly job pages the cycle
+            collection. Collections cap at 25 records per page with <code class="text-xs">nextToken</code>,
+            so backfill is paginated and rate-limit aware.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-base">What it does and does not cover</h3>
+          <p class="text-sm opacity-80">
+            Covered: recovery score, <code class="text-xs">hrv_rmssd_milli</code>,
+            <code class="text-xs">resting_heart_rate</code>, SpO2, skin temperature, sleep stage summary
+            and performance percentage, day strain and kilojoules, and per-workout strain and heart-rate
+            zones. Not covered: vertical jump, tendon pain, RPE, and load lifted, which stay manual, and
+            daily bodyweight, since WHOOP treats weight as a profile field rather than a measurement
+            series. Every row lands in <code class="text-xs">measurements</code> with
+            <code class="text-xs">source = "whoop"</code>, so a manual entry and a device reading are never
+            confused, and raw payloads are kept so a schema change is replayable rather than lossy.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert alert-info alert-soft">
+      <div class="text-sm">
+        <strong>Why this matters for generation:</strong> readiness stops being a questionnaire you have to
+        remember to fill in. WHOOP recovery, sleep, and strain are already there each morning, so the
+        pre-session risk score and the load decision have real objective input from day one rather than
+        after eight weeks of diligent self-reporting. The check-in shrinks to what only you know: soreness,
+        motivation, and tendon pain.
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ============ ML / STATISTICAL INSIGHTS ============ -->
+  <section class="space-y-6">
+    <div class="space-y-3">
+      <span class="badge badge-secondary badge-soft">Pick what you want</span>
+      <h2 class="text-3xl font-bold">Statistical and ML insights we could compute</h2>
+      <p class="opacity-80 max-w-4xl">
+        A full menu, so you can choose rather than have it chosen for you. Everything below is
+        computable from data this app already plans to collect, now including the continuous WHOOP stream.
+        Annotate any row you want in, or any row you want dropped, and it becomes part of the plan.
+      </p>
+      <p class="opacity-80 max-w-4xl">
+        One honest framing first: this is n equals one, with autocorrelated time series and heavy
+        confounding. That rules out deep learning entirely, and it rules out most of what people mean by
+        "ML" here. What it does <em>not</em> rule out is a lot of genuinely useful statistics, provided
+        every number ships with its own uncertainty. The methods that fit are rolling and robust
+        regression, cross-correlation for lags, changepoint detection, state-space filtering, survival
+        analysis, and Bayesian estimates that start from population priors and shrink toward your own
+        data as it accumulates. That last one is what makes week 2 usable instead of useless.
+      </p>
+    </div>
+
+    <div class="stats stats-vertical sm:stats-horizontal w-full shadow bg-base-100">
+      <div class="stat">
+        <div class="stat-title">Candidate insights</div>
+        <div class="stat-value">58</div>
+        <div class="stat-desc">across eight areas</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Tier 1, live in weeks</div>
+        <div class="stat-value text-primary">18</div>
+        <div class="stat-desc">little or no history needed</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Tier 2, one to four months</div>
+        <div class="stat-value text-secondary">25</div>
+        <div class="stat-desc">needs a block or two</div>
+      </div>
+      <div class="stat">
+        <div class="stat-title">Tier 3, six months plus</div>
+        <div class="stat-value opacity-60">15</div>
+        <div class="stat-desc">the long-horizon payoff</div>
+      </div>
+    </div>
+
+    <div class="alert alert-info alert-soft">
+      <div class="text-sm">
+        <strong>Reading the tiers:</strong> tier 1 needs almost no history, so it works from the first
+        few weeks. Tier 2 needs a block or two of consistent logging. Tier 3 needs multiple blocks and is
+        where the app stops being a tracker and starts knowing things about you that you do not know.
+      </div>
+    </div>
+
+    <div class="space-y-2">
+      <h3 class="text-lg font-semibold">Readiness, fatigue, and load</h3>
+      <p class="text-sm opacity-70 max-w-4xl">This group answers whether you are ready today and whether the last three weeks have been sustainable. Everything here is cheap to compute and unusually high-value, because it gates what the generator is allowed to propose.</p>
+      <div class="overflow-x-auto rounded-box border border-base-content/10 bg-base-100">
+        <table class="table table-sm">
+          <thead>
+            <tr><th class="w-10"></th><th>Insight</th><th class="w-1/4">Method</th><th class="w-40">Needs</th><th class="w-20">Tier</th></tr>
+          </thead>
+          <tbody>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">1</td>
+            <td class="align-top"><div class="font-semibold">Personal readiness index</div><div class="text-xs opacity-70">One number from WHOOP recovery, HRV, resting heart rate, and sleep, plus soreness, motivation, and last session RPE.</div></td>
+            <td class="align-top text-xs opacity-80">Z-score each input against your own rolling 30-day baseline, then fit the weights by ridge regression against next-session performance. Most inputs arrive from WHOOP automatically, so the check-in only asks what it cannot read.</td>
+            <td class="align-top text-xs opacity-70">~8 weeks of WHOOP + check-ins</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">2</td>
+            <td class="align-top"><div class="font-semibold">Which readiness inputs actually predict your performance</div><div class="text-xs opacity-70">Most readiness questionnaires ask for things that turn out to be noise for a given person.</div></td>
+            <td class="align-top text-xs opacity-80">Per-input correlation with same-day jump and lift performance; inputs that do not clear the threshold get dropped from the index and from the check-in.</td>
+            <td class="align-top text-xs opacity-70">~8 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">3</td>
+            <td class="align-top"><div class="font-semibold">Per-capacity fatigue decay curves</div><div class="text-xs opacity-70">The ebook says each biomotor capacity has its own curve. This measures yours.</div></td>
+            <td class="align-top text-xs opacity-80">Fit an exponential recovery curve to performance-versus-days-since for each session type: max strength, reactive, upper body.</td>
+            <td class="align-top text-xs opacity-70">~12 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">4</td>
+            <td class="align-top"><div class="font-semibold">Recovery time constant per muscle group</div><div class="text-xs opacity-70">Days back to baseline after a session hitting that group, which is what should actually set session spacing.</div></td>
+            <td class="align-top text-xs opacity-80">Same exponential fit, grouped by muscle group instead of session type.</td>
+            <td class="align-top text-xs opacity-70">~12 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">5</td>
+            <td class="align-top"><div class="font-semibold">Acute to chronic workload ratio</div><div class="text-xs opacity-70">The standard overuse early-warning ratio, computed separately per load type instead of as one blended number.</div></td>
+            <td class="align-top text-xs opacity-80">7-day load over 28-day exponentially weighted load, run separately for high-impact contacts, plyometric volume, and tonnage.</td>
+            <td class="align-top text-xs opacity-70">4 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">6</td>
+            <td class="align-top"><div class="font-semibold">Training monotony and strain</div><div class="text-xs opacity-70">Same weekly load spread evenly across days is harder on you than the same load waved. Foster's classic pair of metrics.</div></td>
+            <td class="align-top text-xs opacity-80">Monotony is weekly mean daily load over its standard deviation; strain is load times monotony.</td>
+            <td class="align-top text-xs opacity-70">3 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">7</td>
+            <td class="align-top"><div class="font-semibold">Sleep debt effect, and at what lag</div><div class="text-xs opacity-70">Whether last night matters, or the night before that.</div></td>
+            <td class="align-top text-xs opacity-80">Cross-correlate sleep against performance at lags of 0 to 3 days and report which lag is strongest.</td>
+            <td class="align-top text-xs opacity-70">~8 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">8</td>
+            <td class="align-top"><div class="font-semibold">Resting heart rate or HRV trend break</div><div class="text-xs opacity-70">Catches illness and overreaching a few days before it is subjectively obvious.</div></td>
+            <td class="align-top text-xs opacity-80">CUSUM or Bayesian changepoint detection on the rolling series rather than a fixed threshold.</td>
+            <td class="align-top text-xs opacity-70">6 weeks of WHOOP data</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+
+    <div class="space-y-2">
+      <h3 class="text-lg font-semibold">WHOOP-derived</h3>
+      <p class="text-sm opacity-70 max-w-4xl">Only possible because the WHOOP API is in the path. These are the insights that need continuous physiological data rather than anything you could reasonably log by hand.</p>
+      <div class="overflow-x-auto rounded-box border border-base-content/10 bg-base-100">
+        <table class="table table-sm">
+          <thead>
+            <tr><th class="w-10"></th><th>Insight</th><th class="w-1/4">Method</th><th class="w-40">Needs</th><th class="w-20">Tier</th></tr>
+          </thead>
+          <tbody>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">9</td>
+            <td class="align-top"><div class="font-semibold">WHOOP recovery score versus your own performance</div><div class="text-xs opacity-70">Whether WHOOP's 0-100 score predicts your jump and lift quality, or whether a custom index from its raw inputs beats it.</div></td>
+            <td class="align-top text-xs opacity-80">Correlate recovery score, and separately a ridge-fit index over hrv_rmssd, resting heart rate, and sleep performance, against next-session performance. Keep whichever wins.</td>
+            <td class="align-top text-xs opacity-70">~8 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">10</td>
+            <td class="align-top"><div class="font-semibold">Day strain as an external load cross-check</div><div class="text-xs opacity-70">Catches days where life load rather than training explains a bad session.</div></td>
+            <td class="align-top text-xs opacity-80">WHOOP day strain and kilojoules against your own logged session volume, with the residual flagged as non-training load.</td>
+            <td class="align-top text-xs opacity-70">4 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">11</td>
+            <td class="align-top"><div class="font-semibold">Sleep architecture versus reactive performance</div><div class="text-xs opacity-70">More specific than total sleep time, and reactive work is where it should show up first.</div></td>
+            <td class="align-top text-xs opacity-80">Slow wave and REM minutes from the stage summary against next-day plyometric session quality and jump height.</td>
+            <td class="align-top text-xs opacity-70">~8 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">12</td>
+            <td class="align-top"><div class="font-semibold">Sleep debt against WHOOP sleep need</div><div class="text-xs opacity-70">WHOOP already computes need, so debt is the accumulated shortfall rather than a guess.</div></td>
+            <td class="align-top text-xs opacity-80">Rolling sum of need minus achieved, tracked as a running deficit against performance - a different signal from the single-night lag effect in row 7.</td>
+            <td class="align-top text-xs opacity-70">6 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">13</td>
+            <td class="align-top"><div class="font-semibold">HRV and resting heart rate baseline drift across a macrocycle</div><div class="text-xs opacity-70">The long-horizon overreaching and aerobic-base signal, distinct from the day-to-day trend break.</div></td>
+            <td class="align-top text-xs opacity-80">Long-run trend of hrv_rmssd and resting_heart_rate with changepoint detection, annotated against block boundaries.</td>
+            <td class="align-top text-xs opacity-70">6 months</td>
+            <td class="align-top"><span class="badge badge-xs badge-ghost">tier 3</span></td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="space-y-2">
+      <h3 class="text-lg font-semibold">Jump performance</h3>
+      <p class="text-sm opacity-70 max-w-4xl">The hard part of jump tracking is separating signal from both measurement noise and the deliberate in-block suppression the training model expects. These are the insights that make a jump chart trustworthy.</p>
+      <div class="overflow-x-auto rounded-box border border-base-content/10 bg-base-100">
+        <table class="table table-sm">
+          <thead>
+            <tr><th class="w-10"></th><th>Insight</th><th class="w-1/4">Method</th><th class="w-40">Needs</th><th class="w-20">Tier</th></tr>
+          </thead>
+          <tbody>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">14</td>
+            <td class="align-top"><div class="font-semibold">Block-adjusted jump trend</div><div class="text-xs opacity-70">Progress net of the suppression a hard block is supposed to cause. The honest version of 'am I improving'.</div></td>
+            <td class="align-top text-xs opacity-80">Regression with mesocycle type as a fixed effect, reporting the trend with block effects partialled out.</td>
+            <td class="align-top text-xs opacity-70">2 blocks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">15</td>
+            <td class="align-top"><div class="font-semibold">Your supercompensation magnitude and timing</div><div class="text-xs opacity-70">How much you rebound above the block-start baseline, and how many days after the block ends the peak lands.</div></td>
+            <td class="align-top text-xs opacity-80">Peak detection relative to block boundaries, averaged across blocks. Directly sets your personal taper length.</td>
+            <td class="align-top text-xs opacity-70">3+ blocks</td>
+            <td class="align-top"><span class="badge badge-xs badge-ghost">tier 3</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">16</td>
+            <td class="align-top"><div class="font-semibold">Your normal in-block dip depth</div><div class="text-xs opacity-70">The alarm signal is not a dip, it is a dip deeper than your own distribution of dips.</div></td>
+            <td class="align-top text-xs opacity-80">Percent drawdown from block-start baseline by block type, held as a distribution rather than a single number.</td>
+            <td class="align-top text-xs opacity-70">2+ blocks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">17</td>
+            <td class="align-top"><div class="font-semibold">Measurement noise floor</div><div class="text-xs opacity-70">How much your jump varies within a single session, with nothing having changed.</div></td>
+            <td class="align-top text-xs opacity-80">Within-session standard deviation across attempts, pooled over sessions.</td>
+            <td class="align-top text-xs opacity-70">10 sessions</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">18</td>
+            <td class="align-top"><div class="font-semibold">Minimal detectable change</div><div class="text-xs opacity-70">The size a change has to reach before it means anything. Rendered as a band on the chart so you stop reacting to noise.</div></td>
+            <td class="align-top text-xs opacity-80">Noise floor times 1.96 times the square root of 2.</td>
+            <td class="align-top text-xs opacity-70">10 sessions</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">19</td>
+            <td class="align-top"><div class="font-semibold">Best attempt versus mean attempt drift</div><div class="text-xs opacity-70">If your best improves but your average does not, that is a consistency or technique problem, not a capacity problem.</div></td>
+            <td class="align-top text-xs opacity-80">Track both series and their gap over time.</td>
+            <td class="align-top text-xs opacity-70">6 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">20</td>
+            <td class="align-top"><div class="font-semibold">Attempt-number effect</div><div class="text-xs opacity-70">Which attempt in a session is usually your best, which sets how many warm-up jumps a test should include.</div></td>
+            <td class="align-top text-xs opacity-80">Mean jump height by attempt index, per session type.</td>
+            <td class="align-top text-xs opacity-70">15 sessions</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">21</td>
+            <td class="align-top"><div class="font-semibold">Left versus right asymmetry index</div><div class="text-xs opacity-70">Asymmetry trend is a tendon-risk covariate, and one-foot jumping is where the 14x bodyweight loading happens.</div></td>
+            <td class="align-top text-xs opacity-80">(left minus right) over max, times 100, tracked as a series with its own noise floor.</td>
+            <td class="align-top text-xs opacity-70">Per-leg logging</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">22</td>
+            <td class="align-top"><div class="font-semibold">One-foot versus two-foot divergence</div><div class="text-xs opacity-70">The two respond to different training. When they separate, the block emphasis explains it.</div></td>
+            <td class="align-top text-xs opacity-80">Ratio series with block annotations.</td>
+            <td class="align-top text-xs opacity-70">2 blocks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">23</td>
+            <td class="align-top"><div class="font-semibold">Time of day and days-since-rest effects</div><div class="text-xs opacity-70">Both shift jump height enough to corrupt a trend if you test at random times.</div></td>
+            <td class="align-top text-xs opacity-80">Fixed effects in the same jump model; used to standardise when testing happens.</td>
+            <td class="align-top text-xs opacity-70">~10 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">24</td>
+            <td class="align-top"><div class="font-semibold">Bodyweight elasticity of your jump</div><div class="text-xs opacity-70">Whether cutting actually raises your jump, or just lowers your strength. The relative-strength question, measured.</div></td>
+            <td class="align-top text-xs opacity-80">Regress jump on bodyweight controlling for block type and training load.</td>
+            <td class="align-top text-xs opacity-70">2 blocks with weight change</td>
+            <td class="align-top"><span class="badge badge-xs badge-ghost">tier 3</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">25</td>
+            <td class="align-top"><div class="font-semibold">Rhythm and approach self-rating versus outcome</div><div class="text-xs opacity-70">Cheap proxy for the ebook's claim that stride frequency is the single biggest determinant.</div></td>
+            <td class="align-top text-xs opacity-80">Ordinal rating logged per jump session, correlated against height.</td>
+            <td class="align-top text-xs opacity-70">Requires logging it</td>
+            <td class="align-top"><span class="badge badge-xs badge-ghost">tier 3</span></td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+
+    <div class="space-y-2">
+      <h3 class="text-lg font-semibold">Strength and its transfer to jumping</h3>
+      <p class="text-sm opacity-70 max-w-4xl">The ebook claims max strength transfers to power but not the reverse, and that relative strength is what matters. Both claims are testable on your own data, and rows 24 and 25 are the ones that would actually change your programming.</p>
+      <div class="overflow-x-auto rounded-box border border-base-content/10 bg-base-100">
+        <table class="table table-sm">
+          <thead>
+            <tr><th class="w-10"></th><th>Insight</th><th class="w-1/4">Method</th><th class="w-40">Needs</th><th class="w-20">Tier</th></tr>
+          </thead>
+          <tbody>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">26</td>
+            <td class="align-top"><div class="font-semibold">Estimated 1RM trajectory per lift</div><div class="text-xs opacity-70">Continuous strength tracking without testing maxes.</div></td>
+            <td class="align-top text-xs opacity-80">Epley and Brzycki estimates from logged reps at load, robust-fit over time with per-lift error bands.</td>
+            <td class="align-top text-xs opacity-70">4 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">27</td>
+            <td class="align-top"><div class="font-semibold">Relative strength trend</div><div class="text-xs opacity-70">The ebook's actual predictor of jumping. Absolute load is secondary.</div></td>
+            <td class="align-top text-xs opacity-80">Estimated 1RM divided by trend bodyweight, per lift.</td>
+            <td class="align-top text-xs opacity-70">4 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">28</td>
+            <td class="align-top"><div class="font-semibold">Load to RPE profile per lift</div><div class="text-xs opacity-70">Detects true capacity drift between test days, since RPE at a fixed percentage moves before your max does.</div></td>
+            <td class="align-top text-xs opacity-80">Regress RPE on percent of estimated 1RM and watch the intercept shift.</td>
+            <td class="align-top text-xs opacity-70">6 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">29</td>
+            <td class="align-top"><div class="font-semibold">Which lifts actually correlate with your jump</div><div class="text-xs opacity-70">Probably the single most decision-relevant thing on this page. It tells you what to keep and what to drop.</div></td>
+            <td class="align-top text-xs opacity-80">Lagged cross-correlation of each lift's relative strength series against the jump series, with multiple-comparison correction.</td>
+            <td class="align-top text-xs opacity-70">~16 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">30</td>
+            <td class="align-top"><div class="font-semibold">Transfer lag per lift</div><div class="text-xs opacity-70">How many weeks after a strength gain your jump responds, which is what makes taper timing plannable.</div></td>
+            <td class="align-top text-xs opacity-80">The lag at which each correlation above peaks.</td>
+            <td class="align-top text-xs opacity-70">6+ months</td>
+            <td class="align-top"><span class="badge badge-xs badge-ghost">tier 3</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">31</td>
+            <td class="align-top"><div class="font-semibold">Your strength residual decay rate</div><div class="text-xs opacity-70">Gives you a personal retaining dose instead of the ebook's general 'two sessions per week'.</div></td>
+            <td class="align-top text-xs opacity-80">Fit decay of estimated 1RM across periods of reduced frequency, per lift.</td>
+            <td class="align-top text-xs opacity-70">Needs a deload or a break</td>
+            <td class="align-top"><span class="badge badge-xs badge-ghost">tier 3</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">32</td>
+            <td class="align-top"><div class="font-semibold">Hypertrophy versus neural gain split</div><div class="text-xs opacity-70">Whether a strength gain came with mass, which matters because relative strength is the target.</div></td>
+            <td class="align-top text-xs opacity-80">Compare estimated 1RM change against lean bodyweight change over the same window.</td>
+            <td class="align-top text-xs opacity-70">2 blocks</td>
+            <td class="align-top"><span class="badge badge-xs badge-ghost">tier 3</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">33</td>
+            <td class="align-top"><div class="font-semibold">Rep-quality decay within sets</div><div class="text-xs opacity-70">Sets your own proximity-to-failure cap rather than using a generic one.</div></td>
+            <td class="align-top text-xs opacity-80">Per-rep RPE or velocity, if logged, fit as a decay curve by exercise.</td>
+            <td class="align-top text-xs opacity-70">Requires per-rep logging</td>
+            <td class="align-top"><span class="badge badge-xs badge-ghost">tier 3</span></td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+
+    <div class="space-y-2">
+      <h3 class="text-lg font-semibold">Plyometrics and tendon risk</h3>
+      <p class="text-sm opacity-70 max-w-4xl">The highest-stakes group. One-foot jumping loads a leg at up to fourteen times bodyweight, so the difference between a general guideline and your own measured ceiling is the difference between training through a season and losing months of it.</p>
+      <div class="overflow-x-auto rounded-box border border-base-content/10 bg-base-100">
+        <table class="table table-sm">
+          <thead>
+            <tr><th class="w-10"></th><th>Insight</th><th class="w-1/4">Method</th><th class="w-40">Needs</th><th class="w-20">Tier</th></tr>
+          </thead>
+          <tbody>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">34</td>
+            <td class="align-top"><div class="font-semibold">Depth jump height calibration curve</div><div class="text-xs opacity-70">More precise than the ebook's stepwise protocol, and it updates itself as you get better.</div></td>
+            <td class="align-top text-xs opacity-80">Fit a quadratic of jump height against box height and take the vertex, rather than stepping up until performance drops.</td>
+            <td class="align-top text-xs opacity-70">One calibration session, refit quarterly</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">35</td>
+            <td class="align-top"><div class="font-semibold">Your personal tendon load ceiling</div><div class="text-xs opacity-70">A number in ground contacts per week, specific to you, with a confidence interval.</div></td>
+            <td class="align-top text-xs opacity-80">Logistic regression of next-day patellar pain against weekly high-impact contacts, plyometric intensity, and coupling-time class.</td>
+            <td class="align-top text-xs opacity-70">~12 weeks with pain logging</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">36</td>
+            <td class="align-top"><div class="font-semibold">Pain-to-load lag structure</div><div class="text-xs opacity-70">So the warning fires on the day you overdid it, not three days later when it hurts.</div></td>
+            <td class="align-top text-xs opacity-80">Cross-correlate pain against contact volume at lags of 0 to 4 days.</td>
+            <td class="align-top text-xs opacity-70">~12 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">37</td>
+            <td class="align-top"><div class="font-semibold">Which exercise classes drive your pain</div><div class="text-xs opacity-70">Not all high-impact work is equal for a given athlete. Depth jumps and bounds may behave completely differently for you.</div></td>
+            <td class="align-top text-xs opacity-80">Per-class regression coefficients with shrinkage, since some classes will have few observations.</td>
+            <td class="align-top text-xs opacity-70">~16 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">38</td>
+            <td class="align-top"><div class="font-semibold">Tendon protocol progression readiness</div><div class="text-xs opacity-70">Turns 'when do I move to phase 3' into a measured decision.</div></td>
+            <td class="align-top text-xs opacity-80">Rule plus model: pain stable or falling while load rises for N consecutive sessions.</td>
+            <td class="align-top text-xs opacity-70">During a flare</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">39</td>
+            <td class="align-top"><div class="font-semibold">Time to symptom-free from past flare-ups</div><div class="text-xs opacity-70">Gives a flare an evidence-based expected timeline instead of an anxious one.</div></td>
+            <td class="align-top text-xs opacity-80">Survival curve fit over your own flare history.</td>
+            <td class="align-top text-xs opacity-70">2+ flares</td>
+            <td class="align-top"><span class="badge badge-xs badge-ghost">tier 3</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">40</td>
+            <td class="align-top"><div class="font-semibold">Pre-session risk score</div><div class="text-xs opacity-70">One number the generator sees before proposing, and you see before accepting.</div></td>
+            <td class="align-top text-xs opacity-80">Combines workload ratio, readiness index, current pain state, and the proposed session's contact count.</td>
+            <td class="align-top text-xs opacity-70">Depends on 5, 1, 30</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+
+    <div class="space-y-2">
+      <h3 class="text-lg font-semibold">Programming quality and adherence</h3>
+      <p class="text-sm opacity-70 max-w-4xl">These measure the app itself, not you. If generated plans are systematically too hard, or you keep making the same edit, that is a fixable defect rather than a personal failing.</p>
+      <div class="overflow-x-auto rounded-box border border-base-content/10 bg-base-100">
+        <table class="table table-sm">
+          <thead>
+            <tr><th class="w-10"></th><th>Insight</th><th class="w-1/4">Method</th><th class="w-40">Needs</th><th class="w-20">Tier</th></tr>
+          </thead>
+          <tbody>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">41</td>
+            <td class="align-top"><div class="font-semibold">Prescription calibration</div><div class="text-xs opacity-70">Whether the generator's load model is systematically too hard or too easy, per exercise.</div></td>
+            <td class="align-top text-xs opacity-80">Actual RPE minus target RPE, decomposed by exercise and by week position in the block; the residual becomes a per-exercise correction factor.</td>
+            <td class="align-top text-xs opacity-70">6 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">42</td>
+            <td class="align-top"><div class="font-semibold">Completion rate by session shape</div><div class="text-xs opacity-70">Which designs you actually finish. Length, set count, time of day, day of week.</div></td>
+            <td class="align-top text-xs opacity-80">Logistic regression of completion against session attributes.</td>
+            <td class="align-top text-xs opacity-70">8 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">43</td>
+            <td class="align-top"><div class="font-semibold">Exercise-level preference score</div><div class="text-xs opacity-70">Turns your accept, edit, and reject behaviour into a soft ranking the generator uses when choosing between equivalent options.</div></td>
+            <td class="align-top text-xs opacity-80">Bayesian rating per exercise from verdicts, completion, and RPE, shrunk toward the class mean.</td>
+            <td class="align-top text-xs opacity-70">8 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">44</td>
+            <td class="align-top"><div class="font-semibold">Edit-pattern mining</div><div class="text-xs opacity-70">What you consistently change about proposals, for example always cutting the fourth accessory or always swapping one movement.</div></td>
+            <td class="align-top text-xs opacity-80">Frequent-itemset mining over the edit log; each stable pattern is proposed as a memory fact.</td>
+            <td class="align-top text-xs opacity-70">30+ edits</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">45</td>
+            <td class="align-top"><div class="font-semibold">Dose-response per exercise</div><div class="text-xs opacity-70">The empirical answer to 'does this exercise work for me'.</div></td>
+            <td class="align-top text-xs opacity-80">Change in the target capacity per unit of volume of that exercise, estimated per block with shrinkage.</td>
+            <td class="align-top text-xs opacity-70">3+ blocks</td>
+            <td class="align-top"><span class="badge badge-xs badge-ghost">tier 3</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">46</td>
+            <td class="align-top"><div class="font-semibold">Optimal weekly frequency per capacity</div><div class="text-xs opacity-70">Your own version of the ebook's 2 to 3 days per week guidance.</div></td>
+            <td class="align-top text-xs opacity-80">Performance change regressed on sessions per week, fit separately per capacity.</td>
+            <td class="align-top text-xs opacity-70">4+ blocks</td>
+            <td class="align-top"><span class="badge badge-xs badge-ghost">tier 3</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">47</td>
+            <td class="align-top"><div class="font-semibold">Block-type effectiveness</div><div class="text-xs opacity-70">Which mesocycle types have actually produced gains for you, after accounting for their expected dip.</div></td>
+            <td class="align-top text-xs opacity-80">Net change per block, adjusted for block type and duration, so future macrocycles weight what works.</td>
+            <td class="align-top text-xs opacity-70">4+ blocks</td>
+            <td class="align-top"><span class="badge badge-xs badge-ghost">tier 3</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">48</td>
+            <td class="align-top"><div class="font-semibold">Schedule reality model</div><div class="text-xs opacity-70">The planner should schedule around what you actually do, not what you intend.</div></td>
+            <td class="align-top text-xs opacity-80">Predicted probability of training by weekday and time slot from your own history.</td>
+            <td class="align-top text-xs opacity-70">8 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+
+    <div class="space-y-2">
+      <h3 class="text-lg font-semibold">Nutrition</h3>
+      <p class="text-sm opacity-70 max-w-4xl">Bodyweight is the noisiest thing you will log daily and the most consequential for relative strength, so filtering it properly is worth more here than any macro-tracking feature.</p>
+      <div class="overflow-x-auto rounded-box border border-base-content/10 bg-base-100">
+        <table class="table table-sm">
+          <thead>
+            <tr><th class="w-10"></th><th>Insight</th><th class="w-1/4">Method</th><th class="w-40">Needs</th><th class="w-20">Tier</th></tr>
+          </thead>
+          <tbody>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">49</td>
+            <td class="align-top"><div class="font-semibold">Bodyweight trend with the noise removed</div><div class="text-xs opacity-70">The daily number is mostly water. The trend is the signal.</div></td>
+            <td class="align-top text-xs opacity-80">Kalman filter or LOESS over daily weights, with the filtered trend used everywhere in the app instead of raw weight.</td>
+            <td class="align-top text-xs opacity-70">2 weeks of daily weights</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">50</td>
+            <td class="align-top"><div class="font-semibold">True maintenance calories</div><div class="text-xs opacity-70">Far more accurate than any predictive equation, because it uses your data.</div></td>
+            <td class="align-top text-xs opacity-80">Rolling regression of trend weight change against logged intake, refit weekly.</td>
+            <td class="align-top text-xs opacity-70">3 weeks of intake logging</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">51</td>
+            <td class="align-top"><div class="font-semibold">Safe rate of change for you</div><div class="text-xs opacity-70">How fast you can cut before jump and relative strength start paying for it.</div></td>
+            <td class="align-top text-xs opacity-80">Weekly percent bodyweight change regressed against jump and relative strength, with a lag.</td>
+            <td class="align-top text-xs opacity-70">One cut or bulk phase</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">52</td>
+            <td class="align-top"><div class="font-semibold">Protein intake versus recovery</div><div class="text-xs opacity-70">Whether your protein is actually a limiter or already sufficient.</div></td>
+            <td class="align-top text-xs opacity-80">Soreness and next-session performance regressed on protein per kilogram, lagged one day.</td>
+            <td class="align-top text-xs opacity-70">8 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-ghost">tier 3</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">53</td>
+            <td class="align-top"><div class="font-semibold">Carbohydrate intake versus reactive session quality</div><div class="text-xs opacity-70">The nutrition variable most likely to show a same-day effect on plyometric work.</div></td>
+            <td class="align-top text-xs opacity-80">Same-day and previous-day carbohydrate intake against session RPE and jump height on reactive days.</td>
+            <td class="align-top text-xs opacity-70">8 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-ghost">tier 3</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">54</td>
+            <td class="align-top"><div class="font-semibold">Under-reporting correction</div><div class="text-xs opacity-70">Everyone under-logs. This estimates your personal factor instead of pretending otherwise.</div></td>
+            <td class="align-top text-xs opacity-80">Gap between logged intake and the intake implied by the weight trend and maintenance estimate.</td>
+            <td class="align-top text-xs opacity-70">6 weeks</td>
+            <td class="align-top"><span class="badge badge-xs badge-secondary badge-soft">tier 2</span></td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+
+    <div class="space-y-2">
+      <h3 class="text-lg font-semibold">Model quality and honesty</h3>
+      <p class="text-sm opacity-70 max-w-4xl">The part most self-quantification tools skip. With fifty-eight candidate relationships and a single subject, some will look real purely by chance, and an app that asserts those confidently is worse than one that says nothing.</p>
+      <div class="overflow-x-auto rounded-box border border-base-content/10 bg-base-100">
+        <table class="table table-sm">
+          <thead>
+            <tr><th class="w-10"></th><th>Insight</th><th class="w-1/4">Method</th><th class="w-40">Needs</th><th class="w-20">Tier</th></tr>
+          </thead>
+          <tbody>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">55</td>
+            <td class="align-top"><div class="font-semibold">Confidence scoring on every insight</div><div class="text-xs opacity-70">Nothing gets asserted from three data points. Insights stay hidden until they earn their place.</div></td>
+            <td class="align-top text-xs opacity-80">Each insight carries n, effect size, and a confidence interval, and is gated behind a threshold before it can enter the prompt context or the UI.</td>
+            <td class="align-top text-xs opacity-70">From day one</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">56</td>
+            <td class="align-top"><div class="font-semibold">Multiple-comparison discipline</div><div class="text-xs opacity-70">With fifty-eight candidate insights, several will look real by chance. This is the guard against the app confidently telling you something false.</div></td>
+            <td class="align-top text-xs opacity-80">Benjamini-Hochberg correction across the insight suite, plus validation on held-out later weeks before an insight is promoted.</td>
+            <td class="align-top text-xs opacity-70">From day one</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">57</td>
+            <td class="align-top"><div class="font-semibold">Insight drift monitoring</div><div class="text-xs opacity-70">When a previously stable relationship changes, that is itself the most interesting finding in the app.</div></td>
+            <td class="align-top text-xs opacity-80">Periodic refit with alerting on coefficient change beyond the confidence interval.</td>
+            <td class="align-top text-xs opacity-70">6 months</td>
+            <td class="align-top"><span class="badge badge-xs badge-ghost">tier 3</span></td>
+          </tr>
+          <tr>
+            <td class="opacity-40 text-xs align-top tabular-nums whitespace-nowrap">58</td>
+            <td class="align-top"><div class="font-semibold">Generation quality tracking</div><div class="text-xs opacity-70">Whether the AI half of the app is getting better or worse over time.</div></td>
+            <td class="align-top text-xs opacity-80">First-attempt gate pass rate, repair-attempt distribution, acceptance rate, and edit magnitude, tracked as series.</td>
+            <td class="align-top text-xs opacity-70">From phase 5</td>
+            <td class="align-top"><span class="badge badge-xs badge-primary">tier 1</span></td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-base">How an insight reaches you</h3>
+          <p class="text-sm opacity-80">
+            Each one is computed in <code class="text-xs">lib/analytics/</code> as a pure function over
+            logged data, never by the model, and written to <code class="text-xs">derived_insights</code>
+            with its statement, its number, its n, and its confidence interval. Only insights past
+            threshold enter the cached prompt prefix, so the generator reasons from your measured
+            patterns rather than from generic guidance. The same rows render on the progress screen with
+            their uncertainty visible.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-base">If you want a starting set</h3>
+          <p class="text-sm opacity-80">
+            My recommendation would be all eighteen tier 1 rows, since they are cheap and mostly
+            prerequisites for the rest, plus five tier 2 rows chosen for decision value: your tendon load
+            ceiling (35), the pain lag (36), which lifts correlate with your jump (29), prescription
+            calibration (41), and the WHOOP recovery index (9). That set answers "how much jumping can I
+            take", "what strength work is worth doing", "how ready am I today", and "is this app
+            calibrated to me" - which is most of the value.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ============ PHASES ============ -->
+  <section class="space-y-5">
+    <h2 class="text-2xl font-bold">Build order</h2>
+    <ul class="steps steps-vertical w-full">
+      <li class="step step-primary" data-content="1">
+        <div class="text-left py-2">
+          <div class="font-bold">Foundation</div>
+          <div class="text-sm opacity-70">Next.js and TypeScript scaffold, Drizzle schema and migrations, Neon connection, passcode auth with a signed cookie, PWA manifest and service worker, Vercel deploy.</div>
+        </div>
+      </li>
+      <li class="step step-primary" data-content="2">
+        <div class="text-left py-2">
+          <div class="font-bold">Exercise directory</div>
+          <div class="text-sm opacity-70">Schema plus seed data covering jump, plyometric, lower body, and upper body work with full attribute tagging, and a browse and edit UI.</div>
+        </div>
+      </li>
+      <li class="step step-primary" data-content="3">
+        <div class="text-left py-2">
+          <div class="font-bold">Logging and tracking</div>
+          <div class="text-sm opacity-70">Mobile-first set logger with an offline queue, manual jump entry, tendon and readiness check-ins, the WHOOP OAuth connection plus webhook receiver and nightly backfill, and the annotated progress charts.</div>
+        </div>
+      </li>
+      <li class="step step-primary" data-content="4">
+        <div class="text-left py-2">
+          <div class="font-bold">Rule engine <span class="badge badge-xs badge-warning badge-soft ml-1">before generation</span></div>
+          <div class="text-sm opacity-70">All 18 rules as pure functions with unit tests each, split into pre-filter, normalizer, gate, and advisory, plus a fixture library of deliberately invalid plans. No model code involved.</div>
+        </div>
+      </li>
+      <li class="step step-primary" data-content="5">
+        <div class="text-left py-2">
+          <div class="font-bold">Generation</div>
+          <div class="text-sm opacity-70">Cached context assembly, mesocycle planner, daily session generator, the repair loop, and the proposal review UI showing rationale, inputs, and validator report.</div>
+        </div>
+      </li>
+      <li class="step step-primary" data-content="6">
+        <div class="text-left py-2">
+          <div class="font-bold">Nutrition</div>
+          <div class="text-sm opacity-70">Food parsing, the food cache, the log UI, phase-aware targets, and bodyweight trend against target rate of change.</div>
+        </div>
+      </li>
+      <li class="step step-primary" data-content="7">
+        <div class="text-left py-2">
+          <div class="font-bold">Memory</div>
+          <div class="text-sm opacity-70">Fact store with embeddings, retrieval into context assembly, the reflection job, and the derived-insight analytics.</div>
+        </div>
+      </li>
+      <li class="step" data-content="8">
+        <div class="text-left py-2">
+          <div class="font-bold">Polish</div>
+          <div class="text-sm opacity-70">Offline behaviour, gym-usable touch targets and contrast, data export.</div>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ============ NUTRITION DETAIL ============ -->
+  <section class="space-y-4">
+    <h2 class="text-2xl font-bold">Nutrition, tied to the training phase</h2>
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-base">Logging</h3>
+          <p class="text-sm opacity-80">
+            You type what you ate in plain words. The parser checks the <code class="text-xs">foods</code>
+            cache first, so a repeated meal resolves to identical macros rather than being re-estimated
+            slightly differently each time. Only genuinely new items hit the model.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-base">Targets</h3>
+          <p class="text-sm opacity-80">
+            Phase-aware. A surplus during accumulation. A cut permitted only when tendon sites are
+            healthy and the current block is not a realization phase, because the ebook ties jumping to
+            <em>relative</em> strength, which makes bodyweight a programming variable rather than a
+            vanity metric.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ============ VERIFICATION ============ -->
+  <section class="space-y-4">
+    <h2 class="text-2xl font-bold">How each phase gets verified</h2>
+    <p class="opacity-80 max-w-3xl">
+      Tested end to end in the shape you will actually experience, not just at the unit level.
+    </p>
+    <div class="overflow-x-auto rounded-box border border-base-content/10 bg-base-100">
+      <table class="table table-sm">
+        <thead><tr><th class="w-40">Area</th><th>Check</th></tr></thead>
+        <tbody>
+          <tr><td class="font-semibold">Rule engine</td><td class="text-sm">Unit tests per rule including the invalid-plan fixtures, asserting each violation is caught with a specific message rather than a generic failure.</td></tr>
+          <tr><td class="font-semibold">Generation</td><td class="text-sm">Seed a realistic history, request a mesocycle, assert the validator passes. Inject a tendon pain spike and assert plyometrics loading that site disappear. Inject an over-targeted request and assert the repair loop converges or fails visibly.</td></tr>
+          <tr><td class="font-semibold">Caching</td><td class="text-sm">Log cache read tokens across repeated generations and assert nonzero, which catches a silent prefix invalidator such as a timestamp in the system prompt.</td></tr>
+          <tr><td class="font-semibold">Nutrition</td><td class="text-sm">Log the same meal twice in plain language, assert identical macros served from cache the second time.</td></tr>
+          <tr><td class="font-semibold">The app itself</td><td class="text-sm">Drive the real UI with Playwright on a mobile viewport: unlock, view today, log sets, submit a check-in, read the chart. Confirm band shading renders and the dip is labelled.</td></tr>
+          <tr><td class="font-semibold">WHOOP ingest</td><td class="text-sm">Run the OAuth flow end to end against a real account, then post a signed <code class="text-xs">sleep.updated</code> webhook and assert the record is fetched and stored. Assert an unsigned or stale-timestamp payload is rejected. Force a 401 and assert the refresh-and-retry path stores the rotated refresh token.</td></tr>
+          <tr><td class="font-semibold">Hygiene</td><td class="text-sm">Lint and <code class="text-xs">tsc --noEmit</code> clean at every phase boundary, not deferred to the end.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ============ RISKS ============ -->
+  <section class="space-y-4">
+    <h2 class="text-2xl font-bold">Risks worth naming</h2>
+    <div class="grid gap-4 md:grid-cols-3">
+      <div class="card card-border border-warning/40 bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-sm">WHOOP token and coverage gaps</h3>
+          <p class="text-sm opacity-80">
+            Refreshing rotates the refresh token and invalidates the old access token, so the stored pair
+            must be replaced atomically or the connection silently dies. Webhooks exist for sleep,
+            recovery, and workouts only, so day strain and body measurements need a nightly poll. And
+            WHOOP weight is a profile field, not a scale reading, so daily bodyweight stays manual.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border border-warning/40 bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-sm">Cold start on personalization</h3>
+          <p class="text-sm opacity-80">
+            The memory layer has nothing to work with for the first several weeks. Early plans will be
+            generic ebook-compliant programming. That is acceptable, but it should be stated in the UI so
+            it does not read as the app being dumb.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border border-warning/40 bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-sm">Rule conflicts are possible</h3>
+          <p class="text-sm opacity-80">
+            The rule of 60 percent, the volume distribution target, and the tendon hard block can jointly
+            become unsatisfiable. The repair loop must therefore be allowed to fail loudly rather than
+            spin, and the validator report has to name which rules conflicted.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RESOLVED QUESTIONS ============ -->
+  <section class="space-y-4">
+    <div class="space-y-2">
+      <span class="badge badge-success badge-soft">Answered</span>
+      <h2 class="text-2xl font-bold">The last three questions, now decided</h2>
+      <p class="opacity-80 max-w-3xl text-sm">
+        Nothing is left open. Each answer has a design consequence, spelled out below so the build does not
+        quietly reinterpret it later.
+      </p>
+    </div>
+    <div class="space-y-3">
+      <div class="card card-border border-success/30 bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-base">
+            Planning horizon: roll forward weekly
+            <span class="badge badge-sm badge-ghost">phase 5</span>
+          </h3>
+          <p class="text-sm opacity-80">
+            The mesocycle is still <em>declared</em> up front, because the block-scope rules need it: its
+            type, its 1 to 2 target abilities, its technical focus, and its stable exercise complex are
+            fixed when the block opens. What is generated weekly is the microcycle inside that
+            declaration: which sessions land on which days, and at what load.
+          </p>
+          <p class="text-sm opacity-80">
+            That split is what makes weekly rolling safe rather than sloppy. Because the complex is
+            already fixed, weekly generation cannot drift into a different program; it can only rearrange
+            and re-load within the block. Two implementation consequences: the load-variation rule
+            compares each new week against the weeks already generated in the block rather than seeing the
+            whole block at once, and the rule of 60 percent is evaluated within the week being generated,
+            which it already was. Regenerating a week after your schedule moves is a first-class action,
+            not a workaround, and each regeneration is stored as its own proposal so the audit trail stays
+            intact.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border border-success/30 bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-base">
+            Exercise directory: broad stock seed, editable
+            <span class="badge badge-sm badge-ghost">phase 2</span>
+          </h3>
+          <p class="text-sm opacity-80">
+            Ships with a broad, fully attribute-tagged directory covering jump and plyometric work, lower
+            body, and upper body, so the generator has real range from day one. Every exercise carries an
+            availability flag, and the pre-filter removes anything unavailable before the prompt is built,
+            so a stock entry you cannot do is simply invisible rather than something to reject later.
+          </p>
+          <p class="text-sm opacity-80">
+            You can add, edit, disable, and re-tag entries from <code class="text-xs">/library</code>,
+            including your own variants and coaching cues. The directory stays a closed set from the
+            model's point of view: it selects from what exists and never invents an exercise. If it wants
+            something absent, it files a suggested addition you can accept into the directory, which keeps
+            the taxonomy clean while still letting the library grow from use.
+          </p>
+        </div>
+      </div>
+      <div class="card card-border border-success/30 bg-base-100">
+        <div class="card-body gap-2">
+          <h3 class="card-title text-base">
+            Memory: auto-commit frequently, with a short exception list
+            <span class="badge badge-sm badge-ghost">phase 7</span>
+          </h3>
+          <p class="text-sm opacity-80">
+            Reflection commits inferred facts automatically after each logged session. Every fact stores
+            its source as inferred, its confidence, and the observations behind it, and a new fact
+            supersedes the old one rather than piling up, so the store stays a current picture instead of
+            an archive. Anything you have stated directly outranks anything inferred and is never
+            overwritten by it.
+          </p>
+          <p class="text-sm opacity-80">
+            What makes aggressive auto-commit safe is reversibility rather than caution: a memory feed
+            shows what was learned and when, every fact is one tap to correct or delete, and a correction
+            immediately supersedes the inference. Two categories still require your confirmation, because
+            a wrong inference there is expensive rather than merely annoying: anything that changes tendon
+            behaviour, such as raising a contact ceiling or advancing a protocol phase, and anything that
+            would retire an exercise or a movement class entirely. Everything else lands on its own.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="pt-6 pb-10 text-sm opacity-60 space-y-1">
+    <p>
+      Design source: no existing design system in the project, so this artifact uses the Lavish default
+      of Tailwind v4 with DaisyUI v5 on the luxury theme.
+    </p>
+    <p>
+      Domain claims are sourced from the condensed reference in <code class="text-xs">AGENTS.md</code>,
+      itself distilled from the THP Jump Training ebook. Those prescriptions are general population
+      guidance from one coaching methodology, not individualized medical advice.
+    </p>
+  </footer>
+
+</main>
+</body>
+</html>
