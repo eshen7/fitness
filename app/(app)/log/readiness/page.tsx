@@ -1,9 +1,10 @@
 import { PageHeader } from "@/components/page-header";
-import { Card } from "@/components/ui";
+import { Card, Tag } from "@/components/ui";
 import { readinessForDay } from "@/lib/log/queries";
 import type { MuscleGroup } from "@/lib/taxonomy";
 import { formatDay, today } from "@/lib/time";
 import { ReadinessForm, type ReadinessPrefill } from "./readiness-form";
+import { WhoopCard } from "./whoop-card";
 
 export const metadata = { title: "Readiness" };
 
@@ -30,9 +31,16 @@ function Stat({
   );
 }
 
-export default async function ReadinessPage() {
+export default async function ReadinessPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ whoop?: string; reason?: string }>;
+}) {
   const day = today();
-  const row = await readinessForDay(day);
+  const [row, { whoop, reason }] = await Promise.all([
+    readinessForDay(day),
+    searchParams,
+  ]);
 
   const prefill: ReadinessPrefill = {
     soreness: (row?.sorenessByRegion ?? {}) as Partial<Record<MuscleGroup, number>>,
@@ -50,7 +58,12 @@ export default async function ReadinessPage() {
 
       {row?.whoopFilled ? (
         <Card className="mb-4">
-          <h2 className="text-sm font-semibold text-ink">From WHOOP</h2>
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="text-sm font-semibold text-ink">From WHOOP</h2>
+            {row.dayStrain === null ? null : (
+              <Tag tone="cool">strain {Number(row.dayStrain).toFixed(1)}</Tag>
+            )}
+          </div>
           <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <Stat label="Recovery" value={row.recoveryScore} unit="%" />
             <Stat
@@ -68,8 +81,27 @@ export default async function ReadinessPage() {
               }
             />
           </div>
+          {/*
+            The split matters more than the total for reactive work, and it is the
+            input to the slow-wave and REM insight, so it is shown rather than
+            being folded into one number.
+          */}
+          {row.slowWaveMinutes === null && row.remMinutes === null ? null : (
+            <p className="mt-3 text-xs text-ink-faint">
+              {row.slowWaveMinutes === null
+                ? ""
+                : `${row.slowWaveMinutes} min slow wave`}
+              {row.slowWaveMinutes !== null && row.remMinutes !== null ? " · " : ""}
+              {row.remMinutes === null ? "" : `${row.remMinutes} min REM`}
+              {row.sleepPerformancePct === null
+                ? ""
+                : ` · ${row.sleepPerformancePct}% of need`}
+            </p>
+          )}
         </Card>
       ) : null}
+
+      <WhoopCard status={whoop} reason={reason} />
 
       <ReadinessForm prefill={prefill} />
     </>

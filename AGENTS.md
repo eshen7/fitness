@@ -35,6 +35,7 @@ app/(auth)/unlock/   passcode gate
 app/(app)/           today, log, progress, nutrition, plan, library
 app/api/             health, and later generation, nutrition parsing, WHOOP
 lib/db/schema/       one file per domain area
+lib/whoop/           OAuth, signed webhook, ingest, and projection into readiness
 lib/engine/          prefilter, normalize, gate, advisories (pure TS, no LLM)
 lib/ai/              Claude clients, prompts, schemas, cached context
 lib/analytics/       trend math and derived insights (pure functions)
@@ -49,6 +50,12 @@ lib/memory/          preference and insight store
 - **Icons live in `public/icons/`,** not via the `app/icon.*` convention, because the proxy matcher excludes that directory and an icon behind the gate is one the OS cannot fetch.
 - **The generator never invents an exercise.** The directory is a closed set; unavailable entries are filtered out before the prompt is built, and the model files a suggested addition instead.
 - **Tendon safety is enforced by construction, not by validation.** A site in protocol phase 1 or 2 removes every exercise loading it from the candidate set, so the rule cannot be violated rather than merely being checked.
+- **`export const dynamic = "force-dynamic"` in `app/(app)/layout.tsx` covers the whole segment.** Without it every database-backed page prerenders at build time and production serves a snapshot of whatever the database held during the build, which looks like a working app right up to the moment it stops updating.
+- **Numerics cross the driver as strings.** Convert at every boundary: `.toFixed(n)` on the way in, `Number()` on the way out. Selecting a column that does not exist is worse than a type error - drizzle treats the `undefined` field as a nested object and throws `Cannot convert undefined or null to object` from inside `orderSelectedFields`.
+- **The WHOOP signature is over the raw bytes.** Read `request.text()` before parsing; re-serializing parsed JSON changes the bytes and every delivery then fails verification.
+- **A WHOOP refresh rotates both tokens.** The old access token dies with the old refresh token, so the pair is one row written in one statement; a partial write silently kills the connection and the only repair is re-authorizing. `scope=offline` must be sent on the refresh too.
+- **A v2 recovery event names its *sleep*, not its cycle.** Recovery rows are keyed by `sleep_id` and dated from the stored sleep, so a recovery arriving before its sleep is deferred rather than guessed at.
+- **The nightly sync in `vercel.json` runs at 09:20 UTC** (about 05:20 ET): late enough that WHOOP has scored the night, early enough to be there before a morning check-in. JSON cannot hold that comment, which is why it is here.
 
 ## Domain reference: jump training
 
