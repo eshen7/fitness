@@ -236,7 +236,7 @@ describe("depthJumpCalibration", () => {
   const day = "2026-08-17";
 
   it("stops at the first height that drops below the standing jump", () => {
-    const { matched, standingCm } = depthJumpCalibration(
+    const { matched, standingCm, dropped } = depthJumpCalibration(
       [
         { boxHeightCm: 30, jumpCm: 50, day },
         { boxHeightCm: 40, jumpCm: 46, day },
@@ -246,10 +246,11 @@ describe("depthJumpCalibration", () => {
     );
     expect(standingCm).toBe(48);
     expect(matched?.boxHeightCm).toBe(30);
+    expect(dropped).toBe(true);
   });
 
-  it("recommends the highest box when none dropped below", () => {
-    const { matched } = depthJumpCalibration(
+  it("recommends the highest box, and reports no drop, when none dropped below", () => {
+    const { matched, dropped } = depthJumpCalibration(
       [
         { boxHeightCm: 30, jumpCm: 48, day },
         { boxHeightCm: 40, jumpCm: 49, day },
@@ -257,6 +258,7 @@ describe("depthJumpCalibration", () => {
       [{ day, cm: 48 }],
     );
     expect(matched?.boxHeightCm).toBe(40);
+    expect(dropped).toBe(false);
   });
 
   it("reads only the most recent day, against that day's best standing jump", () => {

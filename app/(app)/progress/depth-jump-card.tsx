@@ -34,11 +34,13 @@ export function DepthJumpCard({
   standingCm,
   points,
   matched,
+  dropped,
   unitSystem,
 }: {
   standingCm: number | null;
   points: DepthJumpReading[];
   matched: DepthJumpReading | null;
+  dropped: boolean;
   unitSystem: UnitSystem;
 }) {
   const unit = displayUnit("length", unitSystem);
@@ -200,7 +202,9 @@ export function DepthJumpCard({
             {standingCm === null
               ? "Without a standing vertical tested the same day there is nothing to compare these against, so the protocol cannot name a height yet."
               : matched
-                ? `${show(matched.boxHeightCm)} ${unit} is the last box before the vertical first dropped below the standing jump, so that is the working height.`
+                ? dropped
+                  ? `${show(matched.boxHeightCm)} ${unit} is the last box before the vertical first dropped below the standing jump, so that is the working height.`
+                  : `${show(matched.boxHeightCm)} ${unit}, the highest box tested, still matched the standing jump, so raise the box further at the next calibration.`
                 : `The lowest box tested already produced a lower vertical than the standing jump, which means it is too high. Drop back below ${show(points[0].boxHeightCm)} ${unit}.`}
             {vertex
               ? ` A quadratic through the readings peaks at ${round1(vertex.boxHeightCm)} ${unit}, which is the same question asked smoothly.`

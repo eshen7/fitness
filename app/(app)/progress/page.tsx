@@ -58,6 +58,7 @@ export default async function ProgressPage() {
           standingCm={depthJump.standingCm}
           points={depthJump.points}
           matched={depthJump.matched}
+          dropped={depthJump.dropped}
           unitSystem={unitSystem}
         />
         <AdherenceChart sessions={sessions} />

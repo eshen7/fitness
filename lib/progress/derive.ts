@@ -239,7 +239,9 @@ export type DepthJumpReading = { boxHeightCm: number; jumpCm: number; day: strin
  * box that happens to match again is past the point the landing stopped being
  * absorbed. Null when the day has no standing vertical, when it tried fewer than
  * two heights, since one height is not a progression, or when the lowest box
- * already fell short.
+ * already fell short. `dropped` says whether a tested height fell below the
+ * standing jump; when it did not, the top box still matched and the protocol
+ * says to keep raising it.
  */
 export function depthJumpCalibration(
   drops: DepthJumpReading[],
@@ -256,11 +258,15 @@ export function depthJumpCalibration(
     : null;
 
   let matched: DepthJumpReading | null = null;
+  let dropped = false;
   if (standingCm !== null && points.length >= 2) {
     for (const point of points) {
-      if (point.jumpCm < standingCm) break;
+      if (point.jumpCm < standingCm) {
+        dropped = true;
+        break;
+      }
       matched = point;
     }
   }
-  return { day, standingCm, points, matched };
+  return { day, standingCm, points, matched, dropped };
 }
