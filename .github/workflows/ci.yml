@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A superseded run on the same ref tells us nothing, so let a new push cancel it.
+# `main` pushes are exempt: those runs are the record of what shipped.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  # Keep this job name short and stable: it is the check other automation
+  # requires by name.
+  ci:
+    runs-on: ubuntu-latest
+    env:
+      # `lib/env.ts` validates the whole environment the first time anything reads
+      # it, and `next build` imports every route module while collecting output, so
+      # the required variables must be present even though no connection is opened
+      # (see `getDb()`). These are placeholders, never real credentials. No `$` in
+      # any value: dotenv would expand it away.
+      DATABASE_URL: postgres://ci:ci@localhost:5432/ci
+      PASSCODE_HASH: scrypt:16384:8:1:00000000:00000000
+      SESSION_SECRET: ci-placeholder-session-secret-at-least-32-bytes
+      APP_TIMEZONE: America/New_York
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm run typecheck
+
+      # Tests set their own environment in `vitest.config.mts` and touch no
+      # database, so no Postgres service is needed here.
+      - run: npm test
+
+      - run: npm run build
