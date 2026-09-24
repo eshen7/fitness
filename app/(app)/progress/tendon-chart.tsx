@@ -15,7 +15,7 @@ import {
 import { tendonSiteLabels } from "@/lib/labels";
 import type { TendonWeek } from "@/lib/progress/queries";
 import { linePath, niceExtent, yPct } from "@/lib/progress/scale";
-import { TENDON_SITES } from "@/lib/taxonomy";
+import { TENDON_SITES, type TendonSite } from "@/lib/taxonomy";
 import { shortDay, tickIndexes } from "@/lib/progress/axis";
 
 /**
@@ -30,6 +30,9 @@ import { shortDay, tickIndexes } from "@/lib/progress/axis";
  *
  * The count is reps, not sets, because one contact is one landing.
  */
+const siteColour = (site: TendonSite) =>
+  SERIES[TENDON_SITES.indexOf(site) % SERIES.length];
+
 export function TendonChart({ weeks }: { weeks: TendonWeek[] }) {
   const present = TENDON_SITES.filter((site) =>
     weeks.some((week) => week.painBySite[site] !== undefined),
@@ -56,7 +59,7 @@ export function TendonChart({ weeks }: { weeks: TendonWeek[] }) {
   );
 
   const rowsFor = (week: TendonWeek): SliceRow[] => [
-    ...present.flatMap((site, i) => {
+    ...present.flatMap((site) => {
       const value = week.painBySite[site];
       return value === undefined
         ? []
@@ -64,7 +67,7 @@ export function TendonChart({ weeks }: { weeks: TendonWeek[] }) {
             {
               label: tendonSiteLabels.of(site),
               value: `${value}/10`,
-              color: SERIES[i % SERIES.length],
+              color: siteColour(site),
             },
           ];
     }),
@@ -100,8 +103,8 @@ export function TendonChart({ weeks }: { weeks: TendonWeek[] }) {
             height={112}
           >
             <Lines
-              series={present.map((site, i) => ({
-                color: SERIES[i % SERIES.length],
+              series={present.map((site) => ({
+                color: siteColour(site),
                 path: linePath(
                   weeks.map((week, w) => {
                     const value = week.painBySite[site];
@@ -113,7 +116,7 @@ export function TendonChart({ weeks }: { weeks: TendonWeek[] }) {
               }))}
             />
 
-            {present.map((site, i) =>
+            {present.map((site) =>
               weeks.map((week, w) => {
                 const value = week.painBySite[site];
                 return value === undefined ? null : (
@@ -121,7 +124,7 @@ export function TendonChart({ weeks }: { weeks: TendonWeek[] }) {
                     key={`${site}-${week.week}`}
                     leftPct={centre(w)}
                     topPct={yPct(value, pain)}
-                    color={SERIES[i % SERIES.length]}
+                    color={siteColour(site)}
                     small
                   />
                 );
@@ -192,9 +195,9 @@ export function TendonChart({ weeks }: { weeks: TendonWeek[] }) {
           </Plot>
 
           <Legend
-            items={present.map((site, i) => ({
+            items={present.map((site) => ({
               label: tendonSiteLabels.of(site),
-              color: SERIES[i % SERIES.length],
+              color: siteColour(site),
             }))}
           />
 

@@ -92,13 +92,16 @@ const TESTS: {
   { day: "2026-09-14", twoFoot: 82.5, standing: 70.5, oneFootLeft: 77.0, oneFootRight: 67.5 },
 ];
 
-/** Box height against the vertical it produced, on one calibration day. */
-const DEPTH_JUMP_DAY = "2026-08-10";
+/**
+ * Box height against the vertical it produced, on one calibration day. It is a
+ * test day, because calibration reads each drop against that day's standing jump.
+ */
+const DEPTH_JUMP_DAY = "2026-08-17";
 const DEPTH_JUMP: [number, number][] = [
-  [30, 66.0],
-  [40, 68.5],
+  [30, 68.0],
+  [40, 69.0],
   [50, 69.5],
-  [60, 68.0],
+  [60, 67.5],
   [70, 64.5],
 ];
 

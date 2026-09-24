@@ -4,6 +4,7 @@ import {
   bodyweightOn,
   bodyweightTrend,
   bucketTendonWeeks,
+  depthJumpCalibration,
   deriveBlockBands,
   groupSittings,
   type BlockRow,
@@ -165,6 +166,25 @@ describe("bucketTendonWeeks", () => {
     );
     expect(week.contacts).toBe(19);
   });
+
+  it("drops readings outside the window rather than adding a partial week", () => {
+    const weeks = bucketTendonWeeks(
+      "2026-06-01",
+      "2026-06-08",
+      [
+        { week: "2026-05-25", site: "patellar_left", during: 6, after: 6, stiffness: 6 },
+        { week: "2026-06-15", site: "patellar_left", during: 7, after: 7, stiffness: 7 },
+      ],
+      [
+        { week: "2026-05-25", reps: 12 },
+        { week: "2026-06-08", reps: 5 },
+        { week: "2026-06-15", reps: 9 },
+      ],
+    );
+    expect(weeks.map((w) => w.week)).toEqual(["2026-06-01", "2026-06-08"]);
+    expect(weeks.map((w) => w.worstPain)).toEqual([null, null]);
+    expect(weeks.map((w) => w.contacts)).toEqual([0, 5]);
+  });
 });
 
 describe("bodyweight", () => {
@@ -209,5 +229,60 @@ describe("bestByHeight", () => {
       { boxHeightCm: 30, jumpCm: 66, day: "2026-08-10" },
       { boxHeightCm: 50, jumpCm: 69.5, day: "2026-08-11" },
     ]);
+  });
+});
+
+describe("depthJumpCalibration", () => {
+  const day = "2026-08-17";
+
+  it("stops at the first height that drops below the standing jump", () => {
+    const { matched, standingCm } = depthJumpCalibration(
+      [
+        { boxHeightCm: 30, jumpCm: 50, day },
+        { boxHeightCm: 40, jumpCm: 46, day },
+        { boxHeightCm: 50, jumpCm: 48.5, day },
+      ],
+      [{ day, cm: 48 }],
+    );
+    expect(standingCm).toBe(48);
+    expect(matched?.boxHeightCm).toBe(30);
+  });
+
+  it("recommends the highest box when none dropped below", () => {
+    const { matched } = depthJumpCalibration(
+      [
+        { boxHeightCm: 30, jumpCm: 48, day },
+        { boxHeightCm: 40, jumpCm: 49, day },
+      ],
+      [{ day, cm: 48 }],
+    );
+    expect(matched?.boxHeightCm).toBe(40);
+  });
+
+  it("reads only the most recent day, against that day's best standing jump", () => {
+    const result = depthJumpCalibration(
+      [
+        { boxHeightCm: 60, jumpCm: 70, day: "2026-06-01" },
+        { boxHeightCm: 30, jumpCm: 51, day },
+        { boxHeightCm: 40, jumpCm: 49, day },
+      ],
+      [
+        { day: "2026-06-01", cm: 40 },
+        { day, cm: 48 },
+        { day, cm: 50 },
+        { day: "2026-09-01", cm: 45 },
+      ],
+    );
+    expect(result.day).toBe(day);
+    expect(result.standingCm).toBe(50);
+    expect(result.points.map((p) => p.boxHeightCm)).toEqual([30, 40]);
+    expect(result.matched?.boxHeightCm).toBe(30);
+  });
+
+  it("names no height without a standing jump that day, or when the lowest box fell short", () => {
+    const drops = [{ boxHeightCm: 30, jumpCm: 46, day }];
+    expect(depthJumpCalibration(drops, [{ day: "2026-08-10", cm: 40 }]).matched).toBeNull();
+    expect(depthJumpCalibration(drops, [{ day, cm: 48 }]).matched).toBeNull();
+    expect(depthJumpCalibration([], []).day).toBeNull();
   });
 });

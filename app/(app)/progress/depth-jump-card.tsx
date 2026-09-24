@@ -11,20 +11,19 @@ import {
   type Tick,
 } from "@/components/chart";
 import { Tag } from "@/components/ui";
+import type { DepthJumpReading } from "@/lib/progress/derive";
 import { niceExtent, quadraticVertex, yPct } from "@/lib/progress/scale";
 import type { UnitSystem } from "@/lib/taxonomy";
 import { displayUnit, round1, toDisplay } from "@/lib/units";
 import { shortDay } from "@/lib/progress/axis";
 
-type Reading = { boxHeightCm: number; jumpCm: number; day: string };
-
 /**
  * Depth jump calibration: box height against the vertical it produced.
  *
- * The ebook's protocol as a chart. Start low, raise the box, and the height to
- * train at is where the measured vertical still matches the standing jump; go
- * higher and the landing can no longer be absorbed, so the jump falls and the drill
- * stops being a drill. The standing vertical is therefore drawn as the reference
+ * The ebook's protocol as a chart, for the most recent calibration day. Start low,
+ * raise the box, and the height to train at is the last one where the measured
+ * vertical still matched that day's standing jump; go higher and the landing can
+ * no longer be absorbed, so the jump falls and the drill stops being a drill. The standing vertical is therefore drawn as the reference
  * line, because without it a rising curve says nothing about which height to use.
  *
  * The x axis is box height, not time. This is the one chart here that is not a time
@@ -33,10 +32,12 @@ type Reading = { boxHeightCm: number; jumpCm: number; day: string };
 export function DepthJumpCard({
   standingCm,
   points,
+  matched,
   unitSystem,
 }: {
   standingCm: number | null;
-  points: Reading[];
+  points: DepthJumpReading[];
+  matched: DepthJumpReading | null;
   unitSystem: UnitSystem;
 }) {
   const unit = displayUnit("length", unitSystem);
@@ -60,16 +61,6 @@ export function DepthJumpCard({
   const vertex = quadraticVertex(
     points.map((point) => ({ x: show(point.boxHeightCm), y: show(point.jumpCm) })),
   );
-
-  // The protocol's actual answer: the highest box that still matches the standing
-  // jump. The fitted vertex is the smooth version of the same question and is shown
-  // beside it, but the measured height is what gets trained at.
-  const matched =
-    standingCm === null
-      ? null
-      : points
-          .filter((point) => point.jumpCm >= standingCm)
-          .sort((a, b) => b.boxHeightCm - a.boxHeightCm)[0] ?? null;
 
   const xTicks: Tick[] = xExtent.ticks.map((height) => ({
     pct: ((height - xExtent.extent.min) / Math.max(1e-9, xExtent.extent.max - xExtent.extent.min)) * 100,
@@ -206,10 +197,10 @@ export function DepthJumpCard({
 
           <p className="mt-3 text-xs text-ink-muted">
             {standingCm === null
-              ? "Without a standing vertical there is nothing to compare these against, so the protocol cannot name a height yet."
+              ? "Without a standing vertical tested the same day there is nothing to compare these against, so the protocol cannot name a height yet."
               : matched
-                ? `${show(matched.boxHeightCm)} ${unit} is the highest box that still produced a vertical at or above the standing jump, so that is the working height.`
-                : `Every box tested produced a lower vertical than the standing jump, which means the lowest of them is already too high. Drop back below ${show(points[0].boxHeightCm)} ${unit}.`}
+                ? `${show(matched.boxHeightCm)} ${unit} is the last box before the vertical first dropped below the standing jump, so that is the working height.`
+                : `The lowest box tested already produced a lower vertical than the standing jump, which means it is too high. Drop back below ${show(points[0].boxHeightCm)} ${unit}.`}
             {vertex
               ? ` A quadratic through the readings peaks at ${round1(vertex.boxHeightCm)} ${unit}, which is the same question asked smoothly.`
               : ""}

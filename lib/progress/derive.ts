@@ -132,7 +132,8 @@ export type TendonWeek = {
  *
  * Every week from `fromWeek` to `lastWeek` exists, even an empty one: a gap in the
  * bars is information, it is the week nothing was jumped. Both bounds are
- * Mondays, and each reading's `week` is the Monday of the week it fell in.
+ * Mondays, and each reading's `week` is the Monday of the week it fell in. A
+ * reading outside the bounds is dropped rather than growing a partial week.
  *
  * A reading's pain is the worst of its three questions, because any one of them
  * being high is the signal, and morning stiffness is the earliest of them. A
@@ -151,21 +152,13 @@ export function bucketTendonWeeks(
   contacts: { week: string; reps: number | null }[],
 ): TendonWeek[] {
   const byWeek = new Map<string, TendonWeek>();
-  const bucket = (week: string) => {
-    let row = byWeek.get(week);
-    if (!row) {
-      row = { week, painBySite: {}, worstPain: null, contacts: 0 };
-      byWeek.set(week, row);
-    }
-    return row;
-  };
-
   for (let week = fromWeek; week <= lastWeek; week = addDays(week, 7)) {
-    bucket(week);
+    byWeek.set(week, { week, painBySite: {}, worstPain: null, contacts: 0 });
   }
 
   for (const row of pain) {
-    const week = bucket(row.week);
+    const week = byWeek.get(row.week);
+    if (!week) continue;
     const worst = Math.max(row.during, row.after, row.stiffness);
     const prior = week.painBySite[row.site];
     if (prior === undefined || worst > prior) week.painBySite[row.site] = worst;
@@ -173,7 +166,8 @@ export function bucketTendonWeeks(
   }
 
   for (const row of contacts) {
-    bucket(row.week).contacts += row.reps ?? 1;
+    const week = byWeek.get(row.week);
+    if (week) week.contacts += row.reps ?? 1;
   }
 
   return [...byWeek.values()].sort((a, b) => a.week.localeCompare(b.week));
@@ -219,9 +213,7 @@ export function bodyweightOn(trend: { day: string; kg: number }[], day: string) 
  * The calibration question is what a height makes possible, not what an off
  * attempt at it looked like.
  */
-export function bestByHeight(
-  drops: { boxHeightCm: number; jumpCm: number; day: string }[],
-) {
+export function bestByHeight(drops: DepthJumpReading[]): DepthJumpReading[] {
   const best = new Map<number, { day: string; jumpCm: number }>();
   for (const drop of drops) {
     const prior = best.get(drop.boxHeightCm);
@@ -232,4 +224,42 @@ export function bestByHeight(
   return [...best.entries()]
     .map(([boxHeightCm, reading]) => ({ boxHeightCm, ...reading }))
     .sort((a, b) => a.boxHeightCm - b.boxHeightCm);
+}
+
+export type DepthJumpReading = { boxHeightCm: number; jumpCm: number; day: string };
+
+/**
+ * The most recent depth jump calibration, and the height it says to train at.
+ *
+ * A calibration is one training day: the standing vertical tested then, and the
+ * best jump at each box height tried then. Earlier days are a different athlete,
+ * so they are neither mixed into the curve nor compared against today's standing
+ * jump. The protocol raises the box until the vertical drops below the standing
+ * jump, so the working height is the last one before that first drop; a higher
+ * box that happens to match again is past the point the landing stopped being
+ * absorbed. Null when the day has no standing vertical or the lowest box already
+ * fell short.
+ */
+export function depthJumpCalibration(
+  drops: DepthJumpReading[],
+  standing: { day: string; cm: number }[],
+) {
+  const day = drops.reduce<string | null>(
+    (latest, drop) => (latest === null || drop.day > latest ? drop.day : latest),
+    null,
+  );
+  const points = bestByHeight(drops.filter((drop) => drop.day === day));
+  const sameDay = standing.filter((reading) => reading.day === day);
+  const standingCm = sameDay.length
+    ? Math.max(...sameDay.map((reading) => reading.cm))
+    : null;
+
+  let matched: DepthJumpReading | null = null;
+  if (standingCm !== null) {
+    for (const point of points) {
+      if (point.jumpCm < standingCm) break;
+      matched = point;
+    }
+  }
+  return { day, standingCm, points, matched };
 }

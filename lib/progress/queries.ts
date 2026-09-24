@@ -1,13 +1,13 @@
-import { and, asc, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import type { MesocycleType, TendonSite, TestKind } from "@/lib/taxonomy";
 import { TEST_KINDS } from "@/lib/taxonomy";
 import { dayMinus, dayOf, today } from "@/lib/time";
 import {
-  bestByHeight,
   bodyweightOn,
   bodyweightTrend,
   bucketTendonWeeks,
+  depthJumpCalibration,
   deriveBlockBands,
   groupSittings,
   type BlockBand,
@@ -235,6 +235,7 @@ export type SessionOutcome = {
 export async function sessionOutcomes(days = 90): Promise<SessionOutcome[]> {
   const { sessions, sessionBlocks, prescribedSets, loggedSets } = schema;
   const from = dayMinus(days);
+  const until = today();
 
   const rows = await getDb()
     .select({
@@ -249,7 +250,7 @@ export async function sessionOutcomes(days = 90): Promise<SessionOutcome[]> {
     .from(sessions)
     .leftJoin(sessionBlocks, eq(sessionBlocks.sessionId, sessions.id))
     .leftJoin(prescribedSets, eq(prescribedSets.blockId, sessionBlocks.id))
-    .where(gte(sessions.day, from))
+    .where(and(gte(sessions.day, from), lte(sessions.day, until)))
     .groupBy(sessions.id, sessions.day, sessions.kind, sessions.reportedRpe, sessions.skippedAt)
     .orderBy(asc(sessions.day), asc(sessions.id));
 
@@ -262,7 +263,7 @@ export async function sessionOutcomes(days = 90): Promise<SessionOutcome[]> {
     })
     .from(loggedSets)
     .innerJoin(sessions, eq(sessions.id, loggedSets.sessionId))
-    .where(gte(sessions.day, from))
+    .where(and(gte(sessions.day, from), lte(sessions.day, until)))
     .groupBy(loggedSets.sessionId);
   const loggedBySession = new Map(logged.map((row) => [row.sessionId, Number(row.count)]));
 
@@ -282,8 +283,9 @@ export async function sessionOutcomes(days = 90): Promise<SessionOutcome[]> {
  * The depth jump calibration readings: drop height against jump height.
  *
  * The ebook's protocol is to raise the box until measured vertical falls below the
- * standing jump, and to train at the height where the two match. Both numbers are
- * needed to say anything, so the standing vertical comes back with them.
+ * standing jump, and to train at the last height before it did. Both numbers are
+ * needed to say anything, so the standing verticals come back with the drops and
+ * `depthJumpCalibration` pairs them by day.
  */
 export async function depthJumpReadings(days = 365) {
   const { measurements } = schema;
@@ -295,7 +297,6 @@ export async function depthJumpReadings(days = 365) {
         value: measurements.value,
         boxHeightCm: measurements.boxHeightCm,
         measuredAt: measurements.measuredAt,
-        testGroup: measurements.testGroup,
       })
       .from(measurements)
       .where(
@@ -304,24 +305,24 @@ export async function depthJumpReadings(days = 365) {
           isNotNull(measurements.boxHeightCm),
           gte(measurements.measuredAt, since),
         ),
-      )
-      .orderBy(asc(measurements.boxHeightCm)),
+      ),
     getDb()
       .select({ value: measurements.value, measuredAt: measurements.measuredAt })
       .from(measurements)
-      .where(eq(measurements.kind, "standing_vertical"))
-      .orderBy(desc(measurements.measuredAt))
-      .limit(1),
+      .where(
+        and(
+          eq(measurements.kind, "standing_vertical"),
+          gte(measurements.measuredAt, since),
+        ),
+      ),
   ]);
 
-  return {
-    standingCm: standing[0] ? Number(standing[0].value) : null,
-    points: bestByHeight(
-      drops.map((row) => ({
-        boxHeightCm: Number(row.boxHeightCm),
-        jumpCm: Number(row.value),
-        day: dayOf(row.measuredAt),
-      })),
-    ),
-  };
+  return depthJumpCalibration(
+    drops.map((row) => ({
+      boxHeightCm: Number(row.boxHeightCm),
+      jumpCm: Number(row.value),
+      day: dayOf(row.measuredAt),
+    })),
+    standing.map((row) => ({ day: dayOf(row.measuredAt), cm: Number(row.value) })),
+  );
 }

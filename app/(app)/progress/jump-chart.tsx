@@ -121,7 +121,7 @@ export function JumpChart({
       ...(byDay.get(day) ?? []).map((sitting) => ({
         label: measurementKindLabels.of(sitting.kind),
         value: `${show(sitting.best)} ${unit}`,
-        color: SERIES[present.indexOf(sitting.kind as TestKind)],
+        color: SERIES[KINDS.indexOf(sitting.kind)],
       })),
       // Which band the test fell in, so the ordinal drawn on the band has
       // somewhere to resolve to at a width that has no room for the words.
@@ -172,13 +172,13 @@ export function JumpChart({
               <Band
                 topPct={yPct(last.value + noiseFloor, extent)}
                 bottomPct={yPct(last.value - noiseFloor, extent)}
-                color={SERIES[0]}
+                color={SERIES[KINDS.indexOf(primaryKind)]}
               />
             ) : null}
 
             <Lines
-              series={present.map((kind, i) => ({
-                color: SERIES[i],
+              series={present.map((kind) => ({
+                color: SERIES[KINDS.indexOf(kind)],
                 path: linePath(
                   relevant
                     .filter((sitting) => sitting.kind === kind)
@@ -190,7 +190,7 @@ export function JumpChart({
               }))}
             />
 
-            {present.map((kind, i) =>
+            {present.map((kind) =>
               relevant
                 .filter((sitting) => sitting.kind === kind)
                 .map((sitting) => (
@@ -198,7 +198,7 @@ export function JumpChart({
                     key={`${kind}-${sitting.testGroup}`}
                     leftPct={xPct(sitting.day, days)}
                     topPct={yPct(show(sitting.best), extent)}
-                    color={SERIES[i]}
+                    color={SERIES[KINDS.indexOf(kind)]}
                   />
                 )),
             )}
@@ -246,9 +246,9 @@ export function JumpChart({
           </Plot>
 
           <Legend
-            items={present.map((kind, i) => ({
+            items={present.map((kind) => ({
               label: measurementKindLabels.of(kind),
-              color: SERIES[i],
+              color: SERIES[KINDS.indexOf(kind)],
             }))}
           />
 
