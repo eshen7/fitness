@@ -23,8 +23,9 @@ import { shortDay } from "@/lib/progress/axis";
  * The ebook's protocol as a chart, for the most recent calibration day. Start low,
  * raise the box, and the height to train at is the last one where the measured
  * vertical still matched that day's standing jump; go higher and the landing can
- * no longer be absorbed, so the jump falls and the drill stops being a drill. The standing vertical is therefore drawn as the reference
- * line, because without it a rising curve says nothing about which height to use.
+ * no longer be absorbed, so the jump falls and the drill stops being a drill. The
+ * standing vertical is therefore drawn as the reference line, because without it a
+ * rising curve says nothing about which height to use.
  *
  * The x axis is box height, not time. This is the one chart here that is not a time
  * series, which is why it does not share the others' axis helpers.

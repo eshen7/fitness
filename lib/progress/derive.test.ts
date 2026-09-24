@@ -280,9 +280,21 @@ describe("depthJumpCalibration", () => {
   });
 
   it("names no height without a standing jump that day, or when the lowest box fell short", () => {
-    const drops = [{ boxHeightCm: 30, jumpCm: 46, day }];
+    const drops = [
+      { boxHeightCm: 30, jumpCm: 46, day },
+      { boxHeightCm: 40, jumpCm: 49, day },
+    ];
     expect(depthJumpCalibration(drops, [{ day: "2026-08-10", cm: 40 }]).matched).toBeNull();
     expect(depthJumpCalibration(drops, [{ day, cm: 48 }]).matched).toBeNull();
     expect(depthJumpCalibration([], []).day).toBeNull();
+  });
+
+  it("names no height from a single box, which is not a progression", () => {
+    const { matched, points } = depthJumpCalibration(
+      [{ boxHeightCm: 30, jumpCm: 50, day }],
+      [{ day, cm: 48 }],
+    );
+    expect(points).toHaveLength(1);
+    expect(matched).toBeNull();
   });
 });
