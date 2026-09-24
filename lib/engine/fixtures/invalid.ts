@@ -297,6 +297,28 @@ export const INVALID_PLANS: readonly InvalidPlan[] = [
     ],
   },
   {
+    name: "a strength block whose complex holds no plyometric",
+    stage: "declaration",
+    rule: "plyo-frequency",
+    input: {
+      declaration: declare({
+        complex: [
+          ...DECLARATION.complex.filter(
+            (entry) => ![APPROACH, DEPTH_JUMP, BOUND].includes(entry.exerciseId),
+          ),
+          { exerciseId: idOf("front-squat"), isMain: false },
+          { exerciseId: idOf("romanian-deadlift"), isMain: false },
+          { exerciseId: idOf("hip-thrust"), isMain: false },
+        ],
+      }),
+      directory: DIRECTORY,
+      prefiltered: EVERYTHING,
+    },
+    messages: [
+      "The complex holds no plyometric. Plyometrics need 2 to 3 days a week, and a week may not bring in exercises from outside the complex, so add at least one.",
+    ],
+  },
+  {
     name: "bench press trained on Monday only",
     stage: "week",
     rule: "stable-complex",

@@ -250,6 +250,24 @@ describe("plyo-frequency", () => {
       "Plyometrics on 3 days (Mon 21 Sept, Fri 25 Sept and Sat 26 Sept) in a week with a plyometric session at intensity 8 (Sat 26 Sept). At that intensity the ceiling is 2 days a week, because frequency runs inverse to intensity.",
     ]);
   });
+
+  it("rejects a declaration whose complex holds no plyometric while one is eligible", () => {
+    const complex = [
+      ...DECLARATION.complex.filter((item) => !PLYOS.includes(item.exerciseId)),
+      { exerciseId: idOf("front-squat"), isMain: false },
+    ];
+    const declaration: MesocycleDeclaration = { ...DECLARATION, complex };
+    expect(plyoFrequency(input({ declaration, week: undefined }))).toMatchObject([
+      {
+        scope: "mesocycle",
+        message:
+          "The complex holds no plyometric. Plyometrics need 2 to 3 days a week, and a week may not bring in exercises from outside the complex, so add at least one.",
+      },
+    ]);
+    const eligible = new Set(STOCK.filter((e) => e.couplingClass === "not_plyometric").map((e) => e.id));
+    expect(plyoFrequency(input({ declaration, eligible, week: undefined }))).toEqual([]);
+    expect(plyoFrequency(input({ week: undefined }))).toEqual([]);
+  });
 });
 
 describe("back-to-back", () => {
@@ -302,5 +320,26 @@ describe("back-to-back", () => {
     expect(messages(backToBack(input({ week })))).toEqual([
       "The two sessions on Fri 25 Sept are back to back. Both train the posterior chain, and both repeat the \"Hinge\" pattern (Trap bar deadlift on Fri 25 Sept). Back-to-back sessions must not repeat a large muscle group or a coordination pattern.",
     ]);
+  });
+
+  it("compares every pair a day apart, whatever order same-day sessions arrive in", () => {
+    const session = (day: string, exerciseId: number): PlannedSession => ({
+      day,
+      kind: "strength",
+      plannedIntensity: 6,
+      blocks: [{ label: "Strength", items: [{ exerciseId, sets: 3, reps: 5 }] }],
+    });
+    const thursday = session("2026-09-24", BACK_SQUAT);
+    const fridayUpper = session("2026-09-25", BENCH);
+    const fridayLower = session("2026-09-25", BACK_SQUAT);
+    const weekWith = (sessions: PlannedSession[]) => ({ ...baselineWeek(), sessions });
+    const found = (sessions: PlannedSession[]) =>
+      messages(backToBack(input({ week: weekWith(sessions), priorSession: null })));
+    const expected = found([thursday, fridayUpper, fridayLower]);
+    expect(expected).toEqual([
+      "Thu 24 Sept and Fri 25 Sept are back to back. Both train the knee extensors, and both repeat the \"Squat\" pattern (Back squat on Fri 25 Sept). Back-to-back sessions must not repeat a large muscle group or a coordination pattern.",
+    ]);
+    expect(found([thursday, fridayLower, fridayUpper])).toEqual(expected);
+    expect(found([fridayLower, fridayUpper, thursday])).toEqual(expected);
   });
 });

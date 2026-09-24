@@ -272,18 +272,32 @@ export const INTENSE_PLYO_SESSION = 8;
  * with shock-method work or a plyometric session at 8 or above gets 2 at most.
  * The floor does not apply to a detraining week, or when the pre-filter has
  * removed every plyometric, because then there is nothing to schedule.
+ *
+ * At declaration the floor is checked against the complex: a week may not bring
+ * in exercises from outside it, so a complex with no plyometric could never meet
+ * the floor in any week of the block.
  */
 export function plyoFrequency(input: GateInput): Violation[] {
-  const { directory, week, eligible } = input;
-  if (!week) return [];
+  const { declaration, directory, week, eligible } = input;
+  const plyometric = (id: number) => {
+    const exercise = directory.get(id);
+    return exercise !== undefined && isPlyometric(exercise);
+  };
+  const anyEligible = [...eligible].some(plyometric);
+
+  if (!week) {
+    if (!anyEligible || declaration.complex.some((item) => plyometric(item.exerciseId))) return [];
+    return [
+      {
+        rule: "plyo-frequency",
+        scope: "mesocycle",
+        message: `The complex holds no plyometric. Plyometrics need ${PLYO_DAYS.min} to ${PLYO_DAYS.max} days a week, and a week may not bring in exercises from outside the complex, so add at least one.`,
+      },
+    ];
+  }
 
   const plyoSessions = week.sessions.filter(
-    (session) =>
-      isTraining(session) &&
-      itemsOf(session).some((item) => {
-        const exercise = directory.get(item.exerciseId);
-        return exercise !== undefined && isPlyometric(exercise);
-      }),
+    (session) => isTraining(session) && itemsOf(session).some((item) => plyometric(item.exerciseId)),
   );
   const days = unique(plyoSessions.map((session) => session.day)).sort();
 
@@ -299,10 +313,6 @@ export function plyoFrequency(input: GateInput): Violation[] {
     (session) => session.plannedIntensity >= INTENSE_PLYO_SESSION,
   );
 
-  const anyEligible = [...eligible].some((id) => {
-    const exercise = directory.get(id);
-    return exercise !== undefined && isPlyometric(exercise);
-  });
   const floor = week.loadType === "detraining" || !anyEligible ? 0 : PLYO_DAYS.min;
 
   if (days.length < floor) {
@@ -364,15 +374,12 @@ export function backToBack(input: GateInput): Violation[] {
     return { groups, patterns };
   };
 
-  const violations: Violation[] = [];
-  for (let i = 1; i < sessions.length; i++) {
-    const [a, b] = [sessions[i - 1], sessions[i]];
-    if (daysBetween(a.day, b.day) > 1) continue;
+  const repeated = (a: PlannedSession, b: PlannedSession): Violation | null => {
     const first = profile(a);
     const second = profile(b);
     const groups = [...second.groups.keys()].filter((group) => first.groups.has(group));
     const patterns = [...second.patterns.keys()].filter((pattern) => first.patterns.has(pattern));
-    if (groups.length === 0 && patterns.length === 0) continue;
+    if (groups.length === 0 && patterns.length === 0) return null;
 
     const repeats = [
       groups.length > 0 ? `train the ${list(groups.map(groupName))}` : null,
@@ -385,13 +392,23 @@ export function backToBack(input: GateInput): Violation[] {
       ...patterns.flatMap((pattern) => second.patterns.get(pattern)!),
     ]);
     const when = a.day === b.day ? `The two sessions on ${formatDay(a.day)}` : `${formatDay(a.day)} and ${formatDay(b.day)}`;
-    violations.push({
+    return {
       rule: "back-to-back",
       scope: "microcycle",
       day: b.day,
       exerciseIds: ids,
       message: `${when} are back to back. Both ${repeats.join(", and both ")} (${list(ids.map((id) => nameOf(directory, id)))} on ${formatDay(b.day)}). Back-to-back sessions must not repeat a large muscle group or a coordination pattern.`,
-    });
+    };
+  };
+
+  const violations: Violation[] = [];
+  for (let i = 0; i < sessions.length; i++) {
+    for (let j = i + 1; j < sessions.length; j++) {
+      const [a, b] = [sessions[i], sessions[j]];
+      if (daysBetween(a.day, b.day) > 1) break;
+      const violation = repeated(a, b);
+      if (violation) violations.push(violation);
+    }
   }
   return violations;
 }

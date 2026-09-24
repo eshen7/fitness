@@ -84,6 +84,23 @@ describe("rule-of-60", () => {
     ]);
   });
 
+  it("sums two sessions on one day into that day's volume", () => {
+    const even = weekOf([
+      day("2026-09-21", [squat(6)]),
+      day("2026-09-21", [squat(4)]),
+      day("2026-09-23", [squat(16)]),
+    ]);
+    expect(ruleOf60(input({ week: even }))).toEqual([]);
+    const light = weekOf([
+      day("2026-09-21", [squat(5)]),
+      day("2026-09-21", [squat(5)]),
+      day("2026-09-23", [squat(20)]),
+    ]);
+    expect(messages(ruleOf60(input({ week: light })))).toEqual([
+      "The lightest day (Mon 21 Sept, 10 sets) is 50% of the heaviest (Wed 23 Sept, 20 sets). The rule of 60% puts it near 60%, so the light day is lighter than it needs to be.",
+    ]);
+  });
+
   it("needs two training days to compare", () => {
     const week = weekOf([day("2026-09-21", [squat(10)]), day("2026-09-23", [squat(2)], "test")]);
     expect(ruleOf60(input({ week }))).toEqual([]);
@@ -100,6 +117,25 @@ describe("strength-frequency", () => {
       "Strength work of about 30 minutes on 1 day (Mon 21 Sept). Retaining strength takes at least 2 such sessions a week.",
     ]);
     week.sessions[1] = day("2026-09-24", [squat(5)]);
+    expect(strengthFrequency(input({ week }))).toEqual([]);
+  });
+
+  it("counts two sessions on one day as one day", () => {
+    const week = weekOf([
+      day("2026-09-21", [squat(4)]),
+      day("2026-09-21", [squat(4)]),
+      day("2026-09-23", [squat(4)]),
+    ]);
+    expect(messages(strengthFrequency(input({ week })))).toEqual([
+      "Strength work on 2 days (Mon 21 Sept and Wed 23 Sept). The block targets strength, and gaining it takes heavy resistance training at least 3 times a week.",
+    ]);
+  });
+
+  it("sums two short sessions on one day toward the 30 minutes", () => {
+    const week = weekOf(
+      [day("2026-09-21", [squat(3)]), day("2026-09-21", [squat(3)]), day("2026-09-24", [squat(6)])],
+      "retaining",
+    );
     expect(strengthFrequency(input({ week }))).toEqual([]);
   });
 

@@ -10,7 +10,13 @@ import {
   percent,
   setsIn,
 } from "./classify";
-import type { Advisory, Directory, MesocycleDeclaration, MicrocyclePlan } from "./types";
+import type {
+  Advisory,
+  Directory,
+  MesocycleDeclaration,
+  MicrocyclePlan,
+  PlannedSession,
+} from "./types";
 
 /**
  * Stage 5 notes: the ebook's figures that are general-population guidance rather
@@ -34,6 +40,17 @@ const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1
 
 function trainingSessions(week: MicrocyclePlan) {
   return week.sessions.filter((session) => isTraining(session));
+}
+
+/** The week's training sessions grouped by day, in day order, so two sessions on one day count as one day. */
+function trainingDays(week: MicrocyclePlan) {
+  const days = new Map<string, PlannedSession[]>();
+  for (const session of trainingSessions(week)) {
+    days.set(session.day, [...(days.get(session.day) ?? []), session]);
+  }
+  return [...days.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, sessions]) => ({ day, sessions }));
 }
 
 // -----------------------------------------------------------------------------
@@ -107,8 +124,8 @@ export const LIGHT_DAY_RATIO = { target: 0.6, slack: 0.05 } as const;
 
 /** The lightest day's volume near 60 percent of the heaviest day's, within 5 points. */
 export function ruleOf60(input: AdvisoryInput): Advisory[] {
-  const days = trainingSessions(input.week)
-    .map((session) => ({ day: session.day, sets: setsIn(session) }))
+  const days = trainingDays(input.week)
+    .map(({ day, sessions }) => ({ day, sets: sessions.reduce((sum, s) => sum + setsIn(s), 0) }))
     .filter((day) => day.sets > 0);
   if (days.length < 2) return [];
 
@@ -151,9 +168,9 @@ export function strengthFrequency(input: AdvisoryInput): Advisory[] {
     input.week.loadType === "stimulating" &&
     input.declaration.targetAbilities.some((ability) => GAIN_TARGETS.has(ability));
 
-  const sessions = trainingSessions(input.week)
-    .map((session) => {
-      const strength = itemsOf(session).filter((item) => {
+  const strengthDays = trainingDays(input.week)
+    .map(({ day, sessions }) => {
+      const strength = sessions.flatMap(itemsOf).filter((item) => {
         const exercise = input.directory.get(item.exerciseId);
         return exercise !== undefined && isStrengthWork(exercise);
       });
@@ -161,27 +178,27 @@ export function strengthFrequency(input: AdvisoryInput): Advisory[] {
         (sum, item) => sum + item.sets * ((item.restSeconds ?? DEFAULT_REST) + WORK_SECONDS),
         0,
       );
-      return { day: session.day, count: strength.length, minutes: seconds / 60 };
+      return { day, count: strength.length, minutes: seconds / 60 };
     })
-    .filter((session) => session.count > 0);
+    .filter((day) => day.count > 0);
 
-  const days = (found: typeof sessions) =>
+  const days = (found: typeof strengthDays) =>
     found.length === 0
       ? "no day"
       : `${found.length} day${found.length === 1 ? "" : "s"} (${list(found.map((s) => formatDay(s.day)))})`;
 
   if (gaining) {
-    if (sessions.length >= GAIN_SESSIONS) return [];
+    if (strengthDays.length >= GAIN_SESSIONS) return [];
     return [
       {
         rule: "strength-frequency",
         scope: "microcycle",
-        message: `Strength work on ${days(sessions)}. The block targets strength, and gaining it takes heavy resistance training at least ${GAIN_SESSIONS} times a week.`,
+        message: `Strength work on ${days(strengthDays)}. The block targets strength, and gaining it takes heavy resistance training at least ${GAIN_SESSIONS} times a week.`,
       },
     ];
   }
 
-  const substantial = sessions.filter((session) => session.minutes >= RETAIN_MINUTES);
+  const substantial = strengthDays.filter((day) => day.minutes >= RETAIN_MINUTES);
   if (substantial.length >= RETAIN_SESSIONS) return [];
   return [
     {
