@@ -13,6 +13,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx lib/db/migrate.ts",
     "db:seed": "tsx lib/db/seed/run.ts",
+    "db:seed:history": "tsx scripts/seed-history.ts",
     "db:studio": "drizzle-kit studio",
     "passcode": "tsx scripts/hash-passcode.ts"
   },

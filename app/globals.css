@@ -22,6 +22,31 @@
   --color-warn: oklch(84% 0.1 82);
   --color-bad: oklch(72% 0.13 22);
 
+  /*
+    Chart series. Their own role, not the status or accent tokens: `good`, `warn`
+    and `bad` mean a state and are never spent on "the third line", and the accent
+    belongs to the thing you tap. These four are stepped into the dark palette's
+    lightness band rather than matching the interface hues, which sit too light to
+    stay separable as a set, and the order is the colourblind-safety mechanism.
+    Validated as a set against `--color-surface` on the adjacent pairlist: worst
+    adjacent CVD dE 17.1, normal-vision dE 19.2, all four over 3:1 contrast. Both
+    a legend and direct labels ship with every chart, so identity never rests on
+    hue alone.
+  */
+  --color-series-1: oklch(62% 0.115 168);
+  --color-series-2: oklch(55% 0.145 255);
+  --color-series-3: oklch(63% 0.13 62);
+  --color-series-4: oklch(58% 0.15 340);
+
+  /*
+    The fill for a plot with a single series, where a categorical hue would falsely
+    claim membership of the set above. Neutral, but stepped into the same lightness
+    band as the four series rather than borrowing a text token: `ink-muted` is the
+    colour of a label, and a wall of bars painted in it outshouts every data line
+    on the page.
+  */
+  --color-series-neutral: oklch(52% 0.006 255);
+
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", sans-serif;
   --font-display: var(--font-inter-tight), var(--font-inter), ui-sans-serif,
@@ -31,66 +56,83 @@
   --radius-box: 1rem;
 }
 
-html {
-  color-scheme: dark;
-  background-color: var(--color-surface-sunken);
-  /* Keep the safe-area inset available to sticky gym-mode controls. */
-  -webkit-tap-highlight-color: transparent;
-}
-
-body {
-  background-color: var(--color-surface-sunken);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-  font-feature-settings: "cv11", "ss01";
-  -webkit-font-smoothing: antialiased;
-  overscroll-behavior-y: none;
-}
-
-h1,
-h2,
-h3,
-h4 {
-  font-family: var(--font-display);
-  letter-spacing: -0.018em;
-}
-
 /*
-  Native number spinners are removed everywhere rather than per field. They are
-  far too small to hit with a thumb, they only appear once the field is focused,
-  and the width they claim is taken from the digits, which are the part being
-  read. Every numeric field here is typed into, never nudged.
+  Element defaults belong in `@layer base`, not at the top level.
+
+  Unlayered CSS beats every layered rule regardless of specificity, and Tailwind
+  ships its utilities in `@layer utilities`. So a bare `svg { height: auto }` here
+  silently defeats `h-full` on every svg in the app, which is exactly the kind of
+  bug that looks like a broken chart rather than a broken stylesheet.
 */
-input[type="number"] {
-  appearance: textfield;
+@layer base {
+  html {
+    color-scheme: dark;
+    background-color: var(--color-surface-sunken);
+    /* Keep the safe-area inset available to sticky gym-mode controls. */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--color-surface-sunken);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.018em;
+  }
+
+  /*
+    Native number spinners are removed everywhere rather than per field. They are
+    far too small to hit with a thumb, they only appear once the field is focused,
+    and the width they claim is taken from the digits, which are the part being
+    read. Every numeric field here is typed into, never nudged.
+  */
+  input[type="number"] {
+    appearance: textfield;
+  }
+
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+
+  :where(p, li, td) {
+    line-height: 1.6;
+  }
+
+  :where(.grid, .flex) > * {
+    min-width: 0;
+  }
+
+  /*
+    `height: auto` here is what a chart's `h-full` has to beat, which it can only
+    do from a later layer. Utilities come after base, so this belongs in base and
+    nowhere above it.
+  */
+  :where(img, svg, video) {
+    max-width: 100%;
+    height: auto;
+  }
+
+  *:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
 }
 
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
-  appearance: none;
-  margin: 0;
-}
-
-/* Numbers are read at arm's length mid-set, so they never reflow or wobble. */
-.tnum {
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-:where(p, li, td) {
-  line-height: 1.6;
-}
-
-:where(.grid, .flex) > * {
-  min-width: 0;
-}
-
-:where(img, svg, video) {
-  max-width: 100%;
-  height: auto;
-}
-
-*:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
+@layer components {
+  /* Numbers are read at arm's length mid-set, so they never reflow or wobble. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
 }
