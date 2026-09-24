@@ -26,6 +26,9 @@ The build plan lives at `~/.claude/plans/splendid-munching-map.md`.
 
 `npm run lint` and `npm run typecheck` are expected clean at every phase boundary, not deferred.
 
+The `ci` job in `.github/workflows/ci.yml` runs lint, typecheck, test and build on every pull request and on pushes to `main`, on the Node version pinned in `.nvmrc`.
+It supplies placeholder values for the variables `lib/env.ts` requires and starts no database, so a test or a build that needs real infrastructure has to bring its own service container.
+
 ## Stack and layout
 
 Next.js 16 App Router with Turbopack, TypeScript, Tailwind v4, Drizzle over Postgres via postgres.js, installable as a PWA, deployed to Vercel and Neon.
