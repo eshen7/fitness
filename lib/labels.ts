@@ -176,5 +176,18 @@ export const unitSystemLabels = labels<UnitSystem>({
   metric: "Kilograms and centimetres",
 });
 
+/**
+ * The four phases of the load-management protocol, named so the choice is made on
+ * what is actually being done rather than on a number remembered from a table.
+ * Shared by the tendon check-in, which records the phase a site is in, and the
+ * library, which records the phase an exercise is the prescription for.
+ */
+export const PROTOCOL_PHASES = [
+  { value: "1", label: "1 - Isometric loading" },
+  { value: "2", label: "2 - Slow heavy strength" },
+  { value: "3", label: "3 - Energy storage" },
+  { value: "4", label: "4 - Storage and release" },
+] as const;
+
 /** 1 gentle to 5 severe, and 1 trivial to 5 highly technical. */
 export const RATING_SCALE = [1, 2, 3, 4, 5] as const;

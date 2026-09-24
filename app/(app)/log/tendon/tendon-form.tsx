@@ -6,19 +6,8 @@ import { SubmitBar } from "@/components/submit-bar";
 import { Button, Card, Field, Select, Tag, Textarea } from "@/components/ui";
 import { logTendonCheckin } from "@/lib/log/actions";
 import type { ActionResult } from "@/lib/log/schemas";
-import { tendonSiteLabels } from "@/lib/labels";
+import { PROTOCOL_PHASES, tendonSiteLabels } from "@/lib/labels";
 import { TENDON_SITES, type TendonSite } from "@/lib/taxonomy";
-
-/**
- * The four phases of the load-management protocol, named so the choice is made on
- * what is actually being done rather than on a number remembered from a table.
- */
-export const PROTOCOL_PHASES = [
-  { value: "1", label: "1 - Isometric loading" },
-  { value: "2", label: "2 - Slow heavy strength" },
-  { value: "3", label: "3 - Energy storage" },
-  { value: "4", label: "4 - Storage and release" },
-] as const;
 
 type SiteState = {
   painDuringLoad: number | null;
@@ -194,7 +183,7 @@ export function TendonForm({ prefill }: { prefill: TendonPrefill }) {
 
                 <Field
                   label="Protocol phase"
-                  hint="Phase 1 or 2 removes every exercise loading this site from the candidate set until it changes."
+                  hint="Phase 1 or 2 removes every exercise loading this site from the candidate set, apart from the protocol's own prescriptions, until it changes."
                 >
                   <Select
                     value={state.protocolPhase}

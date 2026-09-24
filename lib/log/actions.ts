@@ -185,7 +185,7 @@ export async function logTendonCheckin(input: unknown): Promise<ActionResult> {
   return {
     ok: true,
     message: gated.length
-      ? `Recorded. ${gated.length === 1 ? "One site is" : `${gated.length} sites are`} in protocol phase 1 or 2, so exercises loading ${gated.length === 1 ? "it" : "them"} leave the candidate set until that changes.`
+      ? `Recorded. ${gated.length === 1 ? "One site is" : `${gated.length} sites are`} in protocol phase 1 or 2, so exercises loading ${gated.length === 1 ? "it" : "them"} leave the candidate set, apart from the protocol's own prescriptions, until that changes.`
       : "Recorded.",
   };
 }

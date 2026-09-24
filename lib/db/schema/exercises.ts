@@ -60,7 +60,16 @@ export const exercises = pgTable(
     /** Whether a rep counts as a high-impact contact for tendon load accounting. */
     highImpact: boolean("high_impact").notNull().default(false),
 
+    /**
+     * Equipment requirements, which the pre-filter matches against what is
+     * actually reachable. `equipment` is needed all together, a barbell and a
+     * rack; `equipmentAnyOf` is interchangeable, dumbbells or kettlebells, and
+     * one of them is needed on top. `none` is always satisfied. Load that is
+     * merely optional, a vest on a push-up, belongs on a variant instead,
+     * because listing it here would hide the exercise from anyone without one.
+     */
     equipment: equipment().array().notNull().default([]),
+    equipmentAnyOf: equipment("equipment_any_of").array().notNull().default([]),
 
     /** Tendon sites this exercise loads. Drives the pre-filter, so be honest. */
     loadsTendonSites: tendonSite("loads_tendon_sites")
@@ -69,6 +78,14 @@ export const exercises = pgTable(
       .default([]),
     /** 1 gentle to 5 severe. Compared against the pain-trend load cap. */
     tendonLoadRating: smallint("tendon_load_rating").notNull().default(1),
+    /**
+     * The tendon protocol phase this exercise is the prescription for, 1 to 4,
+     * and null for everything else. A site in phase 1 or 2 removes every
+     * exercise loading it except the prescription for that phase or an earlier
+     * one, because the protocol is load management rather than rest and the
+     * pre-filter must not remove the isometrics the protocol itself calls for.
+     */
+    protocolPhase: smallint("protocol_phase"),
 
     /** 1 trivial to 5 highly technical. Drives session ordering. */
     technicalComplexity: smallint("technical_complexity").notNull().default(1),
