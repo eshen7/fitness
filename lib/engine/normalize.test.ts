@@ -205,6 +205,19 @@ describe("heavy-rest", () => {
     const test = { exerciseId: BACK_SQUAT, sets: 1, reps: 1, loadPctOf1rm: 100, restSeconds: 600 };
     expect(heavyRest(one(test, "test"), context).changes).toEqual([]);
   });
+
+  it("leaves a heavy slow calf raise in a tendon protocol session alone", () => {
+    const protocol = {
+      exerciseId: idOf("slow-heavy-calf-raise"),
+      sets: 4,
+      reps: 6,
+      loadPctOf1rm: 85,
+      restSeconds: 120,
+    };
+    const result = heavyRest(one(protocol, "tendon_protocol"), context);
+    expect(result.changes).toEqual([]);
+    expect(result.session.blocks[0].items[0].restSeconds).toBe(120);
+  });
 });
 
 describe("demand-order", () => {
@@ -254,6 +267,38 @@ describe("demand-order", () => {
     };
     const result = demandOrder(session([core, pair]), context);
     expect(order(result.session)).toEqual([BACK_SQUAT, idOf("box-jump"), PLANK]);
+  });
+
+  it("keeps a leading warm-up block at the start", () => {
+    const written = session([
+      { label: "Warm-up", items: [{ exerciseId: idOf("ankle-dorsiflexion-mobilization"), sets: 2 }] },
+      {
+        label: "Jumps",
+        items: [
+          { exerciseId: APPROACH, sets: 3, reps: 8 },
+          { exerciseId: DEPTH_JUMP, sets: 3, reps: 8 },
+        ],
+      },
+      { label: "Strength", items: [{ exerciseId: BACK_SQUAT, sets: 3, reps: 5, loadPctOf1rm: 80 }] },
+    ]);
+    const demand = demandOrder(written, context);
+    expect(demand.changes).toEqual([]);
+    expect(demand.session).toEqual(written);
+    const main = mainBeforeAssistance(written, context);
+    expect(main.changes).toEqual([]);
+    expect(main.session).toEqual(written);
+  });
+
+  it("still sorts a trailing stretch block after the training work", () => {
+    const result = demandOrder(
+      session([
+        { label: "Strength", items: [{ exerciseId: BACK_SQUAT, sets: 3, reps: 5, loadPctOf1rm: 80 }] },
+        { label: "Stretch", items: [{ exerciseId: idOf("hip-flexor-stretch"), sets: 2 }] },
+        { label: "Jumps", items: [{ exerciseId: APPROACH, sets: 3, reps: 8 }] },
+      ]),
+      context,
+    );
+    expect(order(result.session)).toEqual([APPROACH, BACK_SQUAT, idOf("hip-flexor-stretch")]);
   });
 
   it("leaves a session naming an unknown exercise as written", () => {

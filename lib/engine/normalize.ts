@@ -269,7 +269,7 @@ export const plyoRest: Rule = (session, context) => {
 // -----------------------------------------------------------------------------
 
 export const heavyRest: Rule = (session, context) => {
-  if (session.kind === "test") return { session, changes: [] };
+  if (!isTraining(session)) return { session, changes: [] };
   return eachItem(session, context, (item, exercise, record) =>
     isHeavy(exercise, item) ? fitRest("heavy-rest", item, exercise, HEAVY_REST, record) : item,
   );
@@ -336,15 +336,28 @@ function ordinal(n: number) {
 /**
  * Sorts items within each block and blocks by their lead item. A complex pair
  * moves as a unit and keeps its internal order, which is the point of pairing.
+ * A leading run of warm-up blocks, all mobility work, stays at the start.
  */
-function sortSession(session: PlannedSession, keyOf: (item: PlannedSet) => Key): PlannedSession {
-  const blocks: PlannedBlock[] = session.blocks.map((block) =>
+function sortSession(
+  session: PlannedSession,
+  keyOf: (item: PlannedSet) => Key,
+  isMobility: (item: PlannedSet) => boolean,
+): PlannedSession {
+  let warmUp = 0;
+  while (
+    warmUp < session.blocks.length &&
+    session.blocks[warmUp].items.length > 0 &&
+    session.blocks[warmUp].items.every(isMobility)
+  ) {
+    warmUp++;
+  }
+  const rest: PlannedBlock[] = session.blocks.slice(warmUp).map((block) =>
     block.complexPair
       ? block
       : { ...block, items: [...block.items].sort((a, b) => compare(keyOf(a), keyOf(b))) },
   );
-  blocks.sort((a, b) => compare(keyOf(a.items[0]), keyOf(b.items[0])));
-  return { ...session, blocks };
+  rest.sort((a, b) => compare(keyOf(a.items[0]), keyOf(b.items[0])));
+  return { ...session, blocks: [...session.blocks.slice(0, warmUp), ...rest] };
 }
 
 /**
@@ -364,7 +377,11 @@ function ordering(
   if (exercises.some((exercise) => !exercise)) return { session, changes: [] };
   const exerciseOf = new Map(before.map((item, i) => [item, exercises[i]!]));
 
-  const sorted = sortSession(session, (item) => keyOf(item, exerciseOf.get(item)!));
+  const sorted = sortSession(
+    session,
+    (item) => keyOf(item, exerciseOf.get(item)!),
+    (item) => exerciseOf.get(item)!.movementPattern === "mobility",
+  );
   const after = itemsOf(sorted);
   const from = new Map(before.map((item, i) => [item, i]));
 
