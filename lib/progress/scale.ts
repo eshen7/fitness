@@ -182,8 +182,10 @@ export function minimalDetectableChange(sittings: number[][]) {
  *
  * This is the ebook's depth jump protocol as arithmetic: jump height rises with
  * drop height and then falls once the landing can no longer be absorbed, so the
- * turning point is the height to train at. Needs three distinct heights, and a
- * downward-opening fit, or there is no peak to report yet.
+ * turning point is the height to train at. Needs three distinct heights, a
+ * downward-opening fit, and a peak inside the tested range, or there is no peak
+ * to report yet: a vertex past the highest or below the lowest box is a height
+ * nobody tested, and the curve out there is extrapolation rather than data.
  */
 export function quadraticVertex(points: Point[]) {
   const distinct = new Set(points.map((p) => p.x));
@@ -223,5 +225,7 @@ export function quadraticVertex(points: Point[]) {
   // Opening upward means the data has no peak in it, only a rise or a fall.
   if (a >= 0) return null;
   const boxHeightCm = -b / (2 * a);
+  const xs = points.map((p) => p.x);
+  if (boxHeightCm < Math.min(...xs) || boxHeightCm > Math.max(...xs)) return null;
   return { boxHeightCm, jumpCm: a * boxHeightCm ** 2 + b * boxHeightCm + c };
 }

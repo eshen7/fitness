@@ -161,4 +161,28 @@ describe("depth jump calibration", () => {
     const points = [30, 40, 50].map((x) => ({ x, y: 50 + 0.3 * x }));
     expect(quadraticVertex(points)).toBeNull();
   });
+
+  it("reports no peak when the fitted peak lies past the tested heights", () => {
+    // Concave but still rising at the highest box: the fit peaks near 55 cm.
+    const points = [
+      { x: 20, y: 40 },
+      { x: 30, y: 46 },
+      { x: 40, y: 50 },
+      { x: 50, y: 52 },
+    ];
+    expect(quadraticVertex(points)).toBeNull();
+  });
+
+  it("reports a peak that falls between tested heights", () => {
+    const points = [
+      { x: 20, y: 44 },
+      { x: 30, y: 49 },
+      { x: 40, y: 50 },
+      { x: 50, y: 47 },
+    ];
+    const vertex = quadraticVertex(points);
+    expect(vertex).not.toBeNull();
+    expect(vertex!.boxHeightCm).toBeGreaterThan(30);
+    expect(vertex!.boxHeightCm).toBeLessThan(40);
+  });
 });

@@ -151,9 +151,9 @@ export type Band = {
 export function Bands({ bands }: { bands: Band[] }) {
   return (
     <>
-      {bands.map((band) => (
+      {bands.map((band, i) => (
         <div
-          key={band.leftPct}
+          key={i}
           aria-hidden="true"
           className={`@container absolute inset-y-0 overflow-hidden border-l border-line/70 ${WASH[band.step ?? 1]}`}
           style={{ left: `${band.leftPct}%`, width: `${band.widthPct}%` }}
@@ -418,9 +418,9 @@ export function Columns({
 }) {
   return (
     <>
-      {bars.map((bar) => (
+      {bars.map((bar, i) => (
         <div
-          key={bar.leftPct}
+          key={i}
           /*
             Full height, bottom-aligned, rather than a zero-height box pinned to
             the baseline: a percentage height resolves against the parent, so a
@@ -468,7 +468,7 @@ export function Slices({
 }) {
   return (
     <>
-      {slices.map((slice) => {
+      {slices.map((slice, i) => {
         const centre = slice.leftPct + slice.widthPct / 2;
         // Pinned to whichever edge is nearer, so a readout never leaves the card.
         const place =
@@ -479,7 +479,7 @@ export function Slices({
               : "left-1/2 -translate-x-1/2";
         return (
           <div
-            key={slice.leftPct}
+            key={i}
             tabIndex={0}
             aria-label={`${slice.title}. ${slice.rows.map((r) => `${r.label} ${r.value}`).join(", ")}`}
             className="group absolute inset-y-0 cursor-default focus:outline-none"
