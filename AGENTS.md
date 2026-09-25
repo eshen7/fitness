@@ -21,6 +21,7 @@ The build plan lives at `~/.claude/plans/splendid-munching-map.md`.
 | `npm run db:generate` | Emit a migration from the schema |
 | `npm run db:migrate` | Apply migrations, and create the `vector` extension |
 | `npm run db:seed` | Idempotent seed |
+| `npm run db:seed:history -- --replace` | Replace training history with a deterministic twenty-week dev fixture (destructive, local only) |
 | `npm run passcode` | Print a fresh `PASSCODE_HASH` and `SESSION_SECRET` |
 
 `npm run lint` and `npm run typecheck` are expected clean at every phase boundary, not deferred.
@@ -63,6 +64,8 @@ lib/memory/          preference and insight store
 - **A WHOOP refresh rotates both tokens.** The old access token dies with the old refresh token, so the pair is one row written in one statement; a partial write silently kills the connection and the only repair is re-authorizing. `scope=offline` must be sent on the refresh too.
 - **A v2 recovery event names its *sleep*, not its cycle.** Recovery rows are keyed by `sleep_id` and dated from the stored sleep, so a recovery arriving before its sleep is deferred rather than guessed at.
 - **The nightly sync in `vercel.json` runs at 09:20 UTC** (about 05:20 ET): late enough that WHOOP has scored the night, early enough to be there before a morning check-in. JSON cannot hold that comment, which is why it is here.
+- **Every rule in `app/globals.css` belongs inside a cascade layer.** Tailwind v4 ships its utilities in `@layer utilities`, and unlayered CSS beats every layered rule regardless of specificity. An element default written at the top level therefore silently defeats the utility for it everywhere: a bare `:where(svg) { height: auto }` cost an afternoon by making every chart render at its viewBox aspect ratio instead of `h-full`. Element defaults go in `@layer base`, class rules a utility should be able to override go in `@layer components`.
+- **A percentage height needs a parent with a definite one.** The chart primitives position every mark as a percentage, so a wrapper sized only by its contents collapses its children to nothing rather than erroring. `Columns` is `inset-y-0` with the bar bottom-aligned inside it for exactly this reason.
 
 ## Domain reference: jump training
 

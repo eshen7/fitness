@@ -9,6 +9,19 @@ export function UnlockForm({ next }: { next?: string }) {
   return (
     <form action={action} className="mt-8 flex flex-col gap-3">
       {next ? <input type="hidden" name="next" value={next} /> : null}
+      {/*
+        There is one user and no username, but a password manager files a
+        credential against one, and without it the browser warns on every visit
+        and the saved passcode has no name. A fixed, hidden value costs nothing.
+      */}
+      <input
+        type="text"
+        name="username"
+        value="owner"
+        autoComplete="username"
+        readOnly
+        hidden
+      />
       <label htmlFor="passcode" className="sr-only">
         Passcode
       </label>
