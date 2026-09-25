@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Guidance for agents working in this repository.
-`CLAUDE.md` is a symlink to this file.
+`CLAUDE.md` imports this file; edit this one.
 
 ## Project
 
@@ -39,7 +39,7 @@ app/(app)/           today, log, progress, nutrition, plan, library
 app/api/             health, and later generation, nutrition parsing, WHOOP
 lib/db/schema/       one file per domain area
 lib/whoop/           OAuth, signed webhook, ingest, and projection into readiness
-lib/engine/          prefilter, normalize, gate, advisories (pure TS, no LLM)
+lib/engine/          prefilter, normalize, gate (validate.ts), advisories (pure TS, no LLM)
 lib/ai/              Claude clients, prompts, schemas, cached context
 lib/analytics/       trend math and derived insights (pure functions)
 lib/memory/          preference and insight store
@@ -53,6 +53,10 @@ lib/memory/          preference and insight store
 - **Icons live in `public/icons/`,** not via the `app/icon.*` convention, because the proxy matcher excludes that directory and an icon behind the gate is one the OS cannot fetch.
 - **The generator never invents an exercise.** The directory is a closed set; unavailable entries are filtered out before the prompt is built, and the model files a suggested addition instead.
 - **Tendon safety is enforced by construction, not by validation.** A site in protocol phase 1 or 2 removes every exercise loading it from the candidate set, so the rule cannot be violated rather than merely being checked.
+  The one exemption is the protocol's own prescriptions: `exercises.protocol_phase` tags them, and a site in phase p keeps an exercise tagged p or lower.
+  Tag by hand rather than deriving from attributes, because a slow heavy calf raise and a standing calf raise look identical.
+- **Equipment is `equipment` all together plus one of `equipment_any_of`.** `none` is always satisfied, and an empty available list means bodyweight only.
+- **Every rule message is pinned.** `lib/engine/fixtures/invalid.ts` holds one invalid plan per rule with its exact messages, checked against the stock seed, so rewording a message or re-tagging a stock exercise means updating the fixture in the same change.
 - **`export const dynamic = "force-dynamic"` in `app/(app)/layout.tsx` covers the whole segment.** Without it every database-backed page prerenders at build time and production serves a snapshot of whatever the database held during the build, which looks like a working app right up to the moment it stops updating.
 - **Numerics cross the driver as strings.** Convert at every boundary: `.toFixed(n)` on the way in, `Number()` on the way out. Selecting a column that does not exist is worse than a type error - drizzle treats the `undefined` field as a nested object and throws `Cannot convert undefined or null to object` from inside `orderSelectedFields`.
 - **The WHOOP signature is over the raw bytes.** Read `request.text()` before parsing; re-serializing parsed JSON changes the bytes and every delivery then fails verification.

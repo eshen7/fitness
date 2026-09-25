@@ -79,6 +79,9 @@ export default async function ExercisePage({ params }: { params: Params }) {
               <span>{muscleGroupLabels.of(exercise.primaryMuscleGroup)}</span>
               {!exercise.isStock ? <Tag tone="cool">Custom</Tag> : null}
               {exercise.highImpact ? <Tag tone="warn">Impact</Tag> : null}
+              {exercise.protocolPhase !== null ? (
+                <Tag tone="cool">Protocol phase {exercise.protocolPhase}</Tag>
+              ) : null}
               {exercise.forceVelocity === "shock" ? <Tag tone="bad">Shock</Tag> : null}
               {!exercise.available ? <Tag tone="bad">Unavailable</Tag> : null}
               {usage ? <Tag>Prescribed before</Tag> : null}
@@ -93,7 +96,10 @@ export default async function ExercisePage({ params }: { params: Params }) {
         </div>
       </header>
 
-      {exercise.equipment.length > 0 || easier || harder ? (
+      {exercise.equipment.length > 0 ||
+      exercise.equipmentAnyOf.length > 0 ||
+      easier ||
+      harder ? (
         <Card className="mb-4">
           <dl className="grid gap-4 text-sm sm:grid-cols-2">
             {exercise.equipment.length > 0 ? (
@@ -101,6 +107,19 @@ export default async function ExercisePage({ params }: { params: Params }) {
                 <dt className="text-xs text-ink-faint">Equipment</dt>
                 <dd className="mt-1 flex flex-wrap gap-1.5">
                   {exercise.equipment.map((item) => (
+                    <Tag key={item}>{equipmentLabels.of(item)}</Tag>
+                  ))}
+                </dd>
+              </div>
+            ) : null}
+
+            {exercise.equipmentAnyOf.length > 0 ? (
+              <div>
+                <dt className="text-xs text-ink-faint">
+                  {exercise.equipment.length > 0 ? "Plus one of" : "Any one of"}
+                </dt>
+                <dd className="mt-1 flex flex-wrap gap-1.5">
+                  {exercise.equipmentAnyOf.map((item) => (
                     <Tag key={item}>{equipmentLabels.of(item)}</Tag>
                   ))}
                 </dd>

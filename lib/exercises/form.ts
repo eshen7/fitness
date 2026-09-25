@@ -81,8 +81,14 @@ export const exerciseFormSchema = z
     highImpact: z.coerce.boolean().default(false),
 
     equipment: z.array(z.enum(EQUIPMENT_TYPES)).default([]),
+    equipmentAnyOf: z.array(z.enum(EQUIPMENT_TYPES)).default([]),
     loadsTendonSites: z.array(z.enum(TENDON_SITES)).default([]),
     tendonLoadRating: rating,
+    /** Empty means not a protocol prescription, which is different from phase 1. */
+    protocolPhase: z
+      .enum(["", "1", "2", "3", "4"])
+      .default("")
+      .transform((value) => (value ? Number(value) : null)),
     technicalComplexity: rating,
 
     cues: lines,
@@ -113,6 +119,29 @@ export const exerciseFormSchema = z
         "Shock method requires a measured ground contact under 0.15 s. Set the contact time, or pick another point on the force velocity curve.",
     },
   )
+  // The pre-filter reads the alternatives as "at least one of these", so each of
+  // these shapes would make it say something the owner did not mean.
+  .refine((v) => !v.equipmentAnyOf.includes("none"), {
+    path: ["equipmentAnyOf"],
+    message:
+      "No equipment as an alternative makes the others optional. Put optional load on a variant instead.",
+  })
+  .refine((v) => !v.equipmentAnyOf.some((item) => v.equipment.includes(item)), {
+    path: ["equipmentAnyOf"],
+    message: "Something needed outright cannot also be one of the alternatives.",
+  })
+  .refine((v) => v.equipmentAnyOf.length !== 1, {
+    path: ["equipmentAnyOf"],
+    message:
+      "A single alternative is just a requirement. Tick it under needed, or add a second option.",
+  })
+  // The pre-filter keeps a prescription only for the sites it loads, so one that
+  // loads nothing would be tagged for a protocol it can never take part in.
+  .refine((v) => v.protocolPhase === null || v.loadsTendonSites.length > 0, {
+    path: ["protocolPhase"],
+    message:
+      "A protocol prescription loads the tendon it rebuilds. Tick the sites it loads.",
+  })
   .refine((v) => !v.secondaryMuscleGroups.includes(v.primaryMuscleGroup), {
     path: ["secondaryMuscleGroups"],
     message: "The primary group does not need repeating as a secondary one.",
@@ -142,8 +171,10 @@ export type ExerciseFormFields = {
   typicalContactSeconds: string;
   highImpact: boolean;
   equipment: string[];
+  equipmentAnyOf: string[];
   loadsTendonSites: string[];
   tendonLoadRating: string;
+  protocolPhase: string;
   technicalComplexity: string;
   cues: string;
   notes: string;
@@ -176,8 +207,10 @@ const EMPTY_FIELDS: ExerciseFormFields = {
   typicalContactSeconds: "",
   highImpact: false,
   equipment: [],
+  equipmentAnyOf: [],
   loadsTendonSites: [],
   tendonLoadRating: "1",
+  protocolPhase: "",
   technicalComplexity: "1",
   cues: "",
   notes: "",
@@ -197,11 +230,13 @@ export function exerciseFormFields(
     | "couplingClass"
     | "highImpact"
     | "equipment"
+    | "equipmentAnyOf"
     | "loadsTendonSites"
   > & {
     slug: string;
     typicalContactSeconds: string | null;
     tendonLoadRating: number;
+    protocolPhase: number | null;
     technicalComplexity: number;
     cues: string[];
     notes: string | null;
@@ -222,8 +257,10 @@ export function exerciseFormFields(
     typicalContactSeconds: exercise.typicalContactSeconds ?? "",
     highImpact: exercise.highImpact,
     equipment: [...exercise.equipment],
+    equipmentAnyOf: [...exercise.equipmentAnyOf],
     loadsTendonSites: [...exercise.loadsTendonSites],
     tendonLoadRating: String(exercise.tendonLoadRating),
+    protocolPhase: exercise.protocolPhase?.toString() ?? "",
     technicalComplexity: String(exercise.technicalComplexity),
     cues: exercise.cues.join("\n"),
     notes: exercise.notes ?? "",
@@ -247,8 +284,10 @@ export function readExerciseForm(formData: FormData): ExerciseFormFields {
     typicalContactSeconds: text("typicalContactSeconds"),
     highImpact: formData.get("highImpact") === "on",
     equipment: list("equipment"),
+    equipmentAnyOf: list("equipmentAnyOf"),
     loadsTendonSites: list("loadsTendonSites"),
     tendonLoadRating: text("tendonLoadRating"),
+    protocolPhase: text("protocolPhase"),
     technicalComplexity: text("technicalComplexity"),
     cues: text("cues"),
     notes: text("notes"),

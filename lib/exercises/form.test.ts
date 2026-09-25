@@ -120,6 +120,46 @@ describe("exerciseFormSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("accepts interchangeable equipment alongside what is needed outright", () => {
+    const result = exerciseFormSchema.safeParse(
+      form({ equipment: ["bench"], equipmentAnyOf: ["dumbbell", "kettlebell"] }),
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a lone alternative, which is really a requirement", () => {
+    const result = exerciseFormSchema.safeParse(
+      form({ equipment: [], equipmentAnyOf: ["dumbbell"] }),
+    );
+    expect(result.error?.issues[0]?.path).toEqual(["equipmentAnyOf"]);
+  });
+
+  it("rejects an item that is both needed and an alternative", () => {
+    const result = exerciseFormSchema.safeParse(
+      form({ equipmentAnyOf: ["barbell", "dumbbell"] }),
+    );
+    expect(result.error?.issues[0]?.path).toEqual(["equipmentAnyOf"]);
+  });
+
+  it("rejects no equipment as an alternative", () => {
+    const result = exerciseFormSchema.safeParse(
+      form({ equipment: [], equipmentAnyOf: ["none", "band"] }),
+    );
+    expect(result.error?.issues[0]?.path).toEqual(["equipmentAnyOf"]);
+  });
+
+  it("reads an empty protocol phase as no prescription, not as phase 0", () => {
+    expect(exerciseFormSchema.parse(form()).protocolPhase).toBeNull();
+    expect(exerciseFormSchema.parse(form({ protocolPhase: "2" })).protocolPhase).toBe(2);
+  });
+
+  it("rejects a protocol prescription that loads no tendon", () => {
+    const result = exerciseFormSchema.safeParse(
+      form({ protocolPhase: "1", loadsTendonSites: [] }),
+    );
+    expect(result.error?.issues[0]?.path).toEqual(["protocolPhase"]);
+  });
+
   it("normalizes a supplied slug", () => {
     expect(exerciseFormSchema.parse(form({ slug: "Box Squat " })).slug).toBe(
       "box-squat",

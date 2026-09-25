@@ -36,6 +36,7 @@ export type LoggerExercise = {
   movementPattern: MovementPattern;
   primaryMuscleGroup: MuscleGroup;
   equipment: Equipment[];
+  equipmentAnyOf: Equipment[];
   highImpact: boolean;
   cues: string[];
 };
@@ -293,8 +294,8 @@ export function SetLogger({
   const showBox = exercise?.movementPattern === "depth_drop";
   const bodyweightOnly =
     exercise !== null &&
-    (exercise.equipment.length === 0 ||
-      exercise.equipment.every((item) => item === "none"));
+    exercise.equipmentAnyOf.length === 0 &&
+    exercise.equipment.every((item) => item === "none");
 
   const rejected = queue.rejected;
   const notice =

@@ -12,6 +12,7 @@ import {
   movementPatternLabels,
   muscleGroupLabels,
   planeLabels,
+  PROTOCOL_PHASES,
   RATING_SCALE,
   tendonSiteLabels,
 } from "@/lib/labels";
@@ -288,7 +289,7 @@ export function ExerciseForm({
 
       <Section
         title="Tendon load"
-        description="This drives the pre-filter. A site in protocol phase 1 or 2 removes every exercise listing it from the candidate set entirely, so be honest rather than optimistic."
+        description="This drives the pre-filter. A site in protocol phase 1 or 2 removes every exercise listing it from the candidate set, apart from the protocol's own prescriptions, so be honest rather than optimistic."
       >
         <Field label="Loads these sites" error={error("loadsTendonSites")}>
           <CheckGroup
@@ -314,17 +315,51 @@ export function ExerciseForm({
             ))}
           </Select>
         </Field>
+
+        <Field
+          label="Protocol prescription"
+          hint="The protocol phase this exercise is prescribed for. A site in that phase or a later one keeps it, so the isometrics survive the pre-filter that removes everything else."
+          error={error("protocolPhase")}
+        >
+          <Select name="protocolPhase" defaultValue={v.protocolPhase}>
+            <option value="">Not a protocol exercise</option>
+            {PROTOCOL_PHASES.map((phase) => (
+              <option key={phase.value} value={phase.value}>
+                {phase.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
       </Section>
 
       <Section
         title="Equipment"
         description="Only equipment that is actually available is eligible, so this is what the pre-filter matches against."
       >
-        <Field label="Equipment" error={error("equipment")}>
+        <Field
+          label="Needs all of"
+          hint="Used together, such as a barbell and a rack."
+          error={error("equipment")}
+        >
           <CheckGroup
             name="equipment"
             entries={equipmentLabels.entries()}
             selected={v.equipment}
+            columns={3}
+          />
+        </Field>
+
+        <Field
+          label="Plus one of"
+          hint="Interchangeable, such as dumbbells or kettlebells. Leave empty when nothing is. Optional load like a vest belongs on a variant."
+          error={error("equipmentAnyOf")}
+        >
+          <CheckGroup
+            name="equipmentAnyOf"
+            entries={equipmentLabels
+              .entries()
+              .filter(([value]) => value !== "none")}
+            selected={v.equipmentAnyOf}
             columns={3}
           />
         </Field>

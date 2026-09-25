@@ -1,4 +1,7 @@
+import { addDays } from "@/lib/days";
 import { env } from "@/lib/env";
+
+export { formatDay } from "@/lib/days";
 
 /**
  * Dates in the training day's own zone.
@@ -28,22 +31,7 @@ export function today() {
 
 /** `days` before the given day, as a day key. Negative counts forward. */
 export function dayMinus(days: number, from = today()) {
-  const [y, m, d] = from.split("-").map(Number);
-  // Anchored at UTC noon so the arithmetic cannot cross a boundary on a DST day.
-  const at = new Date(Date.UTC(y, m - 1, d, 12));
-  at.setUTCDate(at.getUTCDate() - days);
-  return at.toISOString().slice(0, 10);
-}
-
-/** Human day label: `Sun 13 Sep`. Weekday first, because that is what is scanned. */
-export function formatDay(day: string) {
-  const [y, m, d] = day.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "UTC",
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  }).format(new Date(Date.UTC(y, m - 1, d, 12)));
+  return addDays(from, -days);
 }
 
 /** `14:32`, in the app's zone. */

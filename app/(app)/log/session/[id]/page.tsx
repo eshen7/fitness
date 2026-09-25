@@ -42,6 +42,7 @@ export default async function SessionPage({ params }: { params: Params }) {
     movementPattern: row.movementPattern,
     primaryMuscleGroup: row.primaryMuscleGroup,
     equipment: row.equipment,
+    equipmentAnyOf: row.equipmentAnyOf,
     highImpact: row.highImpact,
     cues: row.cues,
   }));

@@ -8,10 +8,19 @@ import type { exercises } from "../schema/exercises";
  *
  * - `loadsTendonSites` and `tendonLoadRating` drive the pre-filter. A site in
  *   protocol phase 1 or 2 removes every exercise listing it, which is how tendon
- *   safety becomes impossible to violate rather than merely checked. Unilateral
+ *   safety becomes impossible to violate rather than merely checked. The one
+ *   exception is `protocolPhase`, which marks the protocol's own prescriptions:
+ *   the isometrics for phase 1, the slow heavy lifts for phase 2, and depth
+ *   landings for phase 3. A site keeps the prescriptions for its phase and the
+ *   earlier ones, since the protocol is load management and not rest. Phase 4 is
+ *   ordinary jumping at a managed dose, so nothing is its prescription. Unilateral
  *   drills list both sides, because in practice they are prescribed for both;
  *   training only the healthy side is a deliberate edit, not a default.
  * - `highImpact` is the unit the weekly contact ceiling is counted in.
+ * - `equipment` is needed all together and `equipmentAnyOf` is one of, so a
+ *   carry lists dumbbells and kettlebells as interchangeable rather than as a
+ *   pair. Optional load such as a vest is left off entirely, because the
+ *   pre-filter would otherwise hide a push-up from anyone who does not own one.
  * - `couplingClass` and `typicalContactSeconds` gate shock-method labelling. The
  *   ebook's line is 0.15 s, so anything slower is not shock work whatever it is
  *   called, and the normalizer enforces that.
@@ -343,6 +352,7 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     equipment: ["box"],
     loadsTendonSites: BOTH_KNEE_AND_ANKLE,
     tendonLoadRating: 3,
+    protocolPhase: 3,
     technicalComplexity: 2,
     cues: ["Absorb and hold, do not rebound", "Quiet landing"],
     notes:
@@ -662,7 +672,8 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     couplingClass: "long_ssc",
     typicalContactSeconds: "0.450",
     highImpact: true,
-    equipment: ["barbell", "dumbbell"],
+    equipment: [],
+    equipmentAnyOf: ["barbell", "dumbbell"],
     loadsTendonSites: BOTH_KNEE_AND_ANKLE,
     tendonLoadRating: 4,
     technicalComplexity: 3,
@@ -695,7 +706,8 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     forceVelocity: "max_strength",
     laterality: "bilateral",
     plane: "sagittal",
-    equipment: ["machine", "dumbbell"],
+    equipment: [],
+    equipmentAnyOf: ["machine", "dumbbell"],
     loadsTendonSites: ACHILLES.slice(),
     tendonLoadRating: 2,
     technicalComplexity: 1,
@@ -737,7 +749,7 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     forceVelocity: "non_specific",
     laterality: "bilateral",
     plane: "sagittal",
-    equipment: ["none", "band"],
+    equipment: ["none"],
     tendonLoadRating: 1,
     technicalComplexity: 1,
     cues: ["Pull the toes up hard"],
@@ -760,6 +772,7 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     equipment: ["band", "rack"],
     loadsTendonSites: PATELLAR.slice(),
     tendonLoadRating: 1,
+    protocolPhase: 1,
     technicalComplexity: 1,
     cues: ["Hold at roughly 70 percent effort", "Breathe through the hold"],
     notes:
@@ -776,6 +789,7 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     equipment: ["machine"],
     loadsTendonSites: PATELLAR.slice(),
     tendonLoadRating: 1,
+    protocolPhase: 1,
     technicalComplexity: 1,
     cues: ["Mid-range hold, no lockout"],
     notes: "Patellar protocol phase 1, per side, when the affected side needs isolating.",
@@ -791,6 +805,7 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     equipment: ["none"],
     loadsTendonSites: ACHILLES.slice(),
     tendonLoadRating: 1,
+    protocolPhase: 1,
     technicalComplexity: 1,
     cues: ["Hold high on the toes", "Do not let the heel drift down"],
     notes: "Achilles protocol phase 1.",
@@ -806,6 +821,7 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     equipment: ["machine"],
     loadsTendonSites: PATELLAR.slice(),
     tendonLoadRating: 2,
+    protocolPhase: 2,
     technicalComplexity: 1,
     cues: ["4 seconds down, 4 seconds up"],
     notes:
@@ -820,9 +836,11 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     forceVelocity: "max_strength",
     laterality: "unilateral",
     plane: "sagittal",
-    equipment: ["machine", "dumbbell"],
+    equipment: [],
+    equipmentAnyOf: ["machine", "dumbbell"],
     loadsTendonSites: ACHILLES.slice(),
     tendonLoadRating: 2,
+    protocolPhase: 2,
     technicalComplexity: 1,
     cues: ["4 seconds down, 4 seconds up"],
     notes: "Achilles protocol phase 2.",
@@ -885,7 +903,7 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     forceVelocity: "max_strength",
     laterality: "bilateral",
     plane: "sagittal",
-    equipment: ["dip_station", "weight_vest"],
+    equipment: ["dip_station"],
     tendonLoadRating: 1,
     technicalComplexity: 2,
     cues: ["Slight forward lean", "Stop where the shoulder stays comfortable"],
@@ -899,7 +917,7 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     forceVelocity: "non_specific",
     laterality: "bilateral",
     plane: "sagittal",
-    equipment: ["none", "weight_vest"],
+    equipment: ["none"],
     tendonLoadRating: 1,
     technicalComplexity: 1,
     cues: ["One straight line from head to heels"],
@@ -913,7 +931,7 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     forceVelocity: "max_strength",
     laterality: "bilateral",
     plane: "sagittal",
-    equipment: ["pullup_bar", "weight_vest"],
+    equipment: ["pullup_bar"],
     tendonLoadRating: 1,
     technicalComplexity: 2,
     cues: ["Chest to the bar", "Control the descent"],
@@ -926,7 +944,7 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     forceVelocity: "max_strength",
     laterality: "bilateral",
     plane: "sagittal",
-    equipment: ["pullup_bar", "weight_vest"],
+    equipment: ["pullup_bar"],
     tendonLoadRating: 1,
     technicalComplexity: 2,
     cues: ["Supinated grip, elbows down and back"],
@@ -939,7 +957,8 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     forceVelocity: "max_strength",
     laterality: "bilateral",
     plane: "sagittal",
-    equipment: ["cable", "machine"],
+    equipment: [],
+    equipmentAnyOf: ["cable", "machine"],
     tendonLoadRating: 1,
     technicalComplexity: 1,
     cues: ["Lead with the elbows"],
@@ -981,7 +1000,8 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     forceVelocity: "non_specific",
     laterality: "bilateral",
     plane: "sagittal",
-    equipment: ["barbell", "rack", "gym_rings"],
+    equipment: [],
+    equipmentAnyOf: ["rack", "gym_rings"],
     tendonLoadRating: 1,
     technicalComplexity: 1,
     cues: ["Body stays rigid", "Chest to the bar"],
@@ -994,7 +1014,8 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     forceVelocity: "non_specific",
     laterality: "bilateral",
     plane: "frontal",
-    equipment: ["dumbbell", "cable"],
+    equipment: [],
+    equipmentAnyOf: ["dumbbell", "cable"],
     tendonLoadRating: 1,
     technicalComplexity: 1,
     cues: ["Lead with the elbow, not the hand"],
@@ -1008,7 +1029,8 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     forceVelocity: "non_specific",
     laterality: "bilateral",
     plane: "transverse",
-    equipment: ["cable", "band"],
+    equipment: [],
+    equipmentAnyOf: ["cable", "band"],
     tendonLoadRating: 1,
     technicalComplexity: 1,
     cues: ["Pull to the forehead, thumbs back"],
@@ -1079,7 +1101,8 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     forceVelocity: "non_specific",
     laterality: "unilateral",
     plane: "transverse",
-    equipment: ["cable", "band"],
+    equipment: [],
+    equipmentAnyOf: ["cable", "band"],
     tendonLoadRating: 1,
     technicalComplexity: 1,
     cues: ["Resist the rotation, do not create it"],
@@ -1093,7 +1116,8 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     forceVelocity: "non_specific",
     laterality: "bilateral",
     plane: "sagittal",
-    equipment: ["dumbbell", "kettlebell"],
+    equipment: [],
+    equipmentAnyOf: ["dumbbell", "kettlebell"],
     tendonLoadRating: 1,
     technicalComplexity: 1,
     cues: ["Tall and quiet, no lean"],
@@ -1106,7 +1130,8 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     forceVelocity: "non_specific",
     laterality: "unilateral",
     plane: "frontal",
-    equipment: ["dumbbell", "kettlebell"],
+    equipment: [],
+    equipmentAnyOf: ["dumbbell", "kettlebell"],
     tendonLoadRating: 1,
     technicalComplexity: 1,
     cues: ["Do not let the loaded side pull you over"],
@@ -1124,7 +1149,7 @@ export const STOCK_EXERCISES: SeedExercise[] = [
     forceVelocity: "non_specific",
     laterality: "unilateral",
     plane: "sagittal",
-    equipment: ["none", "band"],
+    equipment: ["none"],
     tendonLoadRating: 1,
     technicalComplexity: 1,
     cues: ["Knee over the toes, heel stays down"],
