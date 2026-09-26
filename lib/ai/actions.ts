@@ -7,7 +7,7 @@ import { addDays } from "@/lib/days";
 import { reviewWeek } from "@/lib/engine";
 import { microcyclePlanSchema, type MicrocyclePlan } from "@/lib/engine/types";
 import { mesocycleTypeLabels } from "@/lib/labels";
-import { hasApiKey } from "./client";
+import { BilledFailure, hasApiKey } from "./client";
 import { loadContext } from "./context";
 import { diffWeeks } from "./edits";
 import { generateDeclaration, generateWeek } from "./generate";
@@ -22,6 +22,7 @@ import {
   loadProposalById,
   nextBlockOrdinal,
   nextWeekSlot,
+  recordSpend,
   totalSpendUsd,
 } from "./proposals";
 import { loadOpenBlock } from "./queries";
@@ -91,6 +92,21 @@ function failed(error: unknown): GenerationResult {
   };
 }
 
+/**
+ * A generation that died in transport saves no proposal, but it was billed, so its
+ * usage goes on the ledger before the failure is reported.
+ */
+async function generationFailed(error: unknown, label: string): Promise<GenerationResult> {
+  if (error instanceof BilledFailure && Object.values(error.usage).some((n) => n > 0)) {
+    try {
+      await recordSpend({ source: "app", label, model: error.model, usage: error.usage });
+    } catch (unrecorded) {
+      console.error("Could not record the spend of a failed generation.", unrecorded);
+    }
+  }
+  return failed(error);
+}
+
 // -----------------------------------------------------------------------------
 
 /**
@@ -137,7 +153,7 @@ export async function declareBlock(input: unknown): Promise<GenerationResult> {
         : `The gate refused every attempt (${run.attempts.length}). The proposal is stored with the violations so the prompt can be fixed.`,
     };
   } catch (error) {
-    return failed(error);
+    return generationFailed(error, "declare block");
   }
 }
 
@@ -202,7 +218,7 @@ export async function generateNextWeek(input: unknown): Promise<GenerationResult
         : `The gate refused every attempt (${run.attempts.length}) and there is no history to fall back on. The violations are on the proposal.`,
     };
   } catch (error) {
-    return failed(error);
+    return generationFailed(error, "generate week");
   }
 }
 
@@ -217,7 +233,7 @@ export async function generateNextWeek(input: unknown): Promise<GenerationResult
 export async function acceptProposal(input: unknown): Promise<GenerationResult> {
   const parsed = acceptSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
-  const { proposalId, editedWeek } = parsed.data;
+  const { proposalId, editedWeek, sessionOrigins } = parsed.data;
 
   try {
     const db = getDb();
@@ -252,8 +268,9 @@ export async function acceptProposal(input: unknown): Promise<GenerationResult> 
 
     // A week handed back unchanged is an acceptance, not an edit, whatever the
     // client sent: the verdict is training signal and must not claim an edit.
+    const origins = sessionOrigins ?? [];
     const edited =
-      editedWeek && diffWeeks(proposed.data, editedWeek as MicrocyclePlan).length
+      editedWeek && diffWeeks(proposed.data, editedWeek as MicrocyclePlan, origins).length
         ? (editedWeek as MicrocyclePlan)
         : null;
     const review = edited
@@ -273,7 +290,7 @@ export async function acceptProposal(input: unknown): Promise<GenerationResult> 
       edited: review ? review.week : null,
       changes: review?.changes,
       advisories: review?.advisories,
-      ownerEdits: review ? diffWeeks(proposed.data, review.week) : null,
+      ownerEdits: review ? diffWeeks(proposed.data, review.week, origins) : null,
       db,
     });
 

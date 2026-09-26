@@ -43,11 +43,23 @@ export const generateWeekSchema = z.object({
 });
 export type GenerateWeekInput = z.input<typeof generateWeekSchema>;
 
-export const acceptSchema = z.object({
-  proposalId: z.number().int().positive(),
-  /** The whole plan as the owner edited it. Omitted means accept as proposed. */
-  editedWeek: microcyclePlanSchema.nullish(),
-});
+export const acceptSchema = z
+  .object({
+    proposalId: z.number().int().positive(),
+    /** The whole plan as the owner edited it. Omitted means accept as proposed. */
+    editedWeek: microcyclePlanSchema.nullish(),
+    /**
+     * For each edited session, the index of the proposed session it came from, so
+     * a moved session is still recognized as itself. Required with `editedWeek`.
+     */
+    sessionOrigins: z.array(z.number().int().nonnegative()).nullish(),
+  })
+  .refine(
+    (input) =>
+      !input.editedWeek ||
+      input.sessionOrigins?.length === input.editedWeek.sessions.length,
+    { path: ["sessionOrigins"], message: "Every edited session needs its origin." },
+  );
 export type AcceptInput = z.input<typeof acceptSchema>;
 
 export const rejectSchema = z.object({

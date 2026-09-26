@@ -14,7 +14,7 @@ import type {
   PlannedSession,
 } from "@/lib/engine/types";
 import type { SessionKind } from "@/lib/taxonomy";
-import { setAiClient } from "./client";
+import { BilledFailure, GENERATION_MODEL, setAiClient } from "./client";
 import type { GenerationContext } from "./context";
 import { fakeAiClient, refused, truncated, type FakeStep } from "./fake";
 import { fixtureBlock, fixtureContext, tendonReading } from "./fixtures";
@@ -363,6 +363,36 @@ describe("generating a week", () => {
     expect(finalViolations(run).length).toBeGreaterThan(0);
     expect(finalViolations(run)).toEqual(run.attempts[2].violations);
     expect(run.usage.outputTokens).toBe(3 * 500 + 32_000);
+  });
+
+  it("propagates a transport failure carrying every token billed before it", async () => {
+    const partial = { inputTokens: 900, outputTokens: 700, cachedInputTokens: 0, reasoningTokens: 0 };
+    use((_, index) => {
+      if (index === 0) return { output: weekProposal() };
+      throw new BilledFailure(new Error("connection reset"), partial, GENERATION_MODEL);
+    });
+    const failure = await generate({
+      declaration: { ...DECLARATION, ...OVER_TARGETED },
+      lastSession: async () => null,
+    }).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(BilledFailure);
+    expect((failure as BilledFailure).message).toBe("connection reset");
+    expect((failure as BilledFailure).usage.outputTokens).toBe(500 + 700);
+  });
+
+  it("meters a transport failure the client did not price", async () => {
+    use((_, index) => {
+      if (index === 0) return { output: weekProposal() };
+      throw new Error("socket hang up");
+    });
+    const failure = await generate({
+      declaration: { ...DECLARATION, ...OVER_TARGETED },
+      lastSession: async () => null,
+    }).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(BilledFailure);
+    expect((failure as BilledFailure).usage.outputTokens).toBe(500);
   });
 
   it("says there is nothing to fall back on rather than inventing one", async () => {

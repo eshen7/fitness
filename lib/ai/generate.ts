@@ -12,6 +12,7 @@ import { addDays } from "@/lib/days";
 import type { SessionKind } from "@/lib/taxonomy";
 import {
   AiOutputError,
+  BilledFailure,
   GENERATION_MODEL,
   getAiClient,
   type AiCall,
@@ -329,7 +330,8 @@ export async function generateWeek(input: {
  * Returns null when the call produced no parseable proposal. That is recorded as
  * a failed attempt rather than thrown, because a truncated or refused response is
  * one bad attempt and the loop has more; only a transport error, which is not an
- * `AiOutputError`, propagates.
+ * `AiOutputError`, propagates, as a `BilledFailure` carrying every token the run
+ * had been billed for so far.
  */
 async function attemptOnce<T extends DeclarationProposal | WeekProposal>(
   call: AiCall<T>,
@@ -347,7 +349,14 @@ async function attemptOnce<T extends DeclarationProposal | WeekProposal>(
     run.suggestedExercises = result.output.suggestedExercises;
     return result.output;
   } catch (error) {
-    if (!(error instanceof AiOutputError)) throw error;
+    if (!(error instanceof AiOutputError)) {
+      const billed = error instanceof BilledFailure ? error : null;
+      throw new BilledFailure(
+        billed ? billed.cause : error,
+        sumUsage(run.usage, billed?.usage ?? EMPTY_USAGE),
+        run.model ?? billed?.model ?? GENERATION_MODEL,
+      );
+    }
     run.usage = sumUsage(run.usage, error.usage);
     run.model ??= GENERATION_MODEL;
     run.attempts.push({

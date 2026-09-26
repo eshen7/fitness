@@ -35,31 +35,39 @@ type SessionPair = { before: PlannedSession | null; after: PlannedSession | null
 /**
  * Which accepted session each proposed one became.
  *
- * Neither array position nor kind alone works. Position breaks the moment a
- * session is dropped or moved, because the editor keeps sessions sorted by day.
- * Kind alone collides, because a week with two mixed days is ordinary - the
- * baseline week is one. So a session first claims one of its kind still on its
- * own day, and only a session that moved takes the next unclaimed one of its kind.
+ * `origins[i]` is the index in `before` that `after.sessions[i]` was edited from,
+ * carried through the edit rather than re-derived. Neither position nor kind nor
+ * day survives an edit: the editor keeps sessions sorted by day, so a move
+ * reorders them, and a week with two sessions of one kind is ordinary. An origin
+ * that names no proposed session, or one already claimed, is an added session.
  */
-function pairSessions(before: MicrocyclePlan, after: MicrocyclePlan): SessionPair[] {
-  const unclaimed = new Set(after.sessions);
-  const partner = new Map<PlannedSession, PlannedSession>();
-  const claim = (session: PlannedSession, fits: (candidate: PlannedSession) => boolean) => {
-    for (const candidate of unclaimed) {
-      if (candidate.kind !== session.kind || !fits(candidate)) continue;
-      unclaimed.delete(candidate);
-      partner.set(session, candidate);
-      return;
+function pairSessions(
+  before: MicrocyclePlan,
+  after: MicrocyclePlan,
+  origins: readonly number[],
+): SessionPair[] {
+  const partner = new Map<number, PlannedSession>();
+  const added: PlannedSession[] = [];
+  after.sessions.forEach((session, index) => {
+    const origin = origins[index];
+    if (origin === undefined || !before.sessions[origin] || partner.has(origin)) {
+      added.push(session);
+    } else {
+      partner.set(origin, session);
     }
-  };
-  for (const session of before.sessions) claim(session, (candidate) => candidate.day === session.day);
-  for (const session of before.sessions) {
-    if (!partner.has(session)) claim(session, () => true);
-  }
+  });
   return [
-    ...before.sessions.map((session) => ({ before: session, after: partner.get(session) ?? null })),
-    ...[...unclaimed].map((session) => ({ before: null, after: session })),
+    ...before.sessions.map((session, index) => ({
+      before: session,
+      after: partner.get(index) ?? null,
+    })),
+    ...added.map((session) => ({ before: null, after: session })),
   ];
+}
+
+/** Origins for a week whose sessions are still where they were proposed. */
+export function identityOrigins(week: MicrocyclePlan): number[] {
+  return week.sessions.map((_, index) => index);
 }
 
 function itemsOf(session: PlannedSession | null) {
@@ -78,7 +86,11 @@ function itemsOf(session: PlannedSession | null) {
  * session moved", and position-keyed diffs report both as a wholesale rewrite the
  * moment a session is dropped.
  */
-export function diffWeeks(before: MicrocyclePlan, after: MicrocyclePlan): OwnerEdit[] {
+export function diffWeeks(
+  before: MicrocyclePlan,
+  after: MicrocyclePlan,
+  origins: readonly number[],
+): OwnerEdit[] {
   const edits: OwnerEdit[] = [];
 
   if (before.loadType !== after.loadType) {
@@ -100,7 +112,7 @@ export function diffWeeks(before: MicrocyclePlan, after: MicrocyclePlan): OwnerE
     });
   }
 
-  const pairs = pairSessions(before, after);
+  const pairs = pairSessions(before, after, origins);
 
   for (const { before: session, after: moved } of pairs) {
     if (!session) continue;

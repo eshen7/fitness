@@ -11,12 +11,14 @@
  * It generates the way the app does - declare a block, then generate its weeks one
  * at a time with each accepted week becoming context for the next - because a
  * pass rate measured on the same single prompt fifty times says nothing about a
- * block that drifts as it fills up. Nothing is written: no proposal rows, no
- * sessions. It reads the database for context only.
+ * block that drifts as it fills up. No plan is written: no proposal rows, no
+ * sessions. The one write is a `spend_ledger` row per generation, so the next
+ * bench run and the app see this one's spend against the same cap.
  *
  * Spend is capped twice over. The meter refuses a generation it cannot afford
  * within `--budget`, and the budget itself is clamped to what is left of
- * `SPEND_CAP_USD` after everything the app has already spent.
+ * `SPEND_CAP_USD` after everything already spent, by the app and by earlier
+ * bench runs.
  *
  * Usage, with the key sourced into the shell rather than copied anywhere:
  *
@@ -29,7 +31,7 @@
 import { writeFileSync } from "node:fs";
 import { config } from "dotenv";
 import { getDb } from "../lib/db";
-import { GENERATION_MODEL, hasApiKey, type AiUsage } from "../lib/ai/client";
+import { BilledFailure, GENERATION_MODEL, hasApiKey, type AiUsage } from "../lib/ai/client";
 import { loadContext, type GenerationContext } from "../lib/ai/context";
 import {
   generateDeclaration,
@@ -39,7 +41,7 @@ import {
   type DeclarationRun,
   type WeekRun,
 } from "../lib/ai/generate";
-import { nextBlockOrdinal, totalSpendUsd } from "../lib/ai/proposals";
+import { nextBlockOrdinal, recordSpend, totalSpendUsd } from "../lib/ai/proposals";
 import { SPEND_CAP_USD, SpendMeter, formatUsd, priceOf } from "../lib/ai/pricing";
 import type { BlockState } from "../lib/ai/queries";
 import type { MesocycleDeclaration, MicrocyclePlan } from "../lib/engine/types";
@@ -139,7 +141,7 @@ function report(measurement: Measurement) {
 /**
  * The block as the weekly generator sees it: the declaration just generated, plus
  * the weeks accepted so far in this bench. Assembled in memory because the bench
- * writes nothing, and a week generated without the weeks before it is not the
+ * writes no plan, and a week generated without the weeks before it is not the
  * prompt the app sends.
  */
 function blockState(input: {
@@ -183,10 +185,15 @@ async function main() {
 
   const price = priceOf(GENERATION_MODEL);
   console.log(
-    `${GENERATION_MODEL} at $${price.input}/$${price.cachedInput} cached/$${price.output} per 1M tokens. Budget ${formatUsd(budget)} of the ${formatUsd(SPEND_CAP_USD)} cap, ${formatUsd(alreadySpent)} already spent by the app.\n`,
+    `${GENERATION_MODEL} at $${price.input}/$${price.cachedInput} cached/$${price.output} per 1M tokens. Budget ${formatUsd(budget)} of the ${formatUsd(SPEND_CAP_USD)} cap, ${formatUsd(alreadySpent)} already spent.\n`,
   );
 
   const meter = new SpendMeter(budget);
+  const charge = async (label: string, model: string, usage: AiUsage) => {
+    const usd = meter.record(label, model, usage);
+    await recordSpend({ source: "bench", label, model, usage }, db);
+    return usd;
+  };
   const base = await loadContext({ db, asOf });
   const measurements: Measurement[] = [];
   let stopped: string | null = null;
@@ -205,7 +212,7 @@ async function main() {
 
     // One block, then its weeks. A pass rate measured on one prompt repeated
     // fifty times would not see the drift that fills a block up.
-    const declarationRun = await tryRun(() =>
+    const declarationRun = await tryRun(`block ${blockOrdinal}`, charge, () =>
       generateDeclaration({
         context: base,
         ordinal: blockOrdinal,
@@ -229,7 +236,11 @@ async function main() {
         "mesocycle",
         blockOrdinal,
         declarationRun,
-        meter.record(`block ${blockOrdinal}`, declarationRun.model ?? GENERATION_MODEL, declarationRun.usage),
+        await charge(
+          `block ${blockOrdinal}`,
+          declarationRun.model ?? GENERATION_MODEL,
+          declarationRun.usage,
+        ),
       ),
     );
     report(measurements.at(-1)!);
@@ -249,7 +260,7 @@ async function main() {
           ...base,
           block: blockState({ declaration, startDate, ordinal: blockOrdinal, priorWeeks }),
         };
-        const weekRun = await tryRun(() =>
+        const weekRun = await tryRun(`week ${ordinal}`, charge, () =>
           generateWeek({
             context,
             declaration,
@@ -275,7 +286,7 @@ async function main() {
             "microcycle",
             ordinal,
             weekRun,
-            meter.record(`week ${ordinal}`, weekRun.model ?? GENERATION_MODEL, weekRun.usage),
+            await charge(`week ${ordinal}`, weekRun.model ?? GENERATION_MODEL, weekRun.usage),
           ),
         );
         report(measurements.at(-1)!);
@@ -325,13 +336,19 @@ async function main() {
  *
  * A refused or truncated response is already an attempt inside the run and is
  * measured as one. This is for the other kind: a 500 or a dropped connection,
- * which says nothing about the prompt and should not be counted against it.
+ * which says nothing about the prompt and should not be counted against it. It
+ * is still charged for whatever it had been billed before it failed.
  */
-async function tryRun<T>(run: () => Promise<T>): Promise<T | null> {
+async function tryRun<T>(
+  label: string,
+  charge: (label: string, model: string, usage: AiUsage) => Promise<number>,
+  run: () => Promise<T>,
+): Promise<T | null> {
   try {
     return await run();
   } catch (error) {
     console.error(`  call failed: ${error instanceof Error ? error.message : String(error)}`);
+    if (error instanceof BilledFailure) await charge(`${label} (failed)`, error.model, error.usage);
     return null;
   }
 }

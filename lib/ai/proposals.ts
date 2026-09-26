@@ -193,17 +193,23 @@ export async function nextWeekSlot(
 
 /**
  * Everything spent on generation so far, from the stored usage and the model's
- * price.
+ * price: every proposal, plus the ledger of spend that has no proposal row -
+ * bench runs and generations that died in transport.
  *
  * Derived rather than tracked, so it survives a restart and cannot drift from what
  * was actually billed for. Shown on the plan screen because a generator that bills
  * per call should say what it has cost without being asked.
  */
 export async function totalSpendUsd(db: Db = getDb()): Promise<number> {
-  const rows = await db
-    .select({ model: schema.planProposals.model, usage: schema.planProposals.usage })
-    .from(schema.planProposals);
-  return rows.reduce((sum, row) => {
+  const [proposals, ledger] = await Promise.all([
+    db
+      .select({ model: schema.planProposals.model, usage: schema.planProposals.usage })
+      .from(schema.planProposals),
+    db
+      .select({ model: schema.spendLedger.model, usage: schema.spendLedger.usage })
+      .from(schema.spendLedger),
+  ]);
+  return [...proposals, ...ledger].reduce((sum, row) => {
     if (!row.model || !row.usage) return sum;
     return (
       sum +
@@ -215,6 +221,14 @@ export async function totalSpendUsd(db: Db = getDb()): Promise<number> {
       })
     );
   }, 0);
+}
+
+/** Puts spend that no proposal row will carry where `totalSpendUsd` counts it. */
+export async function recordSpend(
+  entry: { source: "bench" | "app"; label: string; model: string; usage: AiUsage },
+  db: Db = getDb(),
+): Promise<void> {
+  await db.insert(schema.spendLedger).values(entry);
 }
 
 // -----------------------------------------------------------------------------

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, Field, Tag, Textarea } from "@/components/ui";
 import { acceptProposal, rejectProposalAction } from "@/lib/ai/actions";
-import { diffWeeks } from "@/lib/ai/edits";
+import { diffWeeks, identityOrigins } from "@/lib/ai/edits";
 import { formatUsd, costOf } from "@/lib/ai/pricing";
 import type { StoredProposal } from "@/lib/ai/proposals";
 import { formatDay } from "@/lib/days";
@@ -49,7 +49,7 @@ export function ProposalReview({
   canRegenerate?: boolean;
 }) {
   const router = useRouter();
-  const [edited, setEdited] = useState<MicrocyclePlan | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
   const [reason, setReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -58,10 +58,11 @@ export function ProposalReview({
 
   const week = parseWeek(proposal.normalized);
   const declaration = parseDeclaration(proposal.normalized);
+  const edited = draft?.week ?? null;
   const shown = edited ?? week;
   // Opening the editor takes a working copy, which is not the same as having
   // changed something. The badge and the accept label track the diff, not the mode.
-  const ownerEdits = edited && week ? diffWeeks(week, edited) : [];
+  const ownerEdits = draft && week ? diffWeeks(week, draft.week, draft.origins) : [];
 
   function accept() {
     setMessage(null);
@@ -69,11 +70,12 @@ export function ProposalReview({
       const result = await acceptProposal({
         proposalId: proposal.id,
         editedWeek: ownerEdits.length ? edited : null,
+        sessionOrigins: ownerEdits.length ? draft?.origins : null,
       });
       setOk(result.ok);
       setMessage(result.message);
       if (result.ok) {
-        setEdited(null);
+        setDraft(null);
         router.refresh();
       }
     });
@@ -93,7 +95,9 @@ export function ProposalReview({
   }
 
   function change(edit: WeekEdit) {
-    setEdited((current) => (current ? applyEdit(current, edit) : current));
+    setDraft((current) =>
+      current ? { ...current, week: applyEdit(current.week, edit) } : current,
+    );
   }
 
   return (
@@ -156,7 +160,9 @@ export function ProposalReview({
             {week ? (
               <button
                 type="button"
-                onClick={() => setEdited(edited ? null : week)}
+                onClick={() =>
+                  setDraft(draft ? null : { week, origins: identityOrigins(week) })
+                }
                 className="text-xs font-semibold text-accent underline-offset-2 hover:underline"
               >
                 {edited ? "Discard edits" : "Edit"}
@@ -171,14 +177,16 @@ export function ProposalReview({
               editing={edited !== null}
               onChange={change}
               onMoveSession={(from, to) =>
-                setEdited((current) => (current ? moveSession(current, from, to) : current))
+                setDraft((current) => (current ? moveSession(current, from, to) : current))
               }
               onDropSession={(day) =>
-                setEdited((current) => (current ? dropSession(current, day) : current))
+                setDraft((current) => (current ? dropSession(current, day) : current))
               }
               onDropItem={(day, exerciseId) =>
-                setEdited((current) =>
-                  current ? dropItem(current, day, exerciseId) : current,
+                setDraft((current) =>
+                  current
+                    ? { ...current, week: dropItem(current.week, day, exerciseId) }
+                    : current,
                 )
               }
             />
@@ -572,18 +580,34 @@ function applyEdit(week: MicrocyclePlan, edit: WeekEdit): MicrocyclePlan {
   };
 }
 
-function moveSession(week: MicrocyclePlan, from: string, to: string): MicrocyclePlan {
-  if (to === "") return week;
+/**
+ * The week being edited, with the proposed index each session came from, so the
+ * diff can follow a session across a move that reorders the week.
+ */
+type Draft = { week: MicrocyclePlan; origins: number[] };
+
+function moveSession(draft: Draft, from: string, to: string): Draft {
+  if (to === "") return draft;
+  const rows = draft.week.sessions
+    .map((session, index) => ({
+      session: session.day === from ? { ...session, day: to } : session,
+      origin: draft.origins[index],
+    }))
+    .sort((a, b) => a.session.day.localeCompare(b.session.day));
   return {
-    ...week,
-    sessions: week.sessions
-      .map((session) => (session.day === from ? { ...session, day: to } : session))
-      .sort((a, b) => a.day.localeCompare(b.day)),
+    week: { ...draft.week, sessions: rows.map((row) => row.session) },
+    origins: rows.map((row) => row.origin),
   };
 }
 
-function dropSession(week: MicrocyclePlan, day: string): MicrocyclePlan {
-  return { ...week, sessions: week.sessions.filter((session) => session.day !== day) };
+function dropSession(draft: Draft, day: string): Draft {
+  const kept = draft.week.sessions.flatMap((session, index) =>
+    session.day === day ? [] : [{ session, origin: draft.origins[index] }],
+  );
+  return {
+    week: { ...draft.week, sessions: kept.map((row) => row.session) },
+    origins: kept.map((row) => row.origin),
+  };
 }
 
 /**

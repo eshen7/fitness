@@ -7,7 +7,7 @@ import {
 } from "@/lib/engine/fixtures/baseline";
 import { addDays } from "@/lib/days";
 import type { MicrocyclePlan, PlannedSession } from "@/lib/engine/types";
-import { diffWeeks } from "./edits";
+import { diffWeeks, identityOrigins } from "./edits";
 
 /**
  * Owner edits are stored as a diff because the diff is the training signal:
@@ -44,7 +44,7 @@ function mapSession(
 
 describe("diffWeeks", () => {
   it("reports nothing for an untouched week", () => {
-    expect(diffWeeks(baselineWeek(), baselineWeek())).toEqual([]);
+    expect(diffWeeks(baselineWeek(), baselineWeek(), identityOrigins(baselineWeek()))).toEqual([]);
   });
 
   it("names the field, the day and both values of a prescription edit", () => {
@@ -55,7 +55,7 @@ describe("diffWeeks", () => {
       patch: { sets: 4, loadPctOf1rm: 90 },
     });
 
-    expect(diffWeeks(before, after)).toEqual([
+    expect(diffWeeks(before, after, identityOrigins(after))).toEqual([
       {
         kind: "prescription",
         day: before.sessions[0].day,
@@ -83,7 +83,7 @@ describe("diffWeeks", () => {
       patch: { boxHeightCm: null },
     });
 
-    expect(diffWeeks(before, after)).toEqual([
+    expect(diffWeeks(before, after, identityOrigins(after))).toEqual([
       {
         kind: "prescription",
         day: before.sessions[0].day,
@@ -100,7 +100,7 @@ describe("diffWeeks", () => {
     const moved = addDays(before.sessions[1].day, 1);
     const after = mapSession(before, 1, (session) => ({ ...session, day: moved }));
 
-    expect(diffWeeks(before, after)).toEqual([
+    expect(diffWeeks(before, after, identityOrigins(after))).toEqual([
       {
         kind: "session",
         day: moved,
@@ -121,7 +121,7 @@ describe("diffWeeks", () => {
       patch: { sets: 2 },
     });
 
-    expect(diffWeeks(before, after)).toEqual([
+    expect(diffWeeks(before, after, identityOrigins(after))).toEqual([
       {
         kind: "prescription",
         day: before.sessions[0].day,
@@ -133,21 +133,33 @@ describe("diffWeeks", () => {
     ]);
   });
 
-  it("follows a session moved past another of its kind", () => {
-    // The editor keeps sessions sorted by day, so moving Monday's mixed session
-    // past Friday's reorders them. It is still one move, not two rewrites.
+  it("follows sessions that cross each other when moved", () => {
+    // The editor keeps sessions sorted by day, so swapping the two mixed days
+    // reorders them. Identity rides along as the origin index, so it is still two
+    // moves and not two rewrites of each other's prescriptions.
     const before = baselineWeek();
-    const mixed = before.sessions.filter((session) => session.kind === "mixed");
-    const moved = addDays(mixed[1].day, 1);
-    const after: MicrocyclePlan = {
-      ...before,
-      sessions: before.sessions
-        .map((session) => (session === mixed[0] ? { ...session, day: moved } : session))
-        .sort((a, b) => a.day.localeCompare(b.day)),
-    };
+    const [first, , last] = before.sessions;
+    const days = new Map([
+      [0, addDays(last.day, 1)],
+      [2, addDays(before.startDate, 1)],
+    ]);
+    const edited = before.sessions
+      .map((session, origin) => ({
+        origin,
+        session: { ...session, day: days.get(origin) ?? session.day },
+      }))
+      .sort((a, b) => a.session.day.localeCompare(b.session.day));
+    const after: MicrocyclePlan = { ...before, sessions: edited.map((row) => row.session) };
 
-    expect(diffWeeks(before, after)).toEqual([
-      { kind: "session", day: moved, field: "day", from: mixed[0].day, to: moved },
+    expect(
+      diffWeeks(
+        before,
+        after,
+        edited.map((row) => row.origin),
+      ),
+    ).toEqual([
+      { kind: "session", day: days.get(0), field: "day", from: first.day, to: days.get(0) },
+      { kind: "session", day: days.get(2), field: "day", from: last.day, to: days.get(2) },
     ]);
   });
 
@@ -167,7 +179,7 @@ describe("diffWeeks", () => {
       ],
     };
 
-    const edits = diffWeeks(before, after);
+    const edits = diffWeeks(before, after, [0, 2]);
     expect(edits).toContainEqual({
       kind: "removed",
       day: before.sessions[1].day,
@@ -202,7 +214,7 @@ describe("diffWeeks", () => {
     };
     const after: MicrocyclePlan = { ...before, sessions: [...before.sessions, extra] };
 
-    expect(diffWeeks(before, after)).toEqual([
+    expect(diffWeeks(before, after, identityOrigins(after))).toEqual([
       { kind: "added", day: extra.day, field: "session", from: null, to: "plyometric" },
       { kind: "added", day: extra.day, exerciseId: APPROACH, from: null, to: 3 },
     ]);
@@ -212,7 +224,7 @@ describe("diffWeeks", () => {
     const before = baselineWeek();
     const after: MicrocyclePlan = { ...before, loadType: "retaining", relativeLoad: 0.7 };
 
-    expect(diffWeeks(before, after)).toEqual([
+    expect(diffWeeks(before, after, identityOrigins(after))).toEqual([
       {
         kind: "session",
         day: before.startDate,
@@ -234,7 +246,7 @@ describe("diffWeeks", () => {
     const before = baselineWeek();
     const after = mapSession(before, 2, (session) => ({ ...session, plannedIntensity: 9 }));
 
-    expect(diffWeeks(before, after)).toEqual([
+    expect(diffWeeks(before, after, identityOrigins(after))).toEqual([
       {
         kind: "session",
         day: before.sessions[2].day,

@@ -130,6 +130,24 @@ export class AiOutputError extends Error {
   }
 }
 
+/**
+ * A failure that is not the model's - a dropped connection, a 5xx - carrying
+ * what had already been billed when it happened.
+ *
+ * It propagates rather than counting as an attempt, but the tokens behind it were
+ * paid for, and a spend cap that forgets them is not a cap.
+ */
+export class BilledFailure extends Error {
+  constructor(
+    cause: unknown,
+    readonly usage: AiUsage,
+    readonly model: string,
+  ) {
+    super(cause instanceof Error ? cause.message : String(cause), { cause });
+    this.name = "BilledFailure";
+  }
+}
+
 function addUsage(total: AiUsage, usage: Response["usage"]): AiUsage {
   if (!usage) return total;
   return {
@@ -217,76 +235,81 @@ export const openaiClient: AiClient = {
     const toolCalls: AiToolCall[] = [];
     let usage = EMPTY_USAGE;
 
-    for (let turn = 0; turn <= MAX_TOOL_TURNS; turn += 1) {
-      const response = await client.responses.parse({
-        model: GENERATION_MODEL,
-        input: inputOf(call, history),
-        tools,
-        text: { format },
-        reasoning: { effort: REASONING_EFFORT },
-        max_output_tokens: MAX_OUTPUT_TOKENS,
-        prompt_cache_key: call.cacheKey,
-      });
-      usage = addUsage(usage, response.usage);
+    try {
+      for (let turn = 0; turn <= MAX_TOOL_TURNS; turn += 1) {
+        const response = await client.responses.parse({
+          model: GENERATION_MODEL,
+          input: inputOf(call, history),
+          tools,
+          text: { format },
+          reasoning: { effort: REASONING_EFFORT },
+          max_output_tokens: MAX_OUTPUT_TOKENS,
+          prompt_cache_key: call.cacheKey,
+        });
+        usage = addUsage(usage, response.usage);
 
-      // Checked before any content is read: a truncated plan parses as often as
-      // not, and a half-written week is worse than a reported failure.
-      if (response.status === "incomplete") {
-        throw new AiOutputError(
-          "truncated",
-          `${call.label}: the response stopped early (${response.incomplete_details?.reason ?? "unknown reason"}).`,
-          usage,
-        );
-      }
-      const refusal = refusalOf(response);
-      if (refusal) {
-        throw new AiOutputError(
-          "refused",
-          `${call.label}: the model declined. ${refusal}`,
-          usage,
-        );
-      }
-
-      const calls = functionCallsOf(response);
-      if (calls.length === 0) {
-        if (response.output_parsed === null || response.output_parsed === undefined) {
+        // Checked before any content is read: a truncated plan parses as often as
+        // not, and a half-written week is worse than a reported failure.
+        if (response.status === "incomplete") {
           throw new AiOutputError(
-            "empty",
-            `${call.label}: the response carried neither a tool call nor a plan.`,
+            "truncated",
+            `${call.label}: the response stopped early (${response.incomplete_details?.reason ?? "unknown reason"}).`,
             usage,
           );
         }
-        return {
-          output: response.output_parsed,
-          model: response.model,
-          usage,
-          toolCalls,
-        };
+        const refusal = refusalOf(response);
+        if (refusal) {
+          throw new AiOutputError(
+            "refused",
+            `${call.label}: the model declined. ${refusal}`,
+            usage,
+          );
+        }
+
+        const calls = functionCallsOf(response);
+        if (calls.length === 0) {
+          if (response.output_parsed === null || response.output_parsed === undefined) {
+            throw new AiOutputError(
+              "empty",
+              `${call.label}: the response carried neither a tool call nor a plan.`,
+              usage,
+            );
+          }
+          return {
+            output: response.output_parsed,
+            model: response.model,
+            usage,
+            toolCalls,
+          };
+        }
+
+        for (const item of calls) {
+          // Rebuilt field by field rather than spread: the SDK decorates the call
+          // with `parsed_arguments`, which the API rejects on the way back in.
+          history.push({
+            type: "function_call",
+            call_id: item.call_id,
+            name: item.name,
+            arguments: item.arguments,
+          });
+          toolCalls.push({ name: item.name, input: safeJson(item.arguments) });
+          history.push({
+            type: "function_call_output",
+            call_id: item.call_id,
+            output: await runTool(byName.get(item.name), item),
+          });
+        }
       }
 
-      for (const item of calls) {
-        // Rebuilt field by field rather than spread: the SDK decorates the call
-        // with `parsed_arguments`, which the API rejects on the way back in.
-        history.push({
-          type: "function_call",
-          call_id: item.call_id,
-          name: item.name,
-          arguments: item.arguments,
-        });
-        toolCalls.push({ name: item.name, input: safeJson(item.arguments) });
-        history.push({
-          type: "function_call_output",
-          call_id: item.call_id,
-          output: await runTool(byName.get(item.name), item),
-        });
-      }
+      throw new AiOutputError(
+        "tool-loop",
+        `${call.label}: the model was still calling tools after ${MAX_TOOL_TURNS} rounds.`,
+        usage,
+      );
+    } catch (error) {
+      if (error instanceof AiOutputError) throw error;
+      throw new BilledFailure(error, usage, GENERATION_MODEL);
     }
-
-    throw new AiOutputError(
-      "tool-loop",
-      `${call.label}: the model was still calling tools after ${MAX_TOOL_TURNS} rounds.`,
-      usage,
-    );
   },
 };
 
@@ -297,10 +320,7 @@ export const openaiClient: AiClient = {
  * throwing, because the model can recover from "no such tool" on the next turn
  * and cannot recover from a 500.
  */
-async function runTool(
-  tool: AiTool | undefined,
-  item: ResponseFunctionToolCall,
-): Promise<string> {
+async function runTool(tool: AiTool | undefined, item: ResponseFunctionToolCall): Promise<string> {
   if (!tool) return JSON.stringify({ error: `No tool named ${item.name}.` });
   const parsed = tool.parameters.safeParse(safeJson(item.arguments));
   if (!parsed.success) {

@@ -23,7 +23,7 @@ The build plan lives at `~/.claude/plans/splendid-munching-map.md`.
 | `npm run db:seed` | Idempotent seed |
 | `npm run db:seed:history -- --replace` | Replace training history with a deterministic twenty-week dev fixture (destructive, local only) |
 | `npm run passcode` | Print a fresh `PASSCODE_HASH` and `SESSION_SECRET` |
-| `npm run bench:generation -- --runs 50 --budget 1` | Measure the generation exit criteria against the live model (needs `OPENAI_API_KEY`, spends real money, writes nothing) |
+| `npm run bench:generation -- --runs 50 --budget 1` | Measure the generation exit criteria against the live model (needs `OPENAI_API_KEY`, spends real money, writes only its spend to `spend_ledger`) |
 
 `npm run lint` and `npm run typecheck` are expected clean at every phase boundary, not deferred.
 
@@ -70,7 +70,7 @@ lib/memory/          preference and insight store
 - **A `w-*` handed to `Input`, `Select` or `Textarea` is a coin toss.** `FIELD` in `components/ui.tsx` already carries `w-full`, and two utilities of equal specificity are resolved by their order in the generated stylesheet rather than by the order of the `className` string. Size the wrapper, or let the field flex and mark its siblings `shrink-0`.
 - **The model never sees the clock in the cached half of the prompt.** `lib/ai/context.ts` splits the request into a stable prefix, ordered first, and a volatile suffix; today's date, tendon state and readiness live in the suffix. Moving anything that changes daily into the prefix drops the cache hit rate to zero and multiplies the input cost by ten, silently.
 - **The generator is reached through a seam, never the SDK directly.** `getAiClient()` in `lib/ai/client.ts` returns the override `setAiClient` installed or the real OpenAI client, so `lib/ai/generate.test.ts` drives the whole pipeline - repairs, refusals, truncation, the fallback - with no key and no database. The key is read from the environment at call time and belongs in no file in this repository.
-- **Every live call goes on the meter.** `SpendMeter` in `lib/ai/pricing.ts` prices usage against `MODEL_PRICES`, an unknown model is charged at the dearest rate in the table rather than the cheapest, and `SPEND_CAP_USD` is the owner's hard ceiling. `npm run bench:generation` refuses a generation it cannot afford twice over: against its own `--budget` and against what the app has already spent.
+- **Every live call goes on the meter.** `SpendMeter` in `lib/ai/pricing.ts` prices usage against `MODEL_PRICES`, an unknown model is charged at the dearest rate in the table rather than the cheapest, and `SPEND_CAP_USD` is the owner's hard ceiling. `totalSpendUsd` sums proposal rows and `spend_ledger`, which holds spend with no proposal behind it: bench runs and generations that died in transport as a `BilledFailure`. `npm run bench:generation` refuses a generation it cannot afford twice over: against its own `--budget` and against everything already spent.
 
 ## Domain reference: jump training
 

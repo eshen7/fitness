@@ -322,6 +322,31 @@ export const planProposals = pgTable(
   ],
 );
 
+/**
+ * Model spend that has no proposal row to carry it: every bench generation, and
+ * the attempts billed before a generation died of a transport error.
+ *
+ * `SPEND_CAP_USD` is one ceiling across every live call, so the spend total is
+ * `plan_proposals.usage` plus this, and a call that billed without writing a
+ * proposal still counts against it.
+ */
+export const spendLedger = pgTable("spend_ledger", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  /** Where the call came from: `bench` or `app`. */
+  source: text().notNull(),
+  label: text().notNull(),
+  model: text().notNull(),
+  usage: jsonb()
+    .$type<{
+      inputTokens: number;
+      outputTokens: number;
+      cachedInputTokens: number;
+      reasoningTokens: number;
+    }>()
+    .notNull(),
+  ...stamps,
+});
+
 export const mesocyclesRelations = relations(mesocycles, ({ one, many }) => ({
   macrocycle: one(macrocycles, {
     fields: [mesocycles.macrocycleId],
