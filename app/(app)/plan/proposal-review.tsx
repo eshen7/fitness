@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, Field, Tag, Textarea } from "@/components/ui";
 import { acceptProposal, rejectProposalAction } from "@/lib/ai/actions";
@@ -22,6 +22,7 @@ import {
   movementPatternLabels,
   muscleGroupLabels,
 } from "@/lib/labels";
+import { useVerdictOutcome } from "./verdict-outcome";
 import { WeekEditor, type WeekEdit } from "./week-editor";
 
 /**
@@ -53,8 +54,11 @@ export function ProposalReview({
   const [reason, setReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [ok, setOk] = useState(false);
   const [pending, start] = useTransition();
+  const announce = useVerdictOutcome();
+
+  // A new proposal on screen makes the answer about the last one stale.
+  useEffect(() => announce(null), [announce, proposal.id]);
 
   const week = parseWeek(proposal.normalized);
   const declaration = parseDeclaration(proposal.normalized);
@@ -72,11 +76,13 @@ export function ProposalReview({
         editedWeek: ownerEdits.length ? edited : null,
         sessionOrigins: ownerEdits.length ? draft?.origins : null,
       });
-      setOk(result.ok);
-      setMessage(result.message);
+      // Success refreshes this review away, so its answer goes above it.
       if (result.ok) {
+        announce(result.message);
         setDraft(null);
         router.refresh();
+      } else {
+        setMessage(result.message);
       }
     });
   }
@@ -85,11 +91,12 @@ export function ProposalReview({
     setMessage(null);
     start(async () => {
       const result = await rejectProposalAction({ proposalId: proposal.id, reason });
-      setOk(result.ok);
-      setMessage(result.message);
       if (result.ok) {
+        announce(result.message);
         setRejecting(false);
         router.refresh();
+      } else {
+        setMessage(result.message);
       }
     });
   }
@@ -383,7 +390,7 @@ export function ProposalReview({
         ) : null}
 
         {message ? (
-          <p role="status" className={`text-sm ${ok ? "text-ink-muted" : "text-bad"}`}>
+          <p role="status" className="text-sm text-bad">
             {message}
           </p>
         ) : null}

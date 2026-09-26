@@ -10,6 +10,7 @@ import { CloseBlock } from "./close-block";
 import { DeclareBlock } from "./declare-block";
 import { GenerateWeek } from "./generate-week";
 import { ProposalReview } from "./proposal-review";
+import { VerdictOutcome, VerdictOutcomeProvider } from "./verdict-outcome";
 
 export const metadata = { title: "Plan" };
 
@@ -34,173 +35,179 @@ export default async function PlanPage() {
         </span>
       </PageHeader>
 
-      <div className="space-y-5">
-        {!snapshot.hasKey ? (
-          <Card>
-            <p className="text-sm text-ink-muted">
-              <span className="font-medium text-warn">No API key.</span> Generation
-              needs <code className="text-xs">OPENAI_API_KEY</code> in the
-              environment. Everything already written still reads normally.
-            </p>
-          </Card>
-        ) : null}
+      <VerdictOutcomeProvider>
+        <div className="space-y-5">
+          {!snapshot.hasKey ? (
+            <Card>
+              <p className="text-sm text-ink-muted">
+                <span className="font-medium text-warn">No API key.</span> Generation
+                needs <code className="text-xs">OPENAI_API_KEY</code> in the
+                environment. Everything already written still reads normally.
+              </p>
+            </Card>
+          ) : null}
 
-        {block ? (
-          <Card>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-base font-semibold text-ink">
-                    Block {block.ordinal}
-                  </h2>
-                  <Tag tone="accent">
-                    {mesocycleTypeLabels.of(block.declaration.type)}
-                  </Tag>
-                  <Tag>
-                    {block.priorWeeks.length} of{" "}
-                    {block.declaration.plannedMicrocycles} weeks
-                  </Tag>
+          {block ? (
+            <Card>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-base font-semibold text-ink">
+                      Block {block.ordinal}
+                    </h2>
+                    <Tag tone="accent">
+                      {mesocycleTypeLabels.of(block.declaration.type)}
+                    </Tag>
+                    <Tag>
+                      {block.priorWeeks.length} of{" "}
+                      {block.declaration.plannedMicrocycles} weeks
+                    </Tag>
+                  </div>
+                  <p className="mt-1 text-xs text-ink-faint">
+                    From {formatDay(block.startDate)}
+                  </p>
                 </div>
-                <p className="mt-1 text-xs text-ink-faint">
-                  From {formatDay(block.startDate)}
-                </p>
+                <CloseBlock />
               </div>
-              <CloseBlock />
-            </div>
 
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {block.declaration.targetAbilities.map((ability) => (
-                <Tag key={ability} tone="cool">
-                  {motorAbilityLabels.of(ability)}
-                </Tag>
-              ))}
-            </div>
-            {block.declaration.technicalFocus.length ? (
-              <p className="mt-2 text-sm text-ink-muted">
-                <span className="text-ink-faint">Technical focus: </span>
-                {block.declaration.technicalFocus.join("; ")}
-              </p>
-            ) : null}
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {block.declaration.targetAbilities.map((ability) => (
+                  <Tag key={ability} tone="cool">
+                    {motorAbilityLabels.of(ability)}
+                  </Tag>
+                ))}
+              </div>
+              {block.declaration.technicalFocus.length ? (
+                <p className="mt-2 text-sm text-ink-muted">
+                  <span className="text-ink-faint">Technical focus: </span>
+                  {block.declaration.technicalFocus.join("; ")}
+                </p>
+              ) : null}
 
-            <div className="mt-4">
-              <p className="text-xs font-medium tracking-wide text-ink-faint uppercase">
-                The complex
-              </p>
-              {block.declaration.complex.length ? (
-                <ul className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
-                  {block.declaration.complex.map((item) => (
-                    <li
-                      key={item.exerciseId}
-                      className="flex items-center justify-between gap-2 rounded-field border border-line bg-surface-sunken px-3 py-2"
-                    >
-                      <span className="min-w-0 truncate text-sm text-ink">
-                        {names[String(item.exerciseId)] ?? `Exercise ${item.exerciseId}`}
-                      </span>
-                      <span className="flex shrink-0 items-center gap-1.5">
-                        {item.isMain ? <Tag tone="accent">main</Tag> : null}
-                        <span className="text-xs text-ink-faint tabular-nums">
-                          {item.targetWeeklyFrequency ?? 2}x/wk
+              <div className="mt-4">
+                <p className="text-xs font-medium tracking-wide text-ink-faint uppercase">
+                  The complex
+                </p>
+                {block.declaration.complex.length ? (
+                  <ul className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
+                    {block.declaration.complex.map((item) => (
+                      <li
+                        key={item.exerciseId}
+                        className="flex items-center justify-between gap-2 rounded-field border border-line bg-surface-sunken px-3 py-2"
+                      >
+                        <span className="min-w-0 truncate text-sm text-ink">
+                          {names[String(item.exerciseId)] ?? `Exercise ${item.exerciseId}`}
                         </span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                // A block from before the generator existed has no complex recorded,
-                // and a week generated inside one cannot satisfy stable-complex. Say
-                // that, rather than leaving the heading standing over nothing.
-                <p className="mt-1.5 text-sm text-ink-muted">
-                  Not recorded for this block, so a generated week has nothing to hold
-                  stable. End the block and declare the next one.
-                </p>
-              )}
-            </div>
-          </Card>
-        ) : null}
+                        <span className="flex shrink-0 items-center gap-1.5">
+                          {item.isMain ? <Tag tone="accent">main</Tag> : null}
+                          <span className="text-xs text-ink-faint tabular-nums">
+                            {item.targetWeeklyFrequency ?? 2}x/wk
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  // A block from before the generator existed has no complex recorded,
+                  // and a week generated inside one cannot satisfy stable-complex. Say
+                  // that, rather than leaving the heading standing over nothing.
+                  <p className="mt-1.5 text-sm text-ink-muted">
+                    Not recorded for this block, so a generated week has nothing to hold
+                    stable. End the block and declare the next one.
+                  </p>
+                )}
+              </div>
+            </Card>
+          ) : null}
 
-        {pending ? (
-          <>
-            <ProposalReview proposal={pending} names={names} />
-            {block && nextWeek ? (
-              <Card>
-                <h2 className="text-base font-semibold text-ink">
-                  Not what you wanted?
-                </h2>
-                <p className="mt-1 mb-3 text-sm text-ink-faint">
-                  Regenerating supersedes the proposal above rather than replacing
-                  it, so the reason it was thrown away stays on the record.
-                </p>
-                <GenerateWeek
-                  mesocycleId={block.mesocycleId}
-                  ordinal={pending.ask?.ordinal ?? nextWeek.ordinal}
-                  startDate={pending.ask?.startDate ?? nextWeek.startDate}
-                  supersedesId={pending.id}
-                  disabled={!snapshot.hasKey}
-                />
-              </Card>
-            ) : null}
-          </>
-        ) : block && nextWeek ? (
-          <Card>
-            <h2 className="text-base font-semibold text-ink">
-              Week {nextWeek.ordinal}
-            </h2>
-            <p className="mt-1 mb-4 text-sm text-ink-faint">
-              Generated inside the declaration above: the complex is fixed, the load
-              is what varies.
-            </p>
-            <GenerateWeek
-              mesocycleId={block.mesocycleId}
-              ordinal={nextWeek.ordinal}
-              startDate={nextWeek.startDate}
-              disabled={!snapshot.hasKey}
-            />
-          </Card>
-        ) : (
-          <Card>
-            <h2 className="text-base font-semibold text-ink">Declare a block</h2>
-            <p className="mt-1 mb-4 text-sm text-ink-faint">
-              Type, one or two target abilities, one technical focus, and a stable
-              complex of about ten exercises. Weeks are generated inside it
-              afterwards, one at a time.
-            </p>
-            <DeclareBlock defaultStartDate={today()} disabled={!snapshot.hasKey} />
-          </Card>
-        )}
+          <VerdictOutcome />
 
-        <section>
-          <h2 className="mb-2 text-base font-semibold text-ink">Recent proposals</h2>
-          {snapshot.history.length === 0 ? (
-            <EmptyState title="Nothing generated yet">
-              Every proposal is kept, accepted or not, with the inputs it saw and
-              what the gate made of it.
-            </EmptyState>
+          {pending ? (
+            <>
+              <ProposalReview proposal={pending} names={names} />
+              {block && nextWeek ? (
+                <Card>
+                  <h2 className="text-base font-semibold text-ink">
+                    Not what you wanted?
+                  </h2>
+                  <p className="mt-1 mb-3 text-sm text-ink-faint">
+                    Regenerating supersedes the proposal above rather than replacing
+                    it, so the reason it was thrown away stays on the record.
+                  </p>
+                  <GenerateWeek
+                    mesocycleId={block.mesocycleId}
+                    ordinal={pending.ask?.ordinal ?? nextWeek.ordinal}
+                    startDate={pending.ask?.startDate ?? nextWeek.startDate}
+                    supersedesId={pending.id}
+                    disabled={!snapshot.hasKey}
+                  />
+                </Card>
+              ) : null}
+            </>
+          ) : block && nextWeek ? (
+            <Card>
+              <h2 className="text-base font-semibold text-ink">
+                Week {nextWeek.ordinal}
+              </h2>
+              <p className="mt-1 mb-4 text-sm text-ink-faint">
+                Generated inside the declaration above: the complex is fixed, the load
+                is what varies.
+              </p>
+              <GenerateWeek
+                mesocycleId={block.mesocycleId}
+                ordinal={nextWeek.ordinal}
+                startDate={nextWeek.startDate}
+                disabled={!snapshot.hasKey}
+              />
+            </Card>
           ) : (
-            <ul className="space-y-1.5">
-              {snapshot.history.map((proposal) => (
-                <li
-                  key={proposal.id}
-                  className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-field border border-line bg-surface px-3 py-2 text-sm"
-                >
-                  <span className="text-ink-faint tabular-nums">#{proposal.id}</span>
-                  <span className="text-ink">
-                    {proposal.scope === "mesocycle" ? "Block" : "Week"}
-                    {proposal.ask ? ` ${proposal.ask.ordinal}` : ""}
-                  </span>
-                  <Tag tone={verdictTone(proposal.verdict)}>{proposal.verdict}</Tag>
-                  {proposal.isFallback ? <Tag tone="bad">fallback</Tag> : null}
-                  {proposal.repairAttempts > 0 ? (
-                    <Tag tone="warn">{proposal.repairAttempts} repairs</Tag>
-                  ) : null}
-                  <span className="ml-auto text-xs text-ink-faint">
-                    {proposal.ask ? formatDay(proposal.ask.startDate) : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <Card>
+              <h2 className="text-base font-semibold text-ink">Declare a block</h2>
+              <p className="mt-1 mb-4 text-sm text-ink-faint">
+                Type, one or two target abilities, one technical focus, and a stable
+                complex of about ten exercises. Weeks are generated inside it
+                afterwards, one at a time.
+              </p>
+              <DeclareBlock defaultStartDate={today()} disabled={!snapshot.hasKey} />
+            </Card>
           )}
-        </section>
-      </div>
+
+          <section>
+            <h2 className="mb-2 text-base font-semibold text-ink">Recent proposals</h2>
+            {snapshot.history.length === 0 ? (
+              <EmptyState title="Nothing generated yet">
+                Every proposal is kept, accepted or not, with the inputs it saw and
+                what the gate made of it.
+              </EmptyState>
+            ) : (
+              <ul className="space-y-1.5">
+                {snapshot.history.map((proposal) => (
+                  <li
+                    key={proposal.id}
+                    className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-field border border-line bg-surface px-3 py-2 text-sm"
+                  >
+                    <span className="text-ink-faint tabular-nums">#{proposal.id}</span>
+                    <span className="text-ink">
+                      {proposal.scope === "mesocycle" ? "Block" : "Week"}
+                      {proposal.ask ? ` ${proposal.ask.ordinal}` : ""}
+                    </span>
+                    <Tag tone={verdictTone(proposal.verdict)}>{proposal.verdict}</Tag>
+                    {proposal.isFallback ? <Tag tone="bad">fallback</Tag> : null}
+                    {proposal.repairAttempts > 0 ? (
+                      <Tag tone="warn">
+                        {`${proposal.repairAttempts} repair${proposal.repairAttempts === 1 ? "" : "s"}`}
+                      </Tag>
+                    ) : null}
+                    <span className="ml-auto text-xs text-ink-faint">
+                      {proposal.ask ? formatDay(proposal.ask.startDate) : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      </VerdictOutcomeProvider>
     </>
   );
 }
