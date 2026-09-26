@@ -3,6 +3,7 @@ import type {
   Equipment,
   ForceVelocity,
   Laterality,
+  LoadType,
   MeasurementKind,
   MesocycleType,
   MotorAbility,
@@ -129,6 +130,17 @@ export const mesocycleTypeLabels = labels<MesocycleType>({
   accumulation: "Accumulation",
   transmutation: "Transmutation",
   realization: "Realization",
+});
+
+/**
+ * What a week's load is for. Written as the effect rather than the noun, because
+ * the whole point of the distinction is that a retaining week is not a failed
+ * stimulating one.
+ */
+export const loadTypeLabels = labels<LoadType>({
+  stimulating: "Stimulating",
+  retaining: "Retaining",
+  detraining: "Detraining",
 });
 
 export const motorAbilityLabels = labels<MotorAbility>({

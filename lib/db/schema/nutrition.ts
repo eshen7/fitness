@@ -40,7 +40,7 @@ export const foods = pgTable(
     fatGPerUnit: numeric("fat_g_per_unit", { precision: 7, scale: 2 }).notNull(),
     fiberGPerUnit: numeric("fiber_g_per_unit", { precision: 7, scale: 2 }),
 
-    /** "model" when Claude estimated it, "owner" when corrected by hand. */
+    /** "model" when the model estimated it, "owner" when corrected by hand. */
     provenance: text().notNull().default("model"),
     ...stamps,
   },

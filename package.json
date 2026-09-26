@@ -15,7 +15,8 @@
     "db:seed": "tsx lib/db/seed/run.ts",
     "db:seed:history": "tsx scripts/seed-history.ts",
     "db:studio": "drizzle-kit studio",
-    "passcode": "tsx scripts/hash-passcode.ts"
+    "passcode": "tsx scripts/hash-passcode.ts",
+    "bench:generation": "tsx scripts/bench-generation.ts"
   },
   "overrides": {
     "@esbuild-kit/core-utils": {
@@ -23,10 +24,10 @@
     }
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.125.0",
     "drizzle-orm": "^0.45.2",
     "jose": "^6.1.0",
     "next": "16.3.5",
+    "openai": "^7.23.0",
     "postgres": "^3.4.7",
     "react": "19.2.8",
     "react-dom": "19.2.8",
