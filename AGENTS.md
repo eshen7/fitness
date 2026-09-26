@@ -23,6 +23,7 @@ The build plan lives at `~/.claude/plans/splendid-munching-map.md`.
 | `npm run db:seed` | Idempotent seed |
 | `npm run db:seed:history -- --replace` | Replace training history with a deterministic twenty-week dev fixture (destructive, local only) |
 | `npm run passcode` | Print a fresh `PASSCODE_HASH` and `SESSION_SECRET` |
+| `npm run bench:generation -- --runs 50 --budget 1` | Measure the generation exit criteria against the live model (needs `OPENAI_API_KEY`, spends real money, writes nothing) |
 
 `npm run lint` and `npm run typecheck` are expected clean at every phase boundary, not deferred.
 
@@ -41,7 +42,7 @@ app/api/             health, and later generation, nutrition parsing, WHOOP
 lib/db/schema/       one file per domain area
 lib/whoop/           OAuth, signed webhook, ingest, and projection into readiness
 lib/engine/          prefilter, normalize, gate (validate.ts), advisories (pure TS, no LLM)
-lib/ai/              Claude clients, prompts, schemas, cached context
+lib/ai/              OpenAI client and seam, prompts, schemas, cached context, spend meter
 lib/analytics/       trend math and derived insights (pure functions)
 lib/memory/          preference and insight store
 ```
@@ -66,6 +67,10 @@ lib/memory/          preference and insight store
 - **The nightly sync in `vercel.json` runs at 09:20 UTC** (about 05:20 ET): late enough that WHOOP has scored the night, early enough to be there before a morning check-in. JSON cannot hold that comment, which is why it is here.
 - **Every rule in `app/globals.css` belongs inside a cascade layer.** Tailwind v4 ships its utilities in `@layer utilities`, and unlayered CSS beats every layered rule regardless of specificity. An element default written at the top level therefore silently defeats the utility for it everywhere: a bare `:where(svg) { height: auto }` cost an afternoon by making every chart render at its viewBox aspect ratio instead of `h-full`. Element defaults go in `@layer base`, class rules a utility should be able to override go in `@layer components`.
 - **A percentage height needs a parent with a definite one.** The chart primitives position every mark as a percentage, so a wrapper sized only by its contents collapses its children to nothing rather than erroring. `Columns` is `inset-y-0` with the bar bottom-aligned inside it for exactly this reason.
+- **A `w-*` handed to `Input`, `Select` or `Textarea` is a coin toss.** `FIELD` in `components/ui.tsx` already carries `w-full`, and two utilities of equal specificity are resolved by their order in the generated stylesheet rather than by the order of the `className` string. Size the wrapper, or let the field flex and mark its siblings `shrink-0`.
+- **The model never sees the clock in the cached half of the prompt.** `lib/ai/context.ts` splits the request into a stable prefix, ordered first, and a volatile suffix; today's date, tendon state and readiness live in the suffix. Moving anything that changes daily into the prefix drops the cache hit rate to zero and multiplies the input cost by ten, silently.
+- **The generator is reached through a seam, never the SDK directly.** `getAiClient()` in `lib/ai/client.ts` returns the override `setAiClient` installed or the real OpenAI client, so `lib/ai/generate.test.ts` drives the whole pipeline - repairs, refusals, truncation, the fallback - with no key and no database. The key is read from the environment at call time and belongs in no file in this repository.
+- **Every live call goes on the meter.** `SpendMeter` in `lib/ai/pricing.ts` prices usage against `MODEL_PRICES`, an unknown model is charged at the dearest rate in the table rather than the cheapest, and `SPEND_CAP_USD` is the owner's hard ceiling. `npm run bench:generation` refuses a generation it cannot afford twice over: against its own `--budget` and against what the app has already spent.
 
 ## Domain reference: jump training
 

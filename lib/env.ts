@@ -4,7 +4,7 @@ import { z } from "zod";
  * Fail fast and loudly on a missing or malformed environment rather than at the
  * first request that happens to touch the variable. Only `DATABASE_URL` and the
  * auth secrets are required to boot; integrations are optional so the app runs
- * before WHOOP or Anthropic are connected.
+ * before WHOOP or OpenAI are connected.
  */
 const schema = z.object({
   DATABASE_URL: z.string().min(1),
@@ -14,7 +14,8 @@ const schema = z.object({
   /** Signing key for the session cookie. 32+ random bytes, base64 or hex. */
   SESSION_SECRET: z.string().min(32),
 
-  ANTHROPIC_API_KEY: z.string().optional(),
+  /** Generation. Read at call time in `lib/ai/client.ts`, never at import time. */
+  OPENAI_API_KEY: z.string().optional(),
 
   WHOOP_CLIENT_ID: z.string().optional(),
   WHOOP_CLIENT_SECRET: z.string().optional(),

@@ -302,11 +302,17 @@ export const planProposals = pgTable(
     ownerEdits: jsonb("owner_edits"),
 
     model: text(),
+    /**
+     * Token counts as the provider reported them, summed across every attempt.
+     * `cachedInputTokens` is the caching exit criterion, so it is stored rather
+     * than only logged: a silent prefix invalidator shows up here as a run of
+     * zeroes long after the log has rotated away.
+     */
     usage: jsonb().$type<{
       inputTokens?: number;
       outputTokens?: number;
-      cacheReadInputTokens?: number;
-      cacheCreationInputTokens?: number;
+      cachedInputTokens?: number;
+      reasoningTokens?: number;
     }>(),
     ...stamps,
   },
