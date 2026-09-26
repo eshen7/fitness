@@ -85,11 +85,8 @@ async function capReached(db: Db): Promise<GenerationResult | null> {
   };
 }
 
-function failed(error: unknown): GenerationResult {
-  return {
-    ok: false,
-    message: `Generation failed: ${error instanceof Error ? error.message : "unknown error"}. Nothing was written.`,
-  };
+function reasonOf(error: unknown) {
+  return error instanceof Error ? error.message : "unknown error";
 }
 
 /**
@@ -104,7 +101,10 @@ async function generationFailed(error: unknown, label: string): Promise<Generati
       console.error("Could not record the spend of a failed generation.", unrecorded);
     }
   }
-  return failed(error);
+  return {
+    ok: false,
+    message: `Generation failed: ${reasonOf(error)}. No proposal was saved.`,
+  };
 }
 
 // -----------------------------------------------------------------------------
@@ -307,7 +307,7 @@ export async function acceptProposal(input: unknown): Promise<GenerationResult> 
     }
     return { ok: true, proposalId, message: "Week written. It is on Today." };
   } catch (error) {
-    return failed(error);
+    return { ok: false, message: `Accepting failed: ${reasonOf(error)}. Nothing was written.` };
   }
 }
 

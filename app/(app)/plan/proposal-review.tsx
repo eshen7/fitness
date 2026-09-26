@@ -175,17 +175,18 @@ export function ProposalReview({
               proposed={week ?? undefined}
               names={names}
               editing={edited !== null}
+              sessionKeys={draft?.origins}
               onChange={change}
-              onMoveSession={(from, to) =>
-                setDraft((current) => (current ? moveSession(current, from, to) : current))
+              onMoveSession={(session, to) =>
+                setDraft((current) => (current ? moveSession(current, session, to) : current))
               }
-              onDropSession={(day) =>
-                setDraft((current) => (current ? dropSession(current, day) : current))
+              onDropSession={(session) =>
+                setDraft((current) => (current ? dropSession(current, session) : current))
               }
-              onDropItem={(day, exerciseId) =>
+              onDropItem={(session, exerciseId) =>
                 setDraft((current) =>
                   current
-                    ? { ...current, week: dropItem(current.week, day, exerciseId) }
+                    ? { ...current, week: dropItem(current.week, session, exerciseId) }
                     : current,
                 )
               }
@@ -562,8 +563,8 @@ function applyEdit(week: MicrocyclePlan, edit: WeekEdit): MicrocyclePlan {
     edit.field === "sets" ? Math.max(1, Math.round(edit.value ?? 1)) : edit.value;
   return {
     ...week,
-    sessions: week.sessions.map((session) =>
-      session.day !== edit.day
+    sessions: week.sessions.map((session, index) =>
+      index !== edit.session
         ? session
         : {
             ...session,
@@ -586,11 +587,11 @@ function applyEdit(week: MicrocyclePlan, edit: WeekEdit): MicrocyclePlan {
  */
 type Draft = { week: MicrocyclePlan; origins: number[] };
 
-function moveSession(draft: Draft, from: string, to: string): Draft {
+function moveSession(draft: Draft, moved: number, to: string): Draft {
   if (to === "") return draft;
   const rows = draft.week.sessions
     .map((session, index) => ({
-      session: session.day === from ? { ...session, day: to } : session,
+      session: index === moved ? { ...session, day: to } : session,
       origin: draft.origins[index],
     }))
     .sort((a, b) => a.session.day.localeCompare(b.session.day));
@@ -600,9 +601,9 @@ function moveSession(draft: Draft, from: string, to: string): Draft {
   };
 }
 
-function dropSession(draft: Draft, day: string): Draft {
+function dropSession(draft: Draft, dropped: number): Draft {
   const kept = draft.week.sessions.flatMap((session, index) =>
-    session.day === day ? [] : [{ session, origin: draft.origins[index] }],
+    index === dropped ? [] : [{ session, origin: draft.origins[index] }],
   );
   return {
     week: { ...draft.week, sessions: kept.map((row) => row.session) },
@@ -616,13 +617,13 @@ function dropSession(draft: Draft, day: string): Draft {
  */
 function dropItem(
   week: MicrocyclePlan,
-  day: string,
+  target: number,
   exerciseId: number,
 ): MicrocyclePlan {
   return {
     ...week,
-    sessions: week.sessions.map((session) =>
-      session.day !== day
+    sessions: week.sessions.map((session, index) =>
+      index !== target
         ? session
         : {
             ...session,

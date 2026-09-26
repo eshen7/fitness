@@ -37,7 +37,8 @@ const NUMERIC_FIELDS = [
 }[];
 
 export type WeekEdit = {
-  day: string;
+  /** The session's index in the week shown, since two sessions can share a day. */
+  session: number;
   exerciseId: number;
   field: (typeof NUMERIC_FIELDS)[number]["field"];
   value: number | null;
@@ -73,6 +74,7 @@ export function WeekEditor({
   onMoveSession,
   onDropSession,
   onDropItem,
+  sessionKeys,
 }: {
   week: MicrocyclePlan;
   /** The week as the model proposed it, before any edit. Defaults to `week`. */
@@ -80,9 +82,11 @@ export function WeekEditor({
   names: Record<string, string>;
   editing: boolean;
   onChange?: (edit: WeekEdit) => void;
-  onMoveSession?: (from: string, to: string) => void;
-  onDropSession?: (day: string) => void;
-  onDropItem?: (day: string, exerciseId: number) => void;
+  onMoveSession?: (session: number, to: string) => void;
+  onDropSession?: (session: number) => void;
+  onDropItem?: (session: number, exerciseId: number) => void;
+  /** A stable identity per session, so a move that reorders the week moves its card. */
+  sessionKeys?: readonly number[];
 }) {
   const editable = editableFields(proposed);
   return (
@@ -102,9 +106,9 @@ export function WeekEditor({
         <p className="text-sm text-ink-faint">No sessions.</p>
       ) : null}
 
-      {week.sessions.map((session) => (
+      {week.sessions.map((session, sessionIndex) => (
         <div
-          key={`${session.kind}-${session.day}`}
+          key={sessionKeys?.[sessionIndex] ?? sessionIndex}
           className="rounded-box border border-line bg-surface-sunken p-3"
         >
           <div className="flex flex-wrap items-start justify-between gap-2">
@@ -127,13 +131,13 @@ export function WeekEditor({
                     aria-label={`Day for ${sessionKindLabels.of(session.kind)}`}
                     value={session.day}
                     onChange={(event) =>
-                      onMoveSession?.(session.day, event.target.value)
+                      onMoveSession?.(sessionIndex, event.target.value)
                     }
                     className="h-9 text-xs"
                   />
                   <button
                     type="button"
-                    onClick={() => onDropSession?.(session.day)}
+                    onClick={() => onDropSession?.(sessionIndex)}
                     className="h-9 shrink-0 rounded-field border border-bad/40 px-3 text-xs font-semibold whitespace-nowrap text-bad transition hover:bg-bad/10"
                   >
                     Drop session
@@ -190,7 +194,7 @@ export function WeekEditor({
                                 aria-label={`${label} for ${names[String(item.exerciseId)] ?? item.exerciseId}`}
                                 onChange={(event) =>
                                   onChange?.({
-                                    day: session.day,
+                                    session: sessionIndex,
                                     exerciseId: item.exerciseId,
                                     field,
                                     value:
@@ -205,7 +209,7 @@ export function WeekEditor({
                           ))}
                           <button
                             type="button"
-                            onClick={() => onDropItem?.(session.day, item.exerciseId)}
+                            onClick={() => onDropItem?.(sessionIndex, item.exerciseId)}
                             className="h-9 rounded-field border border-bad/40 px-3 text-xs font-semibold text-bad transition hover:bg-bad/10"
                           >
                             Drop
