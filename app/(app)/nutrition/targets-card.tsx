@@ -1,11 +1,10 @@
 import { Card, Tag } from "@/components/ui";
 import { formatDay } from "@/lib/days";
 import { energyDirectionLabels, mesocycleTypeLabels } from "@/lib/labels";
-import {
-  targetDrifted,
-  type DailyTarget,
-  type TargetGoal,
-  type TargetProposal,
+import type {
+  DailyTarget,
+  TargetGoal,
+  TargetProposal,
 } from "@/lib/nutrition/targets";
 import type { MesocycleType } from "@/lib/taxonomy";
 import { SetTargets } from "./set-targets";
@@ -22,19 +21,19 @@ import { SetTargets } from "./set-targets";
 export function TargetsCard({
   target,
   proposal,
+  stale,
   suggestedGoal,
   cutRefusedBecause,
   blockType,
 }: {
   target: DailyTarget | null;
-  /** The proposal for the goal in force, which is what drift is measured against. */
+  /** The proposal for the suggested goal, which is what the rules say now. */
   proposal: TargetProposal | null;
+  stale: boolean;
   suggestedGoal: TargetGoal;
   cutRefusedBecause: string | null;
   blockType: MesocycleType | null;
 }) {
-  const stale = target !== null && proposal !== null && targetDrifted(target, proposal);
-
   return (
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-2">

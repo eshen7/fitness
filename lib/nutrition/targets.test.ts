@@ -13,8 +13,10 @@ import {
   proposeTargets,
   remaining,
   targetDrifted,
+  targetStale,
   tendonsHealthy,
   type DailyTarget,
+  type TargetGoal,
   type TargetProposal,
   type TendonState,
 } from "./targets";
@@ -278,6 +280,56 @@ describe("targetDrifted", () => {
     );
     expect(goalOf(refused)).toBe("hold");
     expect(goalOf({ targetWeeklyChangePct: null })).toBe("hold");
+  });
+});
+
+describe("targetStale", () => {
+  const propose = (
+    blockType: "accumulation" | "realization",
+    goal: TargetGoal,
+    bodyweightKg = BODYWEIGHT,
+  ) => proposeTargets({ bodyweightKg, blockType, tendon: healthy, goal });
+
+  it("prompts when a gain set in accumulation meets a realization block", () => {
+    const target = { ...inForce(propose("accumulation", "gain")), effectiveFrom: "2026-09-01" };
+    const suggestedGoal = defaultGoalFor("realization");
+    expect(suggestedGoal).toBe("hold");
+    expect(
+      targetStale({
+        target,
+        inForce: propose("realization", goalOf(target)),
+        suggestedGoal,
+        blockStart: "2026-09-20",
+      }),
+    ).toBe(true);
+  });
+
+  it("stays quiet on a hold chosen against the suggestion inside the same block", () => {
+    const target = { ...inForce(propose("accumulation", "hold")), effectiveFrom: "2026-09-10" };
+    const suggestedGoal = defaultGoalFor("accumulation");
+    expect(suggestedGoal).toBe("gain");
+    for (const kg of [BODYWEIGHT, BODYWEIGHT + 0.1]) {
+      expect(
+        targetStale({
+          target,
+          inForce: propose("accumulation", goalOf(target), kg),
+          suggestedGoal,
+          blockStart: "2026-09-01",
+        }),
+      ).toBe(false);
+    }
+  });
+
+  it("stays quiet on a target set the day its block opened", () => {
+    const target = { ...inForce(propose("realization", "hold")), effectiveFrom: "2026-09-20" };
+    expect(
+      targetStale({
+        target,
+        inForce: propose("realization", "hold"),
+        suggestedGoal: "gain",
+        blockStart: "2026-09-20",
+      }),
+    ).toBe(false);
   });
 });
 

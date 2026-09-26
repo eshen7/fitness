@@ -21,6 +21,7 @@ import {
   defaultGoalFor,
   goalOf,
   proposeTargets,
+  targetStale,
   remaining,
   type DailyTarget,
   type RemainingTarget,
@@ -275,10 +276,12 @@ export type NutritionSnapshot = {
   totals: Macros;
   target: DailyTarget | null;
   /**
-   * The rules' answer for the goal in force, or for the suggested goal when nothing
-   * is. Null without a bodyweight, since every target is per kilogram.
+   * What the rules say now: the proposal for the suggested goal. Null without a
+   * bodyweight, since every target is per kilogram.
    */
   proposal: TargetProposal | null;
+  /** Whether the target in force is out of date, per `targetStale`. */
+  stale: boolean;
   /** What the open block implies, which is the default the form opens on. */
   suggestedGoal: TargetGoal;
   /** Why a cut would be declined today, whatever goal is in force. */
@@ -321,14 +324,18 @@ export async function nutritionSnapshot(
   // The proposal is what the rules say the targets should be *now*, which is not
   // the same as the target in force: a block that has moved on, or a tendon that has
   // flared, changes the answer, and the page shows both so the difference is the
-  // prompt to set a new one rather than a silent replacement. It is asked for the
-  // goal in force, so a hold chosen during accumulation is not reported as drift.
+  // prompt to set a new one rather than a silent replacement.
   const suggestedGoal = defaultGoalFor(blockType);
-  const goal = target === null ? suggestedGoal : goalOf(target);
-  const proposal =
+  const proposalFor = (goal: TargetGoal) =>
     trendKg === null
       ? null
       : proposeTargets({ bodyweightKg: trendKg, blockType, tendon, goal });
+  const proposal = proposalFor(suggestedGoal);
+  const inForce = target === null ? null : proposalFor(goalOf(target));
+  const stale =
+    target !== null &&
+    inForce !== null &&
+    targetStale({ target, inForce, suggestedGoal, blockStart: block?.startDate ?? null });
 
   return {
     day,
@@ -338,6 +345,7 @@ export async function nutritionSnapshot(
     totals,
     target,
     proposal,
+    stale,
     suggestedGoal,
     cutRefusedBecause: cutRefusal({ blockType, tendon }),
     blockType,

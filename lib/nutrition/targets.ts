@@ -309,6 +309,34 @@ export function targetDrifted(target: DailyTarget, proposal: TargetProposal): bo
   );
 }
 
+/**
+ * Whether the card should prompt for a new target.
+ *
+ * Two ways a target goes out of date, and only two. The block moved on after the
+ * target took effect and now implies a different goal from the one in force: a gain
+ * set in accumulation once realization opens. Or the rules, asked the target's own
+ * goal again, now answer materially differently, which is also where tendon status
+ * lands: a cut in force that the tendons would now refuse comes back as a hold.
+ * A goal the owner chose against the suggestion inside the same block is neither,
+ * so it stays quiet.
+ *
+ * "Moved on" is read off dates: the open block starting after the target took effect.
+ * `inForce` is the proposal for `goalOf(target)`.
+ */
+export function targetStale(input: {
+  target: DailyTarget;
+  inForce: TargetProposal;
+  suggestedGoal: TargetGoal;
+  blockStart: string | null;
+}): boolean {
+  const blockChanged =
+    input.blockStart !== null && input.blockStart > input.target.effectiveFrom;
+  return (
+    (blockChanged && input.suggestedGoal !== goalOf(input.target)) ||
+    targetDrifted(input.target, input.inForce)
+  );
+}
+
 /** What is left of today's target after what has been eaten. Negative is over. */
 export function remaining(
   target: DailyTarget,

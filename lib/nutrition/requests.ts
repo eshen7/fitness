@@ -52,14 +52,19 @@ export const PER_UNIT_HINT = "Per unit, not per portion.";
 
 /**
  * The most a single gram of any food can hold: pure fat is 9 kcal, and no food is
- * more than all of itself in one macro. A per-gram figure above either is a portion
+ * more than all of itself in one macro. A per-unit figure above either is a portion
  * total typed into a per-unit field, which is the one slip worth catching by unit.
+ *
+ * A millilitre gets the calorie ceiling only: oil is lighter than water, so 9 kcal
+ * still holds, but honey is denser and carries more than a gram of sugar per ml.
  */
 export const PER_GRAM_MAX = { kcal: 9, grams: 1 } as const;
 
-export function perGramImplausible(macros: Macros): boolean {
+export function perUnitImplausible(unit: string, macros: Macros): boolean {
+  if (unit !== "g" && unit !== "ml") return false;
+  if (macros.kcal > PER_GRAM_MAX.kcal) return true;
   return (
-    macros.kcal > PER_GRAM_MAX.kcal ||
+    unit === "g" &&
     [macros.proteinG, macros.carbsG, macros.fatG, macros.fiberG ?? 0].some(
       (grams) => grams > PER_GRAM_MAX.grams,
     )

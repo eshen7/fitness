@@ -23,7 +23,7 @@ import {
   correctEntrySchema,
   deleteEntrySchema,
   logMealSchema,
-  perGramImplausible,
+  perUnitImplausible,
   setTargetsSchema,
   type NutritionResult,
 } from "./requests";
@@ -232,7 +232,7 @@ export async function correctEntry(input: unknown): Promise<NutritionResult> {
   const rewrite =
     edited !== null && !samePerUnit(edited, decodePerUnit(entry)) ? edited : null;
 
-  if (rewrite && entry.unit === "g" && perGramImplausible(rewrite)) {
+  if (rewrite && perUnitImplausible(entry.unit, rewrite)) {
     return { ok: false, message: PER_UNIT_HINT };
   }
 
