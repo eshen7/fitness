@@ -38,11 +38,12 @@ Local Postgres is 17 with pgvector 0.8.6, matching Neon.
 ```
 app/(auth)/unlock/   passcode gate
 app/(app)/           today, log, progress, nutrition, plan, library
-app/api/             health, generation, set logging, WHOOP, and later nutrition parsing
+app/api/             health, generation, set logging, WHOOP, nutrition parsing
 lib/db/schema/       one file per domain area
 lib/whoop/           OAuth, signed webhook, ingest, and projection into readiness
 lib/engine/          prefilter, normalize, gate (validate.ts), advisories (pure TS, no LLM)
 lib/ai/              OpenAI client and seam, prompts, schemas, cached context, spend meter
+lib/nutrition/       food parse resolution and caches, targets, weight trend
 lib/analytics/       trend math and derived insights (pure functions)
 lib/memory/          preference and insight store
 ```
@@ -69,7 +70,7 @@ lib/memory/          preference and insight store
 - **A percentage height needs a parent with a definite one.** The chart primitives position every mark as a percentage, so a wrapper sized only by its contents collapses its children to nothing rather than erroring. `Columns` is `inset-y-0` with the bar bottom-aligned inside it for exactly this reason.
 - **A `w-*` handed to `Input`, `Select` or `Textarea` is a coin toss.** `FIELD` in `components/ui.tsx` already carries `w-full`, and two utilities of equal specificity are resolved by their order in the generated stylesheet rather than by the order of the `className` string. Size the wrapper, or let the field flex and mark its siblings `shrink-0`.
 - **`.tnum` carries `white-space: nowrap`,** not just tabular figures. It is right on a readout that must never reflow and wrong on a sentence: on a paragraph it produces one long line that runs off the side of the card instead of wrapping, with no overflow anywhere to make it visible. Put `tnum` on the figure spans and leave the paragraph unstyled; a detail line built from `A · B · C` then breaks only at the separators.
-- **The cap and the key are checked in `lib/ai/guards.ts`,** shared by generation, food parsing and the bench, because `SPEND_CAP_USD` is one ceiling over the whole account rather than one per feature. It is a separate module because a `"use server"` file may only export async functions.
+- **The cap and the key are checked in `lib/ai/guards.ts`,** shared by generation and food parsing (the bench checks the same total itself), because `SPEND_CAP_USD` is one ceiling over the whole account rather than one per feature. It is a separate module because a `"use server"` file may only export async functions.
 - **The model never sees the clock in the cached half of the prompt.** `lib/ai/context.ts` splits the request into a stable prefix, ordered first, and a volatile suffix; today's date, tendon state and readiness live in the suffix. Moving anything that changes daily into the prefix drops the cache hit rate to zero and multiplies the input cost by ten, silently.
 - **The generator is reached through a seam, never the SDK directly.** `getAiClient()` in `lib/ai/client.ts` returns the override `setAiClient` installed or the real OpenAI client, so `lib/ai/generate.test.ts` drives the whole pipeline - repairs, refusals, truncation, the fallback - with no key and no database. The key is read from the environment at call time and belongs in no file in this repository.
 - **Every live call goes on the meter.** `SpendMeter` in `lib/ai/pricing.ts` prices usage against `MODEL_PRICES`, an unknown model is charged at the dearest rate in the table rather than the cheapest, and `SPEND_CAP_USD` is the owner's hard ceiling. `totalSpendUsd` sums proposal rows and `spend_ledger`, which holds spend with no proposal behind it: bench runs and generations that died in transport as a `BilledFailure`. `npm run bench:generation` refuses a generation it cannot afford twice over: against its own `--budget` and against everything already spent.
