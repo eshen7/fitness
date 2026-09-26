@@ -1,9 +1,12 @@
 import type {
   CouplingClass,
+  EnergyDirection,
   Equipment,
+  FoodUnit,
   ForceVelocity,
   Laterality,
   LoadType,
+  MealSlot,
   MeasurementKind,
   MesocycleType,
   MotorAbility,
@@ -186,6 +189,44 @@ export const measurementKindLabels = labels<MeasurementKind>({
 export const unitSystemLabels = labels<UnitSystem>({
   imperial: "Pounds and inches",
   metric: "Kilograms and centimetres",
+});
+
+export const mealSlotLabels = labels<MealSlot>({
+  breakfast: "Breakfast",
+  lunch: "Lunch",
+  dinner: "Dinner",
+  snack: "Snack",
+  pre_workout: "Pre-workout",
+  post_workout: "Post-workout",
+});
+
+/** Short, because these sit inline after a quantity: `200 g`, `1 scoop`. */
+export const foodUnitLabels = labels<FoodUnit>({
+  g: "g",
+  ml: "ml",
+  item: "×",
+  slice: "slice",
+  cup: "cup",
+  tbsp: "tbsp",
+  tsp: "tsp",
+  scoop: "scoop",
+});
+
+/**
+ * A portion as it is read back: `200 g`, `2×`, `1 scoop`.
+ *
+ * `item` is the odd one out, because its label is a multiplication sign rather than
+ * a noun and `2 ×` reads as an unfinished sum.
+ */
+export function formatPortion(quantity: number, unit: FoodUnit) {
+  const amount = Number(quantity.toFixed(2));
+  return unit === "item" ? `${amount}×` : `${amount} ${foodUnitLabels.of(unit)}`;
+}
+
+export const energyDirectionLabels = labels<EnergyDirection>({
+  surplus: "Surplus",
+  hold: "Maintenance",
+  deficit: "Deficit",
 });
 
 /**

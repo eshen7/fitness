@@ -250,6 +250,39 @@ export const MEAL_SLOTS = [
 ] as const;
 export type MealSlot = (typeof MEAL_SLOTS)[number];
 
+/**
+ * The units a cached food's macros can be per.
+ *
+ * A closed set even though `foods.unit` is a text column, because it is what the
+ * parser is allowed to answer with and the cache key is built from it: `chicken`
+ * per `g` and `chicken` per `item` are two different foods, and a model free to
+ * invent `breast` as a unit would make a third that never matches either. `item`
+ * is the catch-all for a countable thing, which is why the household measures
+ * stop at the ones a recipe actually uses.
+ */
+export const FOOD_UNITS = [
+  "g",
+  "ml",
+  "item",
+  "slice",
+  "cup",
+  "tbsp",
+  "tsp",
+  "scoop",
+] as const;
+export type FoodUnit = (typeof FOOD_UNITS)[number];
+
+/**
+ * Which way a daily calorie target departs from maintenance.
+ *
+ * Named rather than inferred from a signed number because the interesting case is
+ * a deficit that was asked for and refused: relative strength is what predicts
+ * jumping, so a cut is gated on tendon health and on the block, and "hold" then
+ * has to be distinguishable from "hold, because a cut was not allowed".
+ */
+export const ENERGY_DIRECTIONS = ["surplus", "hold", "deficit"] as const;
+export type EnergyDirection = (typeof ENERGY_DIRECTIONS)[number];
+
 export const WHOOP_RECORD_TYPES = [
   "recovery",
   "sleep",

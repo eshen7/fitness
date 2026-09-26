@@ -57,14 +57,30 @@ export const foodLogEntries = pgTable(
     quantity: numeric({ precision: 8, scale: 2 }).notNull(),
     meal: mealSlot().notNull(),
     day: date().notNull(),
+    /**
+     * One instant for every entry a single sentence resolved into, set explicitly
+     * rather than defaulted, because it is what groups them back together: the
+     * phrase cache replays the newest logging of a phrase, and "newest" has to
+     * mean one resolution and not the last row of one.
+     */
     loggedAt: timestamp("logged_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
     /** The raw sentence the owner typed, kept for re-parsing and audit. */
     rawText: text("raw_text"),
+    /**
+     * `rawText` normalised by `lib/nutrition/normalize.ts`, which is the sentence
+     * cache: a phrase logged before is replayed from its own prior entries with no
+     * model call at all. Written from TypeScript rather than derived in SQL so the
+     * one normaliser cannot drift from a second copy of itself.
+     */
+    phraseKey: text("phrase_key"),
     ...stamps,
   },
-  (t) => [index("food_log_entries_day_idx").on(t.day)],
+  (t) => [
+    index("food_log_entries_day_idx").on(t.day),
+    index("food_log_entries_phrase_idx").on(t.phraseKey, t.loggedAt),
+  ],
 );
 
 /**

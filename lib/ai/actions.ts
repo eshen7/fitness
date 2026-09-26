@@ -2,29 +2,29 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { getDb, schema, type Db } from "@/lib/db";
+import { getDb, schema } from "@/lib/db";
 import { addDays } from "@/lib/days";
 import { reviewWeek } from "@/lib/engine";
 import { microcyclePlanSchema, type MicrocyclePlan } from "@/lib/engine/types";
 import { mesocycleTypeLabels } from "@/lib/labels";
-import { BilledFailure, hasApiKey } from "./client";
+import { hasApiKey } from "./client";
 import { loadContext } from "./context";
 import { diffWeeks } from "./edits";
 import { generateDeclaration, generateWeek } from "./generate";
+import {
+  capReached,
+  invalid,
+  keyMissing,
+  reasonOf,
+  recordBilledFailure,
+} from "./guards";
 import {
   acceptDeclaration,
   acceptWeek,
   rejectProposal,
   saveProposal,
 } from "./persist";
-import { formatUsd, SPEND_CAP_USD } from "./pricing";
-import {
-  loadProposalById,
-  nextBlockOrdinal,
-  nextWeekSlot,
-  recordSpend,
-  totalSpendUsd,
-} from "./proposals";
+import { loadProposalById, nextBlockOrdinal, nextWeekSlot } from "./proposals";
 import { loadOpenBlock } from "./queries";
 import {
   acceptSchema,
@@ -49,58 +49,15 @@ import {
  * not the loop converged.
  */
 
-function invalid(error: {
-  issues: { path: PropertyKey[]; message: string }[];
-}): GenerationResult {
-  const errors: Record<string, string> = {};
-  for (const issue of error.issues) {
-    errors[issue.path.map(String).join(".")] = issue.message;
-  }
-  return {
-    ok: false,
-    message: Object.values(errors)[0] ?? "That did not validate.",
-    errors,
-  };
-}
-
-/** A missing key is a configuration problem, and saying so beats a 500. */
-function keyMissing(): GenerationResult {
-  return {
-    ok: false,
-    message:
-      "Generation needs OPENAI_API_KEY in the environment. Nothing was written.",
-  };
-}
-
-/**
- * The owner's ceiling, checked before a call rather than after. A generation
- * started under the cap may still end a little over it; the next one is refused.
- */
-async function capReached(db: Db): Promise<GenerationResult | null> {
-  const spent = await totalSpendUsd(db);
-  if (spent < SPEND_CAP_USD) return null;
-  return {
-    ok: false,
-    message: `Generation has spent ${formatUsd(spent)} of the ${formatUsd(SPEND_CAP_USD)} cap, so it is off. Nothing was written.`,
-  };
-}
-
-function reasonOf(error: unknown) {
-  return error instanceof Error ? error.message : "unknown error";
-}
+/** The subject the shared guards name in their refusals. */
+const SUBJECT = "Generation";
 
 /**
  * A generation that died in transport saves no proposal, but it was billed, so its
  * usage goes on the ledger before the failure is reported.
  */
 async function generationFailed(error: unknown, label: string): Promise<GenerationResult> {
-  if (error instanceof BilledFailure && Object.values(error.usage).some((n) => n > 0)) {
-    try {
-      await recordSpend({ source: "app", label, model: error.model, usage: error.usage });
-    } catch (unrecorded) {
-      console.error("Could not record the spend of a failed generation.", unrecorded);
-    }
-  }
+  await recordBilledFailure(error, label);
   return {
     ok: false,
     message: `Generation failed: ${reasonOf(error)}. No proposal was saved.`,
@@ -119,12 +76,12 @@ async function generationFailed(error: unknown, label: string): Promise<Generati
 export async function declareBlock(input: unknown): Promise<GenerationResult> {
   const parsed = declareBlockSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
-  if (!hasApiKey()) return keyMissing();
+  if (!hasApiKey()) return keyMissing(SUBJECT);
   const { startDate, weeks, note, preferredType } = parsed.data;
 
   try {
     const db = getDb();
-    const refused = await capReached(db);
+    const refused = await capReached(db, SUBJECT);
     if (refused) return refused;
     const context = await loadContext({ db, mesocycleId: null });
     const run = await generateDeclaration({
@@ -167,12 +124,12 @@ export async function declareBlock(input: unknown): Promise<GenerationResult> {
 export async function generateNextWeek(input: unknown): Promise<GenerationResult> {
   const parsed = generateWeekSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
-  if (!hasApiKey()) return keyMissing();
+  if (!hasApiKey()) return keyMissing(SUBJECT);
   const { mesocycleId, note, supersedesId } = parsed.data;
 
   try {
     const db = getDb();
-    const refused = await capReached(db);
+    const refused = await capReached(db, SUBJECT);
     if (refused) return refused;
     const context = await loadContext({ db, mesocycleId });
     const block = context.block;

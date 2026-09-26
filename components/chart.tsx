@@ -629,9 +629,16 @@ export function ChartCard({
 }) {
   return (
     <section className="rounded-box border border-line bg-surface p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <h2 className="text-sm font-semibold text-ink">{title}</h2>
-        {aside}
+      {/*
+        Wrapping, and the aside kept whole. `Tag` is `whitespace-nowrap`, so as a
+        shrinkable flex item it does not wrap or ellipsise when the row is tight - it
+        clips its last letter against the card border, which is how a verdict like
+        "Moving slower than asked" lost its "d" on a phone. `shrink-0` makes it
+        break to its own line instead, and `ml-auto` keeps it right-aligned there.
+      */}
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
+        <h2 className="min-w-0 text-sm font-semibold text-ink">{title}</h2>
+        {aside ? <div className="ml-auto shrink-0">{aside}</div> : null}
       </div>
       {note ? <p className="mt-1.5 mb-4 text-xs text-ink-faint">{note}</p> : null}
       {children}

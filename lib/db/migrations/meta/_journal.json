@@ -43,6 +43,13 @@
       "when": 1790436863087,
       "tag": "0005_magenta_loki",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790439716903,
+      "tag": "0006_deep_mandroid",
+      "breakpoints": true
     }
   ]
 }
