@@ -50,6 +50,13 @@
       "when": 1790439716903,
       "tag": "0006_deep_mandroid",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790449731860,
+      "tag": "0007_smiling_post",
+      "breakpoints": true
     }
   ]
 }

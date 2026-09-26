@@ -203,7 +203,9 @@ export function proposeTargets(input: TargetInputs): TargetProposal {
  * already made and the tendons are a state to be trained out of, so the block is
  * named first when both apply.
  */
-function cutRefusal(input: TargetInputs): string | null {
+export function cutRefusal(
+  input: Pick<TargetInputs, "blockType" | "tendon">,
+): string | null {
   if (input.blockType === "realization") {
     return "a realization block is a peak, and bodyweight moving during it changes the thing being peaked";
   }
@@ -271,6 +273,41 @@ export type RemainingTarget = {
   carbsG: number;
   fatG: number;
 };
+
+/**
+ * The goal a stored target was set for, read back from the sign of its rate.
+ *
+ * A refused cut was written at maintenance with a zero rate, so it reads back as the
+ * hold it became rather than as the cut that was asked for.
+ */
+export function goalOf(target: { targetWeeklyChangePct: number | null }): TargetGoal {
+  const pct = target.targetWeeklyChangePct ?? 0;
+  return pct > 0 ? "gain" : pct < 0 ? "cut" : "hold";
+}
+
+/**
+ * How far the calories may wander before a target counts as out of date.
+ *
+ * Roughly three kilograms of trend bodyweight at the maintenance multiplier, so the
+ * morning-to-morning wobble of the trend never trips it and a real change in size does.
+ */
+export const TARGET_DRIFT_KCAL = 100;
+
+/**
+ * Whether the rules, asked the same question today, give a materially different
+ * answer from the target in force.
+ *
+ * `proposal` must be the proposal for `goalOf(target)`: comparing a hold against the
+ * surplus an accumulation block suggests would report a decision as drift. The
+ * direction changing is always drift - a cut in force that the tendons would now
+ * refuse - and the calories are compared with a tolerance rather than exactly.
+ */
+export function targetDrifted(target: DailyTarget, proposal: TargetProposal): boolean {
+  return (
+    goalOf(target) !== goalOf(proposal) ||
+    Math.abs(target.kcal - proposal.kcal) > TARGET_DRIFT_KCAL
+  );
+}
 
 /** What is left of today's target after what has been eaten. Negative is over. */
 export function remaining(

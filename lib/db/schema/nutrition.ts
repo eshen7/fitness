@@ -28,17 +28,22 @@ export const foods = pgTable(
     /** Grams per unit when the unit is not itself a mass, for display math. */
     gramsPerUnit: numeric("grams_per_unit", { precision: 8, scale: 2 }),
 
-    kcalPerUnit: numeric("kcal_per_unit", { precision: 8, scale: 2 }).notNull(),
+    /**
+     * Four decimals, because a g or ml food is stored per single unit and a gram of
+     * cucumber is 0.0065 g of protein: at two decimals that rounds to 0.01, which is
+     * half as much again on every portion and enough to break the kcal check.
+     */
+    kcalPerUnit: numeric("kcal_per_unit", { precision: 10, scale: 4 }).notNull(),
     proteinGPerUnit: numeric("protein_g_per_unit", {
-      precision: 7,
-      scale: 2,
+      precision: 9,
+      scale: 4,
     }).notNull(),
     carbsGPerUnit: numeric("carbs_g_per_unit", {
-      precision: 7,
-      scale: 2,
+      precision: 9,
+      scale: 4,
     }).notNull(),
-    fatGPerUnit: numeric("fat_g_per_unit", { precision: 7, scale: 2 }).notNull(),
-    fiberGPerUnit: numeric("fiber_g_per_unit", { precision: 7, scale: 2 }),
+    fatGPerUnit: numeric("fat_g_per_unit", { precision: 9, scale: 4 }).notNull(),
+    fiberGPerUnit: numeric("fiber_g_per_unit", { precision: 9, scale: 4 }),
 
     /** "model" when the model estimated it, "owner" when corrected by hand. */
     provenance: text().notNull().default("model"),

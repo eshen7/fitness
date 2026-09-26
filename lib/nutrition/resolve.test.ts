@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AiUsage } from "@/lib/ai/client";
 import type { KnownFood, ParsedMeal } from "@/lib/ai/food";
 import type { FoodUnit } from "@/lib/taxonomy";
+import { decodePerUnit, encodePerUnit, macrosAddUp } from "./macros";
 import { foodKey, phraseKey } from "./normalize";
 import { resolveMeal, type CachedFood, type FoodStore, type MealParser } from "./resolve";
 
@@ -26,7 +27,12 @@ const USAGE: AiUsage = {
   reasoningTokens: 0,
 };
 
-/** An in-memory `FoodStore`: the same three reads and one write, over maps. */
+/**
+ * An in-memory `FoodStore`: the same three reads and one write, over maps.
+ *
+ * Writes go through the same column codec as the Postgres store, so a precision the
+ * columns would lose is lost here too.
+ */
 function memoryStore() {
   const foods = new Map<string, CachedFood>();
   const entries: { phraseKey: string | null; loggedAt: number; quantity: number; key: string }[] =
@@ -67,7 +73,12 @@ function memoryStore() {
       const key = foodKey(food.name, food.unit);
       const held = foods.get(key);
       if (held) return held;
-      const stored: CachedFood = { id: nextId++, key, ...food };
+      const stored: CachedFood = {
+        id: nextId++,
+        key,
+        ...food,
+        perUnit: decodePerUnit(encodePerUnit(food.perUnit)),
+      };
       foods.set(key, stored);
       return stored;
     },
@@ -268,6 +279,53 @@ describe("resolveMeal", () => {
     });
     expect(meal.totals.kcal).toBe(325 + 360);
     expect(meal.items.every((item) => item.source === "model")).toBe(true);
+  });
+
+  it("keeps per-gram macros through the store, so a small food neither drifts nor is flagged", async () => {
+    const { store, log } = memoryStore();
+    const cucumber = { kcal: 0.15, proteinG: 0.0065, carbsG: 0.036, fatG: 0.001 };
+    const parse: MealParser = async () => ({
+      output: {
+        items: [
+          {
+            name: "Cucumber",
+            unit: "g",
+            quantity: 200,
+            perUnit: {
+              kcalPerUnit: cucumber.kcal,
+              proteinGPerUnit: cucumber.proteinG,
+              carbsGPerUnit: cucumber.carbsG,
+              fatGPerUnit: cucumber.fatG,
+              fiberGPerUnit: null,
+            },
+            quantityNote: null,
+          },
+        ],
+        unresolved: [],
+        notes: null,
+      },
+      usage: USAGE,
+      model: "gpt-6-luna",
+    });
+    const text = "200g cucumber";
+
+    const first = await resolveMeal({ text, meal: "lunch", day: "2026-09-20", store, parse });
+    log(
+      text,
+      first.items.map((item) => ({ key: item.food.key, quantity: item.quantity })),
+    );
+    const second = await resolveMeal({ text, meal: "lunch", day: "2026-09-21", store, parse });
+
+    for (const meal of [first, second]) {
+      const [item] = meal.items;
+      expect(macrosAddUp(item.food.perUnit)).toBe(true);
+      expect(item.suspectMacros).toBe(false);
+      for (const field of ["kcal", "proteinG", "carbsG", "fatG"] as const) {
+        const exact = cucumber[field] * 200;
+        expect(Math.abs(item.macros[field] - exact) / exact).toBeLessThan(0.01);
+      }
+    }
+    expect(second.items[0].source).toBe("phrase-cache");
   });
 
   it("flags a food whose calories disagree with its own macros", async () => {

@@ -23,6 +23,60 @@ export const ZERO_MACROS: Macros = {
   fiberG: null,
 };
 
+/**
+ * How per-unit macros cross the driver, which is as strings at the scale of the
+ * `foods` columns in `lib/db/schema/nutrition.ts`.
+ *
+ * One codec for every writer, because the scale is what makes a per-gram value
+ * survive the round trip, and a second `.toFixed` with a different argument would be a
+ * food that reads back as different numbers depending on which path wrote it.
+ */
+export const PER_UNIT_SCALE = 4;
+
+/** The largest values the columns hold: numeric(10,4) for kcal, numeric(9,4) for grams. */
+export const PER_UNIT_MAX = { kcal: 999_999, grams: 99_999 } as const;
+
+export type PerUnitColumns = {
+  kcalPerUnit: string;
+  proteinGPerUnit: string;
+  carbsGPerUnit: string;
+  fatGPerUnit: string;
+  fiberGPerUnit: string | null;
+};
+
+export function encodePerUnit(perUnit: Macros): PerUnitColumns {
+  return {
+    kcalPerUnit: perUnit.kcal.toFixed(PER_UNIT_SCALE),
+    proteinGPerUnit: perUnit.proteinG.toFixed(PER_UNIT_SCALE),
+    carbsGPerUnit: perUnit.carbsG.toFixed(PER_UNIT_SCALE),
+    fatGPerUnit: perUnit.fatG.toFixed(PER_UNIT_SCALE),
+    fiberGPerUnit: perUnit.fiberG === null ? null : perUnit.fiberG.toFixed(PER_UNIT_SCALE),
+  };
+}
+
+export function decodePerUnit(row: PerUnitColumns): Macros {
+  return {
+    kcal: Number(row.kcalPerUnit),
+    proteinG: Number(row.proteinGPerUnit),
+    carbsG: Number(row.carbsGPerUnit),
+    fatG: Number(row.fatGPerUnit),
+    fiberG: row.fiberGPerUnit === null ? null : Number(row.fiberGPerUnit),
+  };
+}
+
+/** Whether two sets of per-unit macros are the same once stored. */
+export function samePerUnit(a: Macros, b: Macros): boolean {
+  const x = decodePerUnit(encodePerUnit(a));
+  const y = decodePerUnit(encodePerUnit(b));
+  return (
+    x.kcal === y.kcal &&
+    x.proteinG === y.proteinG &&
+    x.carbsG === y.carbsG &&
+    x.fatG === y.fatG &&
+    x.fiberG === y.fiberG
+  );
+}
+
 /** Atwater factors, the convention every label on a packet is built on. */
 export const KCAL_PER_G = { protein: 4, carbs: 4, fat: 9 } as const;
 

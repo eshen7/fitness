@@ -16,11 +16,14 @@ import { recordSpend } from "@/lib/ai/proposals";
 import { addDays } from "@/lib/days";
 import { getDb, schema, type Db } from "@/lib/db";
 import { today } from "@/lib/time";
+import { decodePerUnit, encodePerUnit, samePerUnit } from "./macros";
 import { targetInputsFor } from "./queries";
 import {
+  PER_UNIT_HINT,
   correctEntrySchema,
   deleteEntrySchema,
   logMealSchema,
+  perGramImplausible,
   setTargetsSchema,
   type NutritionResult,
 } from "./requests";
@@ -207,28 +210,45 @@ export async function correctEntry(input: unknown): Promise<NutritionResult> {
   const { foodLogEntries, foods } = schema;
 
   const [entry] = await db
-    .select({ id: foodLogEntries.id, foodId: foodLogEntries.foodId })
+    .select({
+      id: foodLogEntries.id,
+      foodId: foodLogEntries.foodId,
+      unit: foods.unit,
+      kcalPerUnit: foods.kcalPerUnit,
+      proteinGPerUnit: foods.proteinGPerUnit,
+      carbsGPerUnit: foods.carbsGPerUnit,
+      fatGPerUnit: foods.fatGPerUnit,
+      fiberGPerUnit: foods.fiberGPerUnit,
+    })
     .from(foodLogEntries)
+    .innerJoin(foods, eq(foods.id, foodLogEntries.foodId))
     .where(eq(foodLogEntries.id, entryId))
     .limit(1);
   if (!entry) return { ok: false, message: "That entry is gone." };
+
+  // Only macros that actually differ from the stored ones rewrite the food, so the
+  // "yours" tag keeps meaning the owner changed the numbers and not just the portion.
+  const edited = perUnit == null ? null : { ...perUnit, fiberG: perUnit.fiberG ?? null };
+  const rewrite =
+    edited !== null && !samePerUnit(edited, decodePerUnit(entry)) ? edited : null;
+
+  if (rewrite && entry.unit === "g" && perGramImplausible(rewrite)) {
+    return { ok: false, message: PER_UNIT_HINT };
+  }
 
   await db
     .update(foodLogEntries)
     .set({ quantity: quantity.toFixed(2), updatedAt: new Date() })
     .where(eq(foodLogEntries.id, entryId));
 
+  if (rewrite === null) {
+    revalidatePath("/nutrition");
+    return { ok: true, message: "Corrected." };
+  }
+
   await db
     .update(foods)
-    .set({
-      kcalPerUnit: perUnit.kcal.toFixed(2),
-      proteinGPerUnit: perUnit.proteinG.toFixed(2),
-      carbsGPerUnit: perUnit.carbsG.toFixed(2),
-      fatGPerUnit: perUnit.fatG.toFixed(2),
-      fiberGPerUnit: perUnit.fiberG == null ? null : perUnit.fiberG.toFixed(2),
-      provenance: "owner",
-      updatedAt: new Date(),
-    })
+    .set({ ...encodePerUnit(rewrite), provenance: "owner", updatedAt: new Date() })
     .where(eq(foods.id, entry.foodId));
 
   revalidatePath("/nutrition");

@@ -1,10 +1,11 @@
 import { Card, Tag } from "@/components/ui";
 import { formatDay } from "@/lib/days";
 import { energyDirectionLabels, mesocycleTypeLabels } from "@/lib/labels";
-import type {
-  DailyTarget,
-  TargetGoal,
-  TargetProposal,
+import {
+  targetDrifted,
+  type DailyTarget,
+  type TargetGoal,
+  type TargetProposal,
 } from "@/lib/nutrition/targets";
 import type { MesocycleType } from "@/lib/taxonomy";
 import { SetTargets } from "./set-targets";
@@ -22,17 +23,17 @@ export function TargetsCard({
   target,
   proposal,
   suggestedGoal,
+  cutRefusedBecause,
   blockType,
 }: {
   target: DailyTarget | null;
+  /** The proposal for the goal in force, which is what drift is measured against. */
   proposal: TargetProposal | null;
   suggestedGoal: TargetGoal;
+  cutRefusedBecause: string | null;
   blockType: MesocycleType | null;
 }) {
-  const stale =
-    target !== null &&
-    proposal !== null &&
-    (proposal.kcal !== target.kcal || proposal.proteinG !== target.proteinG);
+  const stale = target !== null && proposal !== null && targetDrifted(target, proposal);
 
   return (
     <Card>
@@ -99,9 +100,14 @@ export function TargetsCard({
             </p>
           ) : null}
 
-          {proposal.cutRefusedBecause ? (
+          {/*
+            Asked on its own rather than read off the proposal, which only carries a
+            refusal when the goal in force is a cut. Telling the owner before they
+            pick Cut beats a target that quietly lands at maintenance afterwards.
+          */}
+          {cutRefusedBecause ? (
             <p className="mt-2 text-sm text-ink-muted">
-              A cut would be declined right now: {proposal.cutRefusedBecause}.
+              A cut would be declined right now: {cutRefusedBecause}.
             </p>
           ) : null}
 

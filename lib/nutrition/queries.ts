@@ -9,9 +9,17 @@ import { bodyweightOn, bodyweightTrend } from "@/lib/progress/derive";
 import type { FoodUnit, MealSlot, MesocycleType, UnitSystem } from "@/lib/taxonomy";
 import { MEAL_SLOTS } from "@/lib/taxonomy";
 import { dayMinus, dayOf, today } from "@/lib/time";
-import { macrosAddUp, scaleMacros, sumMacros, type Macros } from "./macros";
 import {
+  decodePerUnit,
+  macrosAddUp,
+  scaleMacros,
+  sumMacros,
+  type Macros,
+} from "./macros";
+import {
+  cutRefusal,
   defaultGoalFor,
+  goalOf,
   proposeTargets,
   remaining,
   type DailyTarget,
@@ -89,13 +97,7 @@ export async function dayLog(day: string, db: Db = getDb()): Promise<LoggedItem[
     .orderBy(asc(foodLogEntries.loggedAt), asc(foodLogEntries.id));
 
   return rows.map((row): LoggedItem => {
-    const perUnit: Macros = {
-      kcal: Number(row.kcalPerUnit),
-      proteinG: Number(row.proteinGPerUnit),
-      carbsG: Number(row.carbsGPerUnit),
-      fatG: Number(row.fatGPerUnit),
-      fiberG: row.fiberGPerUnit === null ? null : Number(row.fiberGPerUnit),
-    };
+    const perUnit = decodePerUnit(row);
     const quantity = Number(row.quantity);
     return {
       id: row.id,
@@ -272,10 +274,15 @@ export type NutritionSnapshot = {
   meals: MealGroup[];
   totals: Macros;
   target: DailyTarget | null;
-  /** Null without a bodyweight, since every target is per kilogram. */
+  /**
+   * The rules' answer for the goal in force, or for the suggested goal when nothing
+   * is. Null without a bodyweight, since every target is per kilogram.
+   */
   proposal: TargetProposal | null;
   /** What the open block implies, which is the default the form opens on. */
   suggestedGoal: TargetGoal;
+  /** Why a cut would be declined today, whatever goal is in force. */
+  cutRefusedBecause: string | null;
   blockType: MesocycleType | null;
   remaining: RemainingTarget | null;
   /** Anything ever logged, which is what tells an empty today from a first run. */
@@ -314,12 +321,14 @@ export async function nutritionSnapshot(
   // The proposal is what the rules say the targets should be *now*, which is not
   // the same as the target in force: a block that has moved on, or a tendon that has
   // flared, changes the answer, and the page shows both so the difference is the
-  // prompt to set a new one rather than a silent replacement.
+  // prompt to set a new one rather than a silent replacement. It is asked for the
+  // goal in force, so a hold chosen during accumulation is not reported as drift.
   const suggestedGoal = defaultGoalFor(blockType);
+  const goal = target === null ? suggestedGoal : goalOf(target);
   const proposal =
     trendKg === null
       ? null
-      : proposeTargets({ bodyweightKg: trendKg, blockType, tendon, goal: suggestedGoal });
+      : proposeTargets({ bodyweightKg: trendKg, blockType, tendon, goal });
 
   return {
     day,
@@ -330,6 +339,7 @@ export async function nutritionSnapshot(
     target,
     proposal,
     suggestedGoal,
+    cutRefusedBecause: cutRefusal({ blockType, tendon }),
     blockType,
     remaining: target === null ? null : remaining(target, totals),
     hasHistory,

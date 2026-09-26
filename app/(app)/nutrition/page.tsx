@@ -66,6 +66,7 @@ export default async function NutritionPage() {
           target={snapshot.target}
           proposal={snapshot.proposal}
           suggestedGoal={snapshot.suggestedGoal}
+          cutRefusedBecause={snapshot.cutRefusedBecause}
           blockType={snapshot.blockType}
         />
 

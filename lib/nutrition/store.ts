@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import type { KnownFood } from "@/lib/ai/food";
 import { getDb, schema, type Db } from "@/lib/db";
 import type { FoodUnit } from "@/lib/taxonomy";
+import { decodePerUnit, encodePerUnit, type PerUnitColumns } from "./macros";
 import { foodKey } from "./normalize";
 import type { CachedFood, FoodStore } from "./resolve";
 
@@ -9,25 +10,21 @@ import type { CachedFood, FoodStore } from "./resolve";
  * The `FoodStore` port over Postgres. The only part of the cache that needs a
  * database, which is why it is the only part that is not unit tested.
  *
- * Numerics cross the driver as strings in both directions, so every one of them is
- * `.toFixed(2)` on the way in and `Number()` on the way out. The scales come from
- * `lib/db/schema/nutrition.ts` and two decimals is what the columns hold; writing
- * more precision than that is precision Postgres rounds away, and reading a string
- * as a number is the difference between adding calories and concatenating them.
+ * Numerics cross the driver as strings in both directions. Per-unit macros go through
+ * `encodePerUnit` and `decodePerUnit` in `./macros`, at the scale the columns in
+ * `lib/db/schema/nutrition.ts` hold; reading a string as a number is the difference
+ * between adding calories and concatenating them.
  */
 
-function foodOf(row: {
-  id: number;
-  key: string;
-  name: string;
-  unit: string;
-  kcalPerUnit: string;
-  proteinGPerUnit: string;
-  carbsGPerUnit: string;
-  fatGPerUnit: string;
-  fiberGPerUnit: string | null;
-  provenance: string;
-}): CachedFood {
+function foodOf(
+  row: PerUnitColumns & {
+    id: number;
+    key: string;
+    name: string;
+    unit: string;
+    provenance: string;
+  },
+): CachedFood {
   return {
     id: row.id,
     key: row.key,
@@ -36,13 +33,7 @@ function foodOf(row: {
     // rather than a write that throws; the closed set is enforced where the parse
     // is validated.
     unit: row.unit as FoodUnit,
-    perUnit: {
-      kcal: Number(row.kcalPerUnit),
-      proteinG: Number(row.proteinGPerUnit),
-      carbsG: Number(row.carbsGPerUnit),
-      fatG: Number(row.fatGPerUnit),
-      fiberG: row.fiberGPerUnit === null ? null : Number(row.fiberGPerUnit),
-    },
+    perUnit: decodePerUnit(row),
     provenance: row.provenance,
   };
 }
@@ -148,11 +139,7 @@ export function foodStore(db: Db = getDb()): FoodStore {
           key,
           name: food.name,
           unit: food.unit,
-          kcalPerUnit: food.perUnit.kcal.toFixed(2),
-          proteinGPerUnit: food.perUnit.proteinG.toFixed(2),
-          carbsGPerUnit: food.perUnit.carbsG.toFixed(2),
-          fatGPerUnit: food.perUnit.fatG.toFixed(2),
-          fiberGPerUnit: food.perUnit.fiberG === null ? null : food.perUnit.fiberG.toFixed(2),
+          ...encodePerUnit(food.perUnit),
           provenance: food.provenance,
         })
         .onConflictDoNothing({ target: schema.foods.key })

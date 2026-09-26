@@ -6,10 +6,16 @@ import {
   LOSS_PCT_PER_WEEK,
   MAINTENANCE_KCAL_PER_KG,
   SURPLUS_FRACTION,
+  TARGET_DRIFT_KCAL,
+  cutRefusal,
   defaultGoalFor,
+  goalOf,
   proposeTargets,
   remaining,
+  targetDrifted,
   tendonsHealthy,
+  type DailyTarget,
+  type TargetProposal,
   type TendonState,
 } from "./targets";
 
@@ -191,6 +197,100 @@ describe("proposeTargets", () => {
       goal: "hold",
     });
     expect(target.carbsG).toBe(0);
+  });
+});
+
+/** A proposal written down as the target in force, the way `setTargets` stores it. */
+function inForce(proposal: TargetProposal): DailyTarget {
+  return {
+    kcal: proposal.kcal,
+    proteinG: proposal.proteinG,
+    carbsG: proposal.carbsG,
+    fatG: proposal.fatG,
+    fluidMl: proposal.fluidMl,
+    targetWeeklyChangePct: proposal.targetWeeklyChangePct,
+    rationale: proposal.rationale,
+    effectiveFrom: "2026-09-20",
+  };
+}
+
+describe("targetDrifted", () => {
+  it("stays quiet on a hold chosen during accumulation", () => {
+    const held = inForce(
+      proposeTargets({ bodyweightKg: BODYWEIGHT, blockType: "accumulation", tendon: healthy, goal: "hold" }),
+    );
+    const now = proposeTargets({
+      bodyweightKg: BODYWEIGHT,
+      blockType: "accumulation",
+      tendon: healthy,
+      goal: goalOf(held),
+    });
+    expect(goalOf(held)).toBe("hold");
+    expect(targetDrifted(held, now)).toBe(false);
+  });
+
+  it("stays quiet when the trend moves a tenth of a kilogram overnight", () => {
+    const set = inForce(
+      proposeTargets({ bodyweightKg: BODYWEIGHT, blockType: "accumulation", tendon: healthy, goal: "gain" }),
+    );
+    const now = proposeTargets({
+      bodyweightKg: BODYWEIGHT + 0.1,
+      blockType: "accumulation",
+      tendon: healthy,
+      goal: goalOf(set),
+    });
+    expect(now.kcal).not.toBe(set.kcal);
+    expect(targetDrifted(set, now)).toBe(false);
+  });
+
+  it("fires when bodyweight has moved enough to shift the calories past the tolerance", () => {
+    const set = inForce(
+      proposeTargets({ bodyweightKg: BODYWEIGHT, blockType: null, tendon: healthy, goal: "hold" }),
+    );
+    const kg = TARGET_DRIFT_KCAL / MAINTENANCE_KCAL_PER_KG + 1;
+    const now = proposeTargets({
+      bodyweightKg: BODYWEIGHT + kg,
+      blockType: null,
+      tendon: healthy,
+      goal: goalOf(set),
+    });
+    expect(targetDrifted(set, now)).toBe(true);
+  });
+
+  it("fires when a cut in force would now be refused", () => {
+    const cut = inForce(
+      proposeTargets({ bodyweightKg: BODYWEIGHT, blockType: "transmutation", tendon: healthy, goal: "cut" }),
+    );
+    const flared: TendonState[] = [{ site: "patellar_left", worstPain: 6, protocolPhase: null }];
+    const now = proposeTargets({
+      bodyweightKg: BODYWEIGHT,
+      blockType: "transmutation",
+      tendon: flared,
+      goal: goalOf(cut),
+    });
+    expect(goalOf(cut)).toBe("cut");
+    expect(targetDrifted(cut, now)).toBe(true);
+  });
+
+  it("reads a refused cut back as the hold it was stored as", () => {
+    const refused = inForce(
+      proposeTargets({ bodyweightKg: BODYWEIGHT, blockType: "realization", tendon: healthy, goal: "cut" }),
+    );
+    expect(goalOf(refused)).toBe("hold");
+    expect(goalOf({ targetWeeklyChangePct: null })).toBe("hold");
+  });
+});
+
+describe("cutRefusal", () => {
+  it("answers ahead of time, whatever goal is in force", () => {
+    expect(cutRefusal({ blockType: "realization", tendon: healthy })).toMatch(/realization/);
+    expect(
+      cutRefusal({
+        blockType: "accumulation",
+        tendon: [{ site: "achilles_right", worstPain: 1, protocolPhase: 2 }],
+      }),
+    ).toMatch(/protocol phase 2/);
+    expect(cutRefusal({ blockType: "accumulation", tendon: healthy })).toBeNull();
   });
 });
 

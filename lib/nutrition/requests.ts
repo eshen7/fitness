@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MEAL_SLOTS } from "@/lib/taxonomy";
+import { PER_UNIT_MAX, type Macros } from "./macros";
 
 /**
  * What the nutrition UI sends the server, and what it gets back.
@@ -47,6 +48,24 @@ export const deleteEntrySchema = z.object({
 });
 export type DeleteEntryInput = z.input<typeof deleteEntrySchema>;
 
+export const PER_UNIT_HINT = "Per unit, not per portion.";
+
+/**
+ * The most a single gram of any food can hold: pure fat is 9 kcal, and no food is
+ * more than all of itself in one macro. A per-gram figure above either is a portion
+ * total typed into a per-unit field, which is the one slip worth catching by unit.
+ */
+export const PER_GRAM_MAX = { kcal: 9, grams: 1 } as const;
+
+export function perGramImplausible(macros: Macros): boolean {
+  return (
+    macros.kcal > PER_GRAM_MAX.kcal ||
+    [macros.proteinG, macros.carbsG, macros.fatG, macros.fiberG ?? 0].some(
+      (grams) => grams > PER_GRAM_MAX.grams,
+    )
+  );
+}
+
 /**
  * A correction, which is both the portion on this entry and the macros of the food
  * behind it.
@@ -56,6 +75,10 @@ export type DeleteEntryInput = z.input<typeof deleteEntrySchema>;
  * macros rewrites the cached food, which changes every entry that used it and every
  * entry that ever will: that is the cache doing its job, and it is why the
  * correction is marked as the owner's so no later parse overwrites it.
+ *
+ * `perUnit` is sent only when the owner edited a macro, so a portion fix never has
+ * to re-validate numbers the parse stored. Its ceilings are the columns', because a
+ * food the parse could store is a food the owner must be able to correct.
  */
 export const correctEntrySchema = z.object({
   entryId: z.number().int().positive(),
@@ -63,13 +86,15 @@ export const correctEntrySchema = z.object({
     .number()
     .positive("A portion is more than nothing.")
     .max(10_000, "That is not a portion."),
-  perUnit: z.object({
-    kcal: z.number().min(0).max(1000, "Per unit, not per portion."),
-    proteinG: z.number().min(0).max(100),
-    carbsG: z.number().min(0).max(100),
-    fatG: z.number().min(0).max(100),
-    fiberG: z.number().min(0).max(100).nullish(),
-  }),
+  perUnit: z
+    .object({
+      kcal: z.number().min(0).max(PER_UNIT_MAX.kcal, PER_UNIT_HINT),
+      proteinG: z.number().min(0).max(PER_UNIT_MAX.grams, PER_UNIT_HINT),
+      carbsG: z.number().min(0).max(PER_UNIT_MAX.grams, PER_UNIT_HINT),
+      fatG: z.number().min(0).max(PER_UNIT_MAX.grams, PER_UNIT_HINT),
+      fiberG: z.number().min(0).max(PER_UNIT_MAX.grams, PER_UNIT_HINT).nullish(),
+    })
+    .nullish(),
 });
 export type CorrectEntryInput = z.input<typeof correctEntrySchema>;
 

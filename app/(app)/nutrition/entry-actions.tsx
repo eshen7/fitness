@@ -133,12 +133,28 @@ function CorrectForm({
 }) {
   const word = unitWord(unit);
   const { pending, error, run } = useNutritionAction();
+  const initial = {
+    kcal: String(perUnit.kcal),
+    protein: String(perUnit.proteinG),
+    carbs: String(perUnit.carbsG),
+    fat: String(perUnit.fatG),
+    fiber: perUnit.fiberG === null ? "" : String(perUnit.fiberG),
+  };
   const [portion, setPortion] = useState(String(quantity));
-  const [kcal, setKcal] = useState(String(perUnit.kcal));
-  const [protein, setProtein] = useState(String(perUnit.proteinG));
-  const [carbs, setCarbs] = useState(String(perUnit.carbsG));
-  const [fat, setFat] = useState(String(perUnit.fatG));
-  const [fiber, setFiber] = useState(perUnit.fiberG === null ? "" : String(perUnit.fiberG));
+  const [kcal, setKcal] = useState(initial.kcal);
+  const [protein, setProtein] = useState(initial.protein);
+  const [carbs, setCarbs] = useState(initial.carbs);
+  const [fat, setFat] = useState(initial.fat);
+  const [fiber, setFiber] = useState(initial.fiber);
+
+  // The macros go only when one was touched, so fixing a portion never re-submits,
+  // and never re-validates, numbers the parse stored.
+  const macrosEdited =
+    kcal !== initial.kcal ||
+    protein !== initial.protein ||
+    carbs !== initial.carbs ||
+    fat !== initial.fat ||
+    fiber !== initial.fiber;
 
   function submit() {
     run(
@@ -146,13 +162,15 @@ function CorrectForm({
         correctEntry({
           entryId,
           quantity: Number(portion),
-          perUnit: {
-            kcal: Number(kcal),
-            proteinG: Number(protein),
-            carbsG: Number(carbs),
-            fatG: Number(fat),
-            fiberG: fiber.trim() === "" ? null : Number(fiber),
-          },
+          perUnit: macrosEdited
+            ? {
+                kcal: Number(kcal),
+                proteinG: Number(protein),
+                carbsG: Number(carbs),
+                fatG: Number(fat),
+                fiberG: fiber.trim() === "" ? null : Number(fiber),
+              }
+            : null,
         }),
       onDone,
     );
