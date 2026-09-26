@@ -38,7 +38,7 @@ Local Postgres is 17 with pgvector 0.8.6, matching Neon.
 ```
 app/(auth)/unlock/   passcode gate
 app/(app)/           today, log, progress, nutrition, plan, library
-app/api/             health, and later generation, nutrition parsing, WHOOP
+app/api/             health, generation, set logging, WHOOP, and later nutrition parsing
 lib/db/schema/       one file per domain area
 lib/whoop/           OAuth, signed webhook, ingest, and projection into readiness
 lib/engine/          prefilter, normalize, gate (validate.ts), advisories (pure TS, no LLM)
