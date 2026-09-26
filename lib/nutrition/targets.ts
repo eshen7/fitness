@@ -320,17 +320,22 @@ export function targetDrifted(target: DailyTarget, proposal: TargetProposal): bo
  * A goal the owner chose against the suggestion inside the same block is neither,
  * so it stays quiet.
  *
- * "Moved on" is read off dates: the open block starting after the target took effect.
- * `inForce` is the proposal for `goalOf(target)`.
+ * "Moved on" is read off dates: the open block starting after the target took effect,
+ * or, with no block open, the last one closing after it. `inForce` is the proposal
+ * for `goalOf(target)`.
  */
 export function targetStale(input: {
   target: DailyTarget;
   inForce: TargetProposal;
   suggestedGoal: TargetGoal;
   blockStart: string | null;
+  /** The day the last block closed, only when no block is open now. */
+  blockClosedOn: string | null;
 }): boolean {
+  const from = input.target.effectiveFrom;
   const blockChanged =
-    input.blockStart !== null && input.blockStart > input.target.effectiveFrom;
+    (input.blockStart !== null && input.blockStart > from) ||
+    (input.blockClosedOn !== null && input.blockClosedOn > from);
   return (
     (blockChanged && input.suggestedGoal !== goalOf(input.target)) ||
     targetDrifted(input.target, input.inForce)

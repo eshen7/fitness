@@ -300,6 +300,7 @@ describe("targetStale", () => {
         inForce: propose("realization", goalOf(target)),
         suggestedGoal,
         blockStart: "2026-09-20",
+        blockClosedOn: null,
       }),
     ).toBe(true);
   });
@@ -315,9 +316,40 @@ describe("targetStale", () => {
           inForce: propose("accumulation", goalOf(target), kg),
           suggestedGoal,
           blockStart: "2026-09-01",
+          blockClosedOn: null,
         }),
       ).toBe(false);
     }
+  });
+
+  it("prompts when a gain set in accumulation outlives its block, with none open", () => {
+    const target = { ...inForce(propose("accumulation", "gain")), effectiveFrom: "2026-09-01" };
+    const suggestedGoal = defaultGoalFor(null);
+    const now = proposeTargets({ bodyweightKg: BODYWEIGHT, blockType: null, tendon: healthy, goal: suggestedGoal });
+    expect(now.direction).toBe("hold");
+    expect(now.kcal).toBe(MAINTENANCE);
+    expect(
+      targetStale({
+        target,
+        inForce: proposeTargets({ bodyweightKg: BODYWEIGHT, blockType: null, tendon: healthy, goal: goalOf(target) }),
+        suggestedGoal,
+        blockStart: null,
+        blockClosedOn: "2026-09-15",
+      }),
+    ).toBe(true);
+  });
+
+  it("stays quiet on a target set after the last block closed", () => {
+    const target = { ...inForce(propose("accumulation", "hold")), effectiveFrom: "2026-09-20" };
+    expect(
+      targetStale({
+        target,
+        inForce: proposeTargets({ bodyweightKg: BODYWEIGHT, blockType: null, tendon: healthy, goal: "hold" }),
+        suggestedGoal: defaultGoalFor(null),
+        blockStart: null,
+        blockClosedOn: "2026-09-15",
+      }),
+    ).toBe(false);
   });
 
   it("stays quiet on a target set the day its block opened", () => {
@@ -328,6 +360,7 @@ describe("targetStale", () => {
         inForce: propose("realization", "hold"),
         suggestedGoal: "gain",
         blockStart: "2026-09-20",
+        blockClosedOn: null,
       }),
     ).toBe(false);
   });

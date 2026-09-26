@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, isNull, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { hasApiKey } from "@/lib/ai/client";
 import { SPEND_CAP_USD } from "@/lib/ai/pricing";
 import { totalSpendUsd } from "@/lib/ai/proposals";
@@ -304,17 +304,27 @@ export async function nutritionSnapshot(
   day = today(),
   db: Db = getDb(),
 ): Promise<NutritionSnapshot> {
-  const [items, target, readings, tendon, block, unitSystem, spendUsd, hasHistory] =
-    await Promise.all([
-      dayLog(day, db),
-      activeTarget(day, db),
-      bodyweightReadings(WEIGHT_WINDOW_DAYS, db),
-      tendonStates(),
-      loadOpenBlock(db),
-      getUnitSystem(),
-      totalSpendUsd(db),
-      hasLoggedFood(db),
-    ]);
+  const [
+    items,
+    target,
+    readings,
+    tendon,
+    block,
+    lastClosedOn,
+    unitSystem,
+    spendUsd,
+    hasHistory,
+  ] = await Promise.all([
+    dayLog(day, db),
+    activeTarget(day, db),
+    bodyweightReadings(WEIGHT_WINDOW_DAYS, db),
+    tendonStates(),
+    loadOpenBlock(db),
+    lastBlockClosedOn(db),
+    getUnitSystem(),
+    totalSpendUsd(db),
+    hasLoggedFood(db),
+  ]);
 
   const weight = weightView({ readings, target, day });
   const trendKg = bodyweightOn(weight.trend, day);
@@ -335,7 +345,13 @@ export async function nutritionSnapshot(
   const stale =
     target !== null &&
     inForce !== null &&
-    targetStale({ target, inForce, suggestedGoal, blockStart: block?.startDate ?? null });
+    targetStale({
+      target,
+      inForce,
+      suggestedGoal,
+      blockStart: block?.startDate ?? null,
+      blockClosedOn: block === null ? lastClosedOn : null,
+    });
 
   return {
     day,
@@ -357,6 +373,18 @@ export async function nutritionSnapshot(
     spendCapUsd: SPEND_CAP_USD,
     hasKey: hasApiKey(),
   };
+}
+
+/** The day the most recently closed block was closed, or null if none ever was. */
+async function lastBlockClosedOn(db: Db): Promise<string | null> {
+  const { mesocycles } = schema;
+  const [row] = await db
+    .select({ closedAt: mesocycles.closedAt })
+    .from(mesocycles)
+    .where(isNotNull(mesocycles.closedAt))
+    .orderBy(desc(mesocycles.closedAt))
+    .limit(1);
+  return row?.closedAt ? dayOf(row.closedAt) : null;
 }
 
 /**
