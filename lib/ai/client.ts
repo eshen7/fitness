@@ -104,6 +104,13 @@ export interface AiClient {
   propose<T>(call: AiCall<T>): Promise<AiResult<T>>;
 }
 
+const EMPTY_USAGE: AiUsage = {
+  inputTokens: 0,
+  outputTokens: 0,
+  cachedInputTokens: 0,
+  reasoningTokens: 0,
+};
+
 /**
  * A call that produced no usable plan.
  *
@@ -115,18 +122,13 @@ export class AiOutputError extends Error {
   constructor(
     readonly reason: "unparseable" | "refused" | "truncated" | "empty" | "tool-loop",
     message: string,
+    /** What the failed call was billed for. A truncated response is the dearest kind. */
+    readonly usage: AiUsage = EMPTY_USAGE,
   ) {
     super(message);
     this.name = "AiOutputError";
   }
 }
-
-const EMPTY_USAGE: AiUsage = {
-  inputTokens: 0,
-  outputTokens: 0,
-  cachedInputTokens: 0,
-  reasoningTokens: 0,
-};
 
 function addUsage(total: AiUsage, usage: Response["usage"]): AiUsage {
   if (!usage) return total;
@@ -233,11 +235,16 @@ export const openaiClient: AiClient = {
         throw new AiOutputError(
           "truncated",
           `${call.label}: the response stopped early (${response.incomplete_details?.reason ?? "unknown reason"}).`,
+          usage,
         );
       }
       const refusal = refusalOf(response);
       if (refusal) {
-        throw new AiOutputError("refused", `${call.label}: the model declined. ${refusal}`);
+        throw new AiOutputError(
+          "refused",
+          `${call.label}: the model declined. ${refusal}`,
+          usage,
+        );
       }
 
       const calls = functionCallsOf(response);
@@ -246,6 +253,7 @@ export const openaiClient: AiClient = {
           throw new AiOutputError(
             "empty",
             `${call.label}: the response carried neither a tool call nor a plan.`,
+            usage,
           );
         }
         return {
@@ -277,6 +285,7 @@ export const openaiClient: AiClient = {
     throw new AiOutputError(
       "tool-loop",
       `${call.label}: the model was still calling tools after ${MAX_TOOL_TURNS} rounds.`,
+      usage,
     );
   },
 };

@@ -68,7 +68,7 @@ export function ProposalReview({
     start(async () => {
       const result = await acceptProposal({
         proposalId: proposal.id,
-        editedWeek: edited,
+        editedWeek: ownerEdits.length ? edited : null,
       });
       setOk(result.ok);
       setMessage(result.message);
@@ -106,10 +106,12 @@ export function ProposalReview({
               : `Proposed week${shown ? ` ${shown.ordinal}` : ""}`}
           </h2>
           {proposal.isFallback ? <Tag tone="bad">Fallback</Tag> : null}
-          {proposal.violations.length ? (
+          {proposal.passed ? (
+            <Tag tone="accent">Gate passed</Tag>
+          ) : proposal.violations.length ? (
             <Tag tone="bad">{proposal.violations.length} unresolved</Tag>
           ) : (
-            <Tag tone="accent">Gate passed</Tag>
+            <Tag tone="bad">No usable attempt</Tag>
           )}
           <Tag tone={proposal.repairAttempts > 0 ? "warn" : "neutral"}>
             {proposal.repairAttempts === 0
@@ -164,6 +166,7 @@ export function ProposalReview({
           <div className="mt-2">
             <WeekEditor
               week={shown}
+              proposed={week ?? undefined}
               names={names}
               editing={edited !== null}
               onChange={change}

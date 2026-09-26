@@ -2,15 +2,9 @@ import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { Card, EmptyState, Tag } from "@/components/ui";
 import { loadDirectory, loadOpenBlock, loadPlannedDay } from "@/lib/ai/queries";
-import { formatSeconds } from "@/lib/engine/classify";
-import type { PlannedSet } from "@/lib/engine/types";
 import { formatDay } from "@/lib/days";
-import {
-  couplingClassLabels,
-  loadTypeLabels,
-  mesocycleTypeLabels,
-  sessionKindLabels,
-} from "@/lib/labels";
+import { loadTypeLabels, mesocycleTypeLabels, sessionKindLabels } from "@/lib/labels";
+import { describePrescription, prescriptionDetail } from "@/lib/prescription";
 import { today } from "@/lib/time";
 
 export const metadata = { title: "Today" };
@@ -115,11 +109,11 @@ export default async function TodayPage() {
                               `Exercise ${prescription.exerciseId}`}
                           </span>
                           <span className="text-xs text-ink-muted tabular-nums">
-                            {describe(prescription)}
+                            {describePrescription(prescription)}
                           </span>
                         </div>
                         <p className="mt-0.5 text-xs text-ink-faint">
-                          {detail(prescription)}
+                          {prescriptionDetail(prescription)}
                         </p>
                       </li>
                     ))}
@@ -141,31 +135,4 @@ export default async function TodayPage() {
       </div>
     </>
   );
-}
-
-/** The prescription in one line: `4 x 8 at 85% 1RM`. */
-function describe(item: PlannedSet) {
-  const volume =
-    item.reps != null
-      ? `${item.sets} x ${item.reps}`
-      : item.holdSeconds != null
-        ? `${item.sets} x ${item.holdSeconds}s`
-        : `${item.sets} sets`;
-  const load = [
-    item.loadPctOf1rm != null ? `${item.loadPctOf1rm}% 1RM` : null,
-    item.loadKg != null ? `${item.loadKg} kg` : null,
-    item.boxHeightCm != null ? `${item.boxHeightCm} cm box` : null,
-    item.targetRpe != null ? `RPE ${item.targetRpe}` : null,
-  ].filter(Boolean);
-  return load.length ? `${volume} at ${load.join(", ")}` : volume;
-}
-
-function detail(item: PlannedSet) {
-  return [
-    item.restSeconds == null ? null : `${formatSeconds(item.restSeconds)} rest`,
-    item.couplingClass ? couplingClassLabels.of(item.couplingClass) : null,
-    item.tempo ? `tempo ${item.tempo}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
 }

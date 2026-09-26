@@ -1,10 +1,10 @@
 "use client";
 
 import { Input, Tag } from "@/components/ui";
-import { formatSeconds } from "@/lib/engine/classify";
 import type { MicrocyclePlan, PlannedSet } from "@/lib/engine/types";
-import { couplingClassLabels, loadTypeLabels, sessionKindLabels } from "@/lib/labels";
+import { loadTypeLabels, sessionKindLabels } from "@/lib/labels";
 import { formatDay } from "@/lib/days";
+import { describePrescription, prescriptionDetail } from "@/lib/prescription";
 
 /**
  * The proposed week, readable first and editable second.
@@ -43,8 +43,30 @@ export type WeekEdit = {
   value: number | null;
 };
 
+/**
+ * The numeric fields each exercise carries in the week as proposed. The editor
+ * offers these rather than whatever is set right now, so clearing a field to type
+ * a new number does not take the input away mid-edit.
+ */
+function editableFields(week: MicrocyclePlan) {
+  const fields = new Map<number, Set<keyof PlannedSet>>();
+  for (const session of week.sessions) {
+    for (const block of session.blocks) {
+      for (const item of block.items) {
+        const held = fields.get(item.exerciseId) ?? new Set<keyof PlannedSet>();
+        for (const { field } of NUMERIC_FIELDS) {
+          if (item[field] != null) held.add(field);
+        }
+        fields.set(item.exerciseId, held);
+      }
+    }
+  }
+  return fields;
+}
+
 export function WeekEditor({
   week,
+  proposed = week,
   names,
   editing,
   onChange,
@@ -53,6 +75,8 @@ export function WeekEditor({
   onDropItem,
 }: {
   week: MicrocyclePlan;
+  /** The week as the model proposed it, before any edit. Defaults to `week`. */
+  proposed?: MicrocyclePlan;
   names: Record<string, string>;
   editing: boolean;
   onChange?: (edit: WeekEdit) => void;
@@ -60,6 +84,7 @@ export function WeekEditor({
   onDropSession?: (day: string) => void;
   onDropItem?: (day: string, exerciseId: number) => void;
 }) {
+  const editable = editableFields(proposed);
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 text-xs text-ink-faint">
@@ -141,7 +166,7 @@ export function WeekEditor({
                         </span>
                         {editing ? null : (
                           <span className="text-xs tabular-nums text-ink-muted">
-                            {describe(item)}
+                            {describePrescription(item)}
                           </span>
                         )}
                       </div>
@@ -149,9 +174,11 @@ export function WeekEditor({
                       {editing ? (
                         <div className="mt-2 flex flex-wrap items-end gap-2">
                           {NUMERIC_FIELDS.filter(
-                            ({ field }) => item[field] !== null && item[field] !== undefined,
+                            ({ field }) =>
+                              item[field] != null ||
+                              editable.get(item.exerciseId)?.has(field),
                           ).map(({ field, label, step }) => (
-                            <label key={field} className="block">
+                            <label key={field} className="block w-20">
                               <span className="mb-0.5 block text-[0.6875rem] text-ink-faint">
                                 {label}
                               </span>
@@ -172,7 +199,7 @@ export function WeekEditor({
                                         : Number(event.target.value),
                                   })
                                 }
-                                className="h-9 w-20 text-xs tabular-nums"
+                                className="h-9 text-xs tabular-nums"
                               />
                             </label>
                           ))}
@@ -186,17 +213,7 @@ export function WeekEditor({
                         </div>
                       ) : (
                         <p className="mt-0.5 text-xs text-ink-faint">
-                          {[
-                            item.restSeconds == null
-                              ? null
-                              : `${formatSeconds(item.restSeconds)} rest`,
-                            item.couplingClass
-                              ? couplingClassLabels.of(item.couplingClass)
-                              : null,
-                            item.tempo ? `tempo ${item.tempo}` : null,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
+                          {prescriptionDetail(item)}
                         </p>
                       )}
                     </li>
@@ -209,21 +226,4 @@ export function WeekEditor({
       ))}
     </div>
   );
-}
-
-/** The prescription in one line: `4 x 8 at 85%, 45 cm`. */
-function describe(item: PlannedSet) {
-  const reps =
-    item.reps != null
-      ? `${item.sets} x ${item.reps}`
-      : item.holdSeconds != null
-        ? `${item.sets} x ${item.holdSeconds}s`
-        : `${item.sets} sets`;
-  const load = [
-    item.loadPctOf1rm != null ? `${item.loadPctOf1rm}% 1RM` : null,
-    item.loadKg != null ? `${item.loadKg} kg` : null,
-    item.boxHeightCm != null ? `${item.boxHeightCm} cm box` : null,
-    item.targetRpe != null ? `RPE ${item.targetRpe}` : null,
-  ].filter(Boolean);
-  return load.length ? `${reps} at ${load.join(", ")}` : reps;
 }

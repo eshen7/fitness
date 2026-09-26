@@ -22,6 +22,7 @@ import {
   FALLBACK_LOAD_SCALE,
   MAX_REPAIR_ATTEMPTS,
   generateDeclaration,
+  finalViolations,
   generateWeek,
   repairAttemptsOf,
 } from "./generate";
@@ -316,6 +317,52 @@ describe("generating a week", () => {
     // 68%, which is felt and still trains.
     expect(Math.max(...loadsOf(fallback!))).toBe(Math.round(85 * FALLBACK_LOAD_SCALE));
     expect(loadsOf(fallback!).length).toBeGreaterThan(3);
+  });
+
+  it("keeps the fallback inside the candidate set a tendon has narrowed", async () => {
+    use(always({ output: weekProposal() }));
+    const priors = new Map<SessionKind, PlannedSession>(
+      baselineWeek().sessions.map((session) => [session.kind, session]),
+    );
+    const context = fixtureContext({
+      block: fixtureBlock(),
+      tendon: [
+        tendonReading({ site: "patellar_left", protocolPhase: 2, painDuringLoad: 4 }),
+      ],
+    });
+    const run = await generate({
+      context,
+      declaration: { ...DECLARATION, ...OVER_TARGETED },
+      lastSession: async (kind) => priors.get(kind) ?? null,
+    });
+
+    const candidates = new Set(context.prefiltered.candidates.map((exercise) => exercise.id));
+    const shipped = run.fallback!.sessions.flatMap((session) =>
+      session.blocks.flatMap((block) => block.items.map((item) => item.exerciseId)),
+    );
+    expect(shipped.length).toBeGreaterThan(0);
+    for (const exerciseId of shipped) expect(candidates.has(exerciseId)).toBe(true);
+    for (const session of run.fallback!.sessions) {
+      for (const block of session.blocks) expect(block.items.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("meters a failed call and reports the violations of the last gated attempt", async () => {
+    use([
+      { output: weekProposal() },
+      { output: weekProposal() },
+      { output: weekProposal() },
+      truncated("week 2"),
+    ]);
+    const run = await generate({
+      declaration: { ...DECLARATION, ...OVER_TARGETED },
+      lastSession: async () => null,
+    });
+
+    expect(run.attempts.at(-1)!.error).not.toBeNull();
+    expect(finalViolations(run).length).toBeGreaterThan(0);
+    expect(finalViolations(run)).toEqual(run.attempts[2].violations);
+    expect(run.usage.outputTokens).toBe(3 * 500 + 32_000);
   });
 
   it("says there is nothing to fall back on rather than inventing one", async () => {

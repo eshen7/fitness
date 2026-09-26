@@ -34,6 +34,7 @@ import { loadContext, type GenerationContext } from "../lib/ai/context";
 import {
   generateDeclaration,
   generateWeek,
+  finalViolations,
   repairAttemptsOf,
   type DeclarationRun,
   type WeekRun,
@@ -43,6 +44,7 @@ import { SPEND_CAP_USD, SpendMeter, formatUsd, priceOf } from "../lib/ai/pricing
 import type { BlockState } from "../lib/ai/queries";
 import type { MesocycleDeclaration, MicrocyclePlan } from "../lib/engine/types";
 import { addDays } from "../lib/days";
+import { dayOf } from "../lib/time";
 
 config({ path: [".env.local", ".env"], quiet: true });
 
@@ -84,8 +86,7 @@ function number(name: string, fallback: number): number {
 
 /** The violations a run ended on, deduplicated, as rule ids. */
 function unresolved(run: DeclarationRun | WeekRun): string[] {
-  const last = run.attempts.at(-1);
-  return [...new Set((last?.violations ?? []).map((violation) => violation.rule))];
+  return [...new Set(finalViolations(run).map((violation) => violation.rule))];
 }
 
 function measure(
@@ -193,7 +194,7 @@ async function main() {
   let blockOrdinal = await nextBlockOrdinal(db);
   let startDate = base.block
     ? addDays(base.block.priorWeeks.at(-1)?.startDate ?? base.block.startDate, 7)
-    : asOf.toISOString().slice(0, 10);
+    : dayOf(asOf);
 
   while (measurements.length < runs && !stopped) {
     const estimate = meter.worstUsd || FIRST_ESTIMATE_USD;

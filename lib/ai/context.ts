@@ -9,6 +9,7 @@ import type {
   TendonReading,
 } from "@/lib/engine/types";
 import { formatDay } from "@/lib/days";
+import { dayOf } from "@/lib/time";
 import {
   couplingClassLabels,
   equipmentLabels,
@@ -187,7 +188,7 @@ function tendonText(context: GenerationContext) {
     .sort((a, b) => a.site.localeCompare(b.site))
     .map(
       (reading) =>
-        `${tendonSiteLabels.of(reading.site)}: pain during load ${reading.painDuringLoad}/10, after load ${reading.painAfterLoad}/10, morning stiffness ${reading.morningStiffness}/10${reading.protocolPhase === null ? ", no protocol" : `, protocol phase ${reading.protocolPhase}`} (${formatDay(reading.recordedAt.toISOString().slice(0, 10))}).`,
+        `${tendonSiteLabels.of(reading.site)}: pain during load ${reading.painDuringLoad}/10, after load ${reading.painAfterLoad}/10, morning stiffness ${reading.morningStiffness}/10${reading.protocolPhase === null ? ", no protocol" : `, protocol phase ${reading.protocolPhase}`} (${formatDay(dayOf(reading.recordedAt))}).`,
     );
   const caps = loadCaps.map((cap) => cap.message);
   const removals = excluded.map((exclusion) => exclusion.message);
@@ -310,7 +311,7 @@ export function volatileText(context: GenerationContext) {
 }
 
 function dayOfContext(context: GenerationContext) {
-  return context.asOf.toISOString().slice(0, 10);
+  return dayOf(context.asOf);
 }
 
 // -----------------------------------------------------------------------------

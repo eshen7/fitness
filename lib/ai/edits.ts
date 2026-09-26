@@ -30,42 +30,53 @@ const SET_FIELDS = [
   "targetRpe",
 ] as const;
 
+type SessionPair = { before: PlannedSession | null; after: PlannedSession | null };
+
 /**
- * A session's identity across an edit: its kind, plus which one of that kind it is.
+ * Which accepted session each proposed one became.
  *
- * Neither half alone works. Array position breaks the moment a session is dropped,
- * reporting every later session as rewritten. Kind alone collides, because a week
- * with two mixed days is ordinary - the baseline week is one - and merging them
- * would silently drop every edit made to the first.
+ * Neither array position nor kind alone works. Position breaks the moment a
+ * session is dropped or moved, because the editor keeps sessions sorted by day.
+ * Kind alone collides, because a week with two mixed days is ordinary - the
+ * baseline week is one. So a session first claims one of its kind still on its
+ * own day, and only a session that moved takes the next unclaimed one of its kind.
  */
-function keyedSessions(week: MicrocyclePlan) {
-  const seen = new Map<string, number>();
-  return week.sessions.map((session) => {
-    const nth = (seen.get(session.kind) ?? 0) + 1;
-    seen.set(session.kind, nth);
-    return { key: `${session.kind}#${nth}`, session };
-  });
+function pairSessions(before: MicrocyclePlan, after: MicrocyclePlan): SessionPair[] {
+  const unclaimed = new Set(after.sessions);
+  const partner = new Map<PlannedSession, PlannedSession>();
+  const claim = (session: PlannedSession, fits: (candidate: PlannedSession) => boolean) => {
+    for (const candidate of unclaimed) {
+      if (candidate.kind !== session.kind || !fits(candidate)) continue;
+      unclaimed.delete(candidate);
+      partner.set(session, candidate);
+      return;
+    }
+  };
+  for (const session of before.sessions) claim(session, (candidate) => candidate.day === session.day);
+  for (const session of before.sessions) {
+    if (!partner.has(session)) claim(session, () => true);
+  }
+  return [
+    ...before.sessions.map((session) => ({ before: session, after: partner.get(session) ?? null })),
+    ...[...unclaimed].map((session) => ({ before: null, after: session })),
+  ];
 }
 
-function itemsWithSessions(week: MicrocyclePlan) {
-  const rows = new Map<string, { session: PlannedSession; item: PlannedSet }>();
-  for (const { key, session } of keyedSessions(week)) {
-    for (const block of session.blocks) {
-      for (const item of block.items) {
-        rows.set(`${key}:${item.exerciseId}`, { session, item });
-      }
-    }
+function itemsOf(session: PlannedSession | null) {
+  const items = new Map<number, PlannedSet>();
+  for (const block of session?.blocks ?? []) {
+    for (const item of block.items) items.set(item.exerciseId, item);
   }
-  return rows;
+  return items;
 }
 
 /**
  * The difference between the plan as proposed and the plan as accepted.
  *
- * Keyed on session kind plus exercise rather than on array position, because the
- * edits worth learning from are "less of this exercise" and "this session moved",
- * and position-keyed diffs report both as a wholesale rewrite the moment a session
- * is dropped.
+ * Keyed on the paired session plus exercise rather than on array position,
+ * because the edits worth learning from are "less of this exercise" and "this
+ * session moved", and position-keyed diffs report both as a wholesale rewrite the
+ * moment a session is dropped.
  */
 export function diffWeeks(before: MicrocyclePlan, after: MicrocyclePlan): OwnerEdit[] {
   const edits: OwnerEdit[] = [];
@@ -89,15 +100,10 @@ export function diffWeeks(before: MicrocyclePlan, after: MicrocyclePlan): OwnerE
     });
   }
 
-  const beforeSessions = new Map(
-    keyedSessions(before).map(({ key, session }) => [key, session]),
-  );
-  const afterSessions = new Map(
-    keyedSessions(after).map(({ key, session }) => [key, session]),
-  );
+  const pairs = pairSessions(before, after);
 
-  for (const [key, session] of beforeSessions) {
-    const moved = afterSessions.get(key);
+  for (const { before: session, after: moved } of pairs) {
+    if (!session) continue;
     if (!moved) {
       edits.push({
         kind: "removed",
@@ -127,57 +133,61 @@ export function diffWeeks(before: MicrocyclePlan, after: MicrocyclePlan): OwnerE
       });
     }
   }
-  for (const [key, session] of afterSessions) {
-    if (!beforeSessions.has(key)) {
-      edits.push({
-        kind: "added",
-        day: session.day,
-        field: "session",
-        from: null,
-        to: session.kind,
-      });
-    }
+  for (const { before: session, after: added } of pairs) {
+    if (session || !added) continue;
+    edits.push({
+      kind: "added",
+      day: added.day,
+      field: "session",
+      from: null,
+      to: added.kind,
+    });
   }
 
-  const beforeItems = itemsWithSessions(before);
-  const afterItems = itemsWithSessions(after);
-
-  for (const [key, { session, item }] of beforeItems) {
-    const next = afterItems.get(key);
-    if (!next) {
-      edits.push({
-        kind: "removed",
-        day: session.day,
-        exerciseId: item.exerciseId,
-        from: item.sets,
-        to: null,
-      });
-      continue;
-    }
-    for (const field of SET_FIELDS) {
-      const from = item[field] ?? null;
-      const to = next.item[field] ?? null;
-      if (from !== to) {
+  for (const { before: session, after: next } of pairs) {
+    if (!session) continue;
+    const nextItems = itemsOf(next);
+    for (const item of itemsOf(session).values()) {
+      const edited = nextItems.get(item.exerciseId);
+      if (!next || !edited) {
         edits.push({
-          kind: "prescription",
-          day: next.session.day,
+          kind: "removed",
+          day: session.day,
           exerciseId: item.exerciseId,
-          field,
-          from,
-          to,
+          from: item.sets,
+          to: null,
         });
+        continue;
+      }
+      for (const field of SET_FIELDS) {
+        const from = item[field] ?? null;
+        const to = edited[field] ?? null;
+        if (from !== to) {
+          edits.push({
+            kind: "prescription",
+            day: next.day,
+            exerciseId: item.exerciseId,
+            field,
+            from,
+            to,
+          });
+        }
       }
     }
   }
-  for (const [key, { session, item }] of afterItems) {
-    if (beforeItems.has(key)) continue;
-    edits.push({
-      kind: "added",
-      day: session.day,
-      exerciseId: item.exerciseId,
-      from: null,
-      to: item.sets,
-    });
+  for (const { before: session, after: next } of pairs) {
+    if (!next) continue;
+    const proposed = itemsOf(session);
+    for (const item of itemsOf(next).values()) {
+      if (proposed.has(item.exerciseId)) continue;
+      edits.push({
+        kind: "added",
+        day: next.day,
+        exerciseId: item.exerciseId,
+        from: null,
+        to: item.sets,
+      });
+    }
   }
 
   return edits;

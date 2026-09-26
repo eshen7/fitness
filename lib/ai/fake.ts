@@ -108,7 +108,11 @@ export function fakeAiClient(
 /** A step that fails the way a truncated response does. */
 export function truncated(label = "fake"): FakeStep {
   return {
-    error: new AiOutputError("truncated", `${label}: the response stopped early (max_output_tokens).`),
+    error: new AiOutputError(
+      "truncated",
+      `${label}: the response stopped early (max_output_tokens).`,
+      { inputTokens: 4000, outputTokens: 32_000, cachedInputTokens: 0, reasoningTokens: 0 },
+    ),
   };
 }
 

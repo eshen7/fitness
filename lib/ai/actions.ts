@@ -2,7 +2,7 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { getDb, schema } from "@/lib/db";
+import { getDb, schema, type Db } from "@/lib/db";
 import { addDays } from "@/lib/days";
 import { reviewWeek } from "@/lib/engine";
 import { microcyclePlanSchema, type MicrocyclePlan } from "@/lib/engine/types";
@@ -17,7 +17,13 @@ import {
   rejectProposal,
   saveProposal,
 } from "./persist";
-import { loadProposalById, nextBlockOrdinal, nextWeekSlot } from "./proposals";
+import { formatUsd, SPEND_CAP_USD } from "./pricing";
+import {
+  loadProposalById,
+  nextBlockOrdinal,
+  nextWeekSlot,
+  totalSpendUsd,
+} from "./proposals";
 import { loadOpenBlock } from "./queries";
 import {
   acceptSchema,
@@ -65,6 +71,19 @@ function keyMissing(): GenerationResult {
   };
 }
 
+/**
+ * The owner's ceiling, checked before a call rather than after. A generation
+ * started under the cap may still end a little over it; the next one is refused.
+ */
+async function capReached(db: Db): Promise<GenerationResult | null> {
+  const spent = await totalSpendUsd(db);
+  if (spent < SPEND_CAP_USD) return null;
+  return {
+    ok: false,
+    message: `Generation has spent ${formatUsd(spent)} of the ${formatUsd(SPEND_CAP_USD)} cap, so it is off. Nothing was written.`,
+  };
+}
+
 function failed(error: unknown): GenerationResult {
   return {
     ok: false,
@@ -89,6 +108,8 @@ export async function declareBlock(input: unknown): Promise<GenerationResult> {
 
   try {
     const db = getDb();
+    const refused = await capReached(db);
+    if (refused) return refused;
     const context = await loadContext({ db, mesocycleId: null });
     const run = await generateDeclaration({
       context,
@@ -135,6 +156,8 @@ export async function generateNextWeek(input: unknown): Promise<GenerationResult
 
   try {
     const db = getDb();
+    const refused = await capReached(db);
+    if (refused) return refused;
     const context = await loadContext({ db, mesocycleId });
     const block = context.block;
     if (!block) {
@@ -149,9 +172,9 @@ export async function generateNextWeek(input: unknown): Promise<GenerationResult
     const run = await generateWeek({
       context,
       declaration: block.declaration,
-      // A regeneration replaces a week rather than adding one, so it keeps the
-      // ordinal of the week it supersedes instead of claiming the next slot.
-      ordinal: supersedesId ? Math.max(1, slot.ordinal) : slot.ordinal,
+      // A superseded week was never written, so a regeneration takes the same
+      // next slot the week it replaces had.
+      ordinal: slot.ordinal,
       startDate,
       priorWeeks: block.priorWeeks,
       priorSession: block.priorSession,
@@ -227,7 +250,12 @@ export async function acceptProposal(input: unknown): Promise<GenerationResult> 
       };
     }
 
-    const edited = editedWeek ? (editedWeek as MicrocyclePlan) : null;
+    // A week handed back unchanged is an acceptance, not an edit, whatever the
+    // client sent: the verdict is training signal and must not claim an edit.
+    const edited =
+      editedWeek && diffWeeks(proposed.data, editedWeek as MicrocyclePlan).length
+        ? (editedWeek as MicrocyclePlan)
+        : null;
     const review = edited
       ? reviewWeek({
           declaration: block.declaration,

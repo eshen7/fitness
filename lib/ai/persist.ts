@@ -16,11 +16,13 @@ import type { ProposalVerdict } from "@/lib/taxonomy";
 import type { AiUsage } from "./client";
 import {
   advisoryStrings,
+  finalViolations,
   repairAttemptsOf,
   type DeclarationRun,
   type GenerationAsk,
   type WeekRun,
 } from "./generate";
+import { advisoryLines } from "./prompts";
 
 /**
  * Everything the generator writes.
@@ -64,7 +66,7 @@ export function shippedWeek(run: WeekRun): {
 /** The gate's last word, plus the trail that got there. */
 function gateReportOf(run: DeclarationRun | WeekRun) {
   return {
-    violations: run.attempts.at(-1)?.violations ?? [],
+    violations: finalViolations(run),
     attempts: run.attempts,
   };
 }
@@ -485,7 +487,7 @@ async function settle(
       ...(input.changes === undefined ? {} : { normalizerDiff: input.changes }),
       ...(input.advisories === undefined
         ? {}
-        : { advisories: input.advisories.map((advisory) => advisory.message) }),
+        : { advisories: advisoryLines(input.advisories) }),
       ...(input.normalized === undefined ? {} : { normalized: input.normalized }),
       updatedAt: new Date(),
     })

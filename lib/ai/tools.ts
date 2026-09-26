@@ -8,6 +8,7 @@ import {
   MUSCLE_GROUPS,
   TENDON_SITES,
 } from "@/lib/taxonomy";
+import { dayOf } from "@/lib/time";
 import type { AiTool } from "./client";
 import type { GenerationContext } from "./context";
 import {
@@ -124,7 +125,7 @@ export function buildTools(context: GenerationContext, db?: Db): AiTool[] {
             .filter((reading) => !args.site || reading.site === args.site)
             .map((reading) => ({
               site: reading.site,
-              day: reading.recordedAt.toISOString().slice(0, 10),
+              day: dayOf(reading.recordedAt),
               painDuringLoad: reading.painDuringLoad,
               painAfterLoad: reading.painAfterLoad,
               morningStiffness: reading.morningStiffness,

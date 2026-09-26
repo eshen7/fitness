@@ -12,6 +12,7 @@ import { addDays } from "@/lib/days";
 import type { SessionKind } from "@/lib/taxonomy";
 import {
   AiOutputError,
+  GENERATION_MODEL,
   getAiClient,
   type AiCall,
   type AiToolCall,
@@ -208,10 +209,9 @@ export async function generateDeclaration(input: {
     }
     appendRepair(call, proposal, review.violations, attempt);
   }
-  // Out of attempts. The declaration is kept so the review UI can show what was
-  // proposed alongside why it was refused; there is no fallback at block scope,
-  // because a block is declared once and has nothing to fall back to.
-  run.declaration = null;
+  // Out of attempts. There is no fallback at block scope, because a block is
+  // declared once and has nothing to fall back to; the refused proposal stays on
+  // the run as `proposal`, with the violations, for the review UI.
   return run;
 }
 
@@ -314,6 +314,7 @@ export async function generateWeek(input: {
     ordinal: input.ordinal,
     startDate: input.startDate,
     attempted: run.week,
+    candidates: new Set(context.prefiltered.candidates.map((exercise) => exercise.id)),
     lastSession:
       input.lastSession ?? ((kind) => loadLastPlannedSession(kind, input.db)),
   });
@@ -347,6 +348,8 @@ async function attemptOnce<T extends DeclarationProposal | WeekProposal>(
     return result.output;
   } catch (error) {
     if (!(error instanceof AiOutputError)) throw error;
+    run.usage = sumUsage(run.usage, error.usage);
+    run.model ??= GENERATION_MODEL;
     run.attempts.push({
       attempt,
       violations: [],
@@ -386,8 +389,10 @@ function appendRepair<T>(
  * The plan's promise is that the failure mode is a conservative real workout
  * rather than a blank screen, so this reuses sessions the owner has already
  * trained instead of synthesizing anything. It is not gated: it cannot be, since
- * it is the path taken when nothing passes the gate. It ships flagged, with the
- * violations attached, and the owner sees both.
+ * it is the path taken when nothing passes the gate. It is prefiltered, though:
+ * an exercise the candidate set no longer holds is dropped, because tendon
+ * safety is enforced by construction and history predates today's tendon state.
+ * It ships flagged, with the violations attached, and the owner sees both.
  *
  * Returns null when there is no history to reuse, which on a brand-new database is
  * the honest answer. The proposal then shows the violations, which is worse than a
@@ -397,6 +402,7 @@ async function fallbackWeek(input: {
   ordinal: number;
   startDate: string;
   attempted: MicrocyclePlan | null;
+  candidates: ReadonlySet<number>;
   lastSession: (kind: SessionKind) => Promise<PlannedSession | null>;
 }): Promise<MicrocyclePlan | null> {
   const kinds = uniqueKinds(input.attempted);
@@ -404,19 +410,25 @@ async function fallbackWeek(input: {
   for (const [index, kind] of kinds.entries()) {
     const prior = await input.lastSession(kind);
     if (!prior) continue;
+    const blocks = prior.blocks
+      .map((block) => ({
+        ...block,
+        items: block.items
+          .filter((item) => input.candidates.has(item.exerciseId))
+          .map((item) => ({
+            ...item,
+            loadKg: item.loadKg == null ? item.loadKg : scale(item.loadKg),
+            loadPctOf1rm:
+              item.loadPctOf1rm == null ? item.loadPctOf1rm : Math.round(scale(item.loadPctOf1rm)),
+          })),
+      }))
+      .filter((block) => block.items.length > 0);
+    if (blocks.length === 0) continue;
     sessions.push({
       ...prior,
       day: addDays(input.startDate, dayOffset(input.attempted, kind, index)),
       title: `${prior.title ?? "Session"} (fallback, load reduced)`,
-      blocks: prior.blocks.map((block) => ({
-        ...block,
-        items: block.items.map((item) => ({
-          ...item,
-          loadKg: item.loadKg == null ? item.loadKg : scale(item.loadKg),
-          loadPctOf1rm:
-            item.loadPctOf1rm == null ? item.loadPctOf1rm : Math.round(scale(item.loadPctOf1rm)),
-        })),
-      })),
+      blocks,
     });
   }
   if (sessions.length === 0) return null;
@@ -459,6 +471,15 @@ function dayOffset(week: MicrocyclePlan | null, kind: SessionKind, index: number
 /** Advisories as the strings the proposal row stores. */
 export function advisoryStrings(run: WeekRun) {
   return advisoryLines(run.advisories);
+}
+
+/**
+ * The violations the run ended on: those of the last attempt that reached the
+ * gate. A truncated or refused call after it says nothing about the rules, so it
+ * must not read as a clean report.
+ */
+export function finalViolations(run: RunShape): Violation[] {
+  return run.attempts.findLast((attempt) => attempt.error === null)?.violations ?? [];
 }
 
 /** `repairAttempts` for the stored proposal: 0 when the first attempt passed. */

@@ -133,6 +133,24 @@ describe("diffWeeks", () => {
     ]);
   });
 
+  it("follows a session moved past another of its kind", () => {
+    // The editor keeps sessions sorted by day, so moving Monday's mixed session
+    // past Friday's reorders them. It is still one move, not two rewrites.
+    const before = baselineWeek();
+    const mixed = before.sessions.filter((session) => session.kind === "mixed");
+    const moved = addDays(mixed[1].day, 1);
+    const after: MicrocyclePlan = {
+      ...before,
+      sessions: before.sessions
+        .map((session) => (session === mixed[0] ? { ...session, day: moved } : session))
+        .sort((a, b) => a.day.localeCompare(b.day)),
+    };
+
+    expect(diffWeeks(before, after)).toEqual([
+      { kind: "session", day: moved, field: "day", from: mixed[0].day, to: moved },
+    ]);
+  });
+
   it("reports a dropped prescription and a dropped session", () => {
     const before = baselineWeek();
     const after: MicrocyclePlan = {

@@ -32,6 +32,8 @@ export type StoredProposal = {
   violations: Violation[];
   /** The repair loop's trail: one entry per call, with what the gate said each time. */
   attempts: Attempt[];
+  /** Whether any attempt passed the gate. No violations is not the same thing. */
+  passed: boolean;
   advisories: string[];
   rationale: string | null;
   claimedConstraints: string[];
@@ -44,9 +46,14 @@ export type StoredProposal = {
   usage: AiUsage | null;
 };
 
-/** The newest proposal of a scope still awaiting a verdict. */
+/**
+ * The newest proposal of a scope still awaiting a verdict. A week is looked for
+ * only inside the given block, so one left pending when its block closed never
+ * surfaces under the next.
+ */
 export async function loadPendingProposal(
   scope: "mesocycle" | "microcycle",
+  mesocycleId: number | null,
   db: Db = getDb(),
 ): Promise<StoredProposal | null> {
   const [row] = await db
@@ -56,6 +63,7 @@ export async function loadPendingProposal(
       and(
         eq(schema.planProposals.scope, scope),
         eq(schema.planProposals.verdict, "pending"),
+        mesocycleId === null ? undefined : eq(schema.planProposals.mesocycleId, mesocycleId),
       ),
     )
     .orderBy(desc(schema.planProposals.createdAt), desc(schema.planProposals.id))
@@ -106,6 +114,7 @@ type ProposalSelect = typeof schema.planProposals.$inferSelect;
 function hydrate(row: ProposalSelect): StoredProposal {
   const inputs = asRecord(row.inputs);
   const gate = asRecord(row.gateReport);
+  const attempts = Array.isArray(gate?.attempts) ? (gate.attempts as Attempt[]) : [];
   return {
     id: row.id,
     scope: row.scope,
@@ -119,7 +128,8 @@ function hydrate(row: ProposalSelect): StoredProposal {
     normalized: row.normalized,
     changes: Array.isArray(row.normalizerDiff) ? (row.normalizerDiff as Change[]) : [],
     violations: Array.isArray(gate?.violations) ? (gate.violations as Violation[]) : [],
-    attempts: Array.isArray(gate?.attempts) ? (gate.attempts as Attempt[]) : [],
+    attempts,
+    passed: attempts.some((attempt) => attempt.passed === true),
     advisories: row.advisories,
     rationale: row.rationale,
     claimedConstraints: row.claimedConstraints,
@@ -234,8 +244,8 @@ export async function planSnapshot(db: Db = getDb()): Promise<PlanSnapshot> {
   // With a block open the question is which week comes next; without one it is
   // whether to open a block at all, so only the matching scope is surfaced.
   const pending = block
-    ? await loadPendingProposal("microcycle", db)
-    : await loadPendingProposal("mesocycle", db);
+    ? await loadPendingProposal("microcycle", block.mesocycleId, db)
+    : await loadPendingProposal("mesocycle", null, db);
 
   let nextWeek: PlanSnapshot["nextWeek"] = null;
   if (block) {
