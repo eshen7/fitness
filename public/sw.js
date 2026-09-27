@@ -49,8 +49,15 @@ const OFFLINE = "/offline";
  * bundle on the current build.
  */
 const REFRESH_MS = 60 * 60 * 1000;
-/** Kept on the stored document, since a worker is stopped whenever it idles. */
+/** How soon an attempt that did not complete the bundle may try again. */
+const RETRY_MS = 5 * 60 * 1000;
+/**
+ * Both stamps live in the cache, since a worker is stopped whenever it idles.
+ * FETCHED_AT is on the document and only a complete bundle carries it; ATTEMPT
+ * is its own entry, written before every try, so a failing one still counts.
+ */
 const FETCHED_AT = "x-fetched-at";
+const ATTEMPT = `${OFFLINE}?attempted`;
 let refreshing = null;
 
 /** Content-hashed, so a URL match is an exact-bytes match and cannot go stale. */
@@ -207,10 +214,14 @@ async function refreshOffline() {
   );
   const stored = await normalize(response);
   const headers = new Headers(stored.headers);
-  headers.set(FETCHED_AT, String(Date.now()));
+  if (!chunks.includes(null)) headers.set(FETCHED_AT, String(Date.now()));
   await cache.put(documentHref, new Response(await stored.arrayBuffer(), { headers }));
 
-  const live = new Set([documentHref, ...kept.map((chunk) => chunk.href)]);
+  const live = new Set([
+    documentHref,
+    new URL(ATTEMPT, origin).href,
+    ...kept.map((chunk) => chunk.href),
+  ]);
   const keys = await cache.keys();
   await Promise.all(keys.filter((key) => !live.has(key.url)).map((key) => cache.delete(key)));
 }
@@ -218,9 +229,16 @@ async function refreshOffline() {
 /** Never awaited by a response, and never allowed to throw into one. */
 function refreshOfflineSoon() {
   refreshing ??= (async () => {
+    const now = Date.now();
     const current = await cached(OFFLINE, BUNDLE);
     const fetchedAt = Number(current?.headers.get(FETCHED_AT) ?? 0);
-    if (Date.now() - fetchedAt >= REFRESH_MS) await refreshOffline();
+    if (now - fetchedAt < REFRESH_MS) return;
+    const attempt = await cached(ATTEMPT, BUNDLE);
+    const attemptedAt = Number((await attempt?.text()) ?? 0);
+    if (now - attemptedAt < RETRY_MS) return;
+    const cache = await caches.open(BUNDLE);
+    await cache.put(new URL(ATTEMPT, self.location.origin).href, new Response(String(now)));
+    await refreshOffline();
   })()
     .catch(() => {})
     .finally(() => {
