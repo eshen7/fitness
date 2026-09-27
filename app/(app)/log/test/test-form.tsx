@@ -129,7 +129,7 @@ export function TestForm({ unitSystem }: { unitSystem: UnitSystem }) {
                 }
                 disabled={attempts.length === 1}
                 aria-label={`Remove attempt ${index + 1}`}
-                className="flex size-11 shrink-0 items-center justify-center rounded-field border border-line text-ink-faint transition hover:border-ink-faint hover:text-ink-muted disabled:opacity-30"
+                className="flex size-11 shrink-0 items-center justify-center rounded-field border border-line-strong text-ink-faint transition hover:border-ink-faint hover:text-ink-muted disabled:opacity-30"
               >
                 <svg
                   viewBox="0 0 24 24"

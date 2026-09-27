@@ -68,7 +68,7 @@ export default async function ExercisePage({ params }: { params: Params }) {
       <header className="mb-6">
         <Link
           href="/library"
-          className="text-sm text-ink-faint hover:text-ink-muted"
+          className="-my-2 inline-flex min-h-11 items-center text-sm text-ink-faint hover:text-ink-muted"
         >
           ← Library
         </Link>

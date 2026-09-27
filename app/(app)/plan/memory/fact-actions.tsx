@@ -45,7 +45,7 @@ function useFactAction() {
   return { pending, error, run };
 }
 
-/** Small enough to read as a caption, still 44px of thumb. */
+/** Small enough to read as a caption, 44px square at minimum to the thumb. */
 function MicroButton({
   tone = "muted",
   ...props
@@ -59,7 +59,7 @@ function MicroButton({
     <button
       type="button"
       {...props}
-      className={`inline-flex h-11 shrink-0 items-center rounded-field px-2 text-xs font-medium transition disabled:opacity-50 ${styles}`}
+      className={`inline-flex h-11 min-w-11 shrink-0 items-center justify-center rounded-field px-3 text-xs font-medium transition disabled:opacity-50 ${styles}`}
     />
   );
 }

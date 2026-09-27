@@ -34,7 +34,7 @@ export function UnlockForm({ next }: { next?: string }) {
         autoFocus
         aria-invalid={state.error ? true : undefined}
         aria-describedby={state.error ? "passcode-error" : undefined}
-        className="h-14 rounded-field border border-line bg-surface px-4 text-lg tracking-widest text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+        className="h-14 rounded-field border border-line-strong bg-surface px-4 text-lg tracking-widest text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
         placeholder="Passcode"
       />
       <button

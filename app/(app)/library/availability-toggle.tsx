@@ -32,9 +32,13 @@ export function AvailabilityToggle({
         startTransition(() => setExerciseAvailability(slug, !available))
       }
       title={available ? "Available. Tap to disable." : "Unavailable. Tap to enable."}
-      className={`relative shrink-0 rounded-full border transition disabled:opacity-50 ${
+      // A switch track reads as a switch at 24px and cannot be hit at 24px, so the
+      // 44px target is a centred pseudo-element rather than the track itself. It
+      // overhangs the row's own padding, which is the right place for it: a tap
+      // just above the toggle was aimed at the toggle.
+      className={`relative shrink-0 rounded-full border transition before:absolute before:top-1/2 before:left-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[''] disabled:opacity-50 ${
         size === "md" ? "h-7 w-12" : "h-6 w-10"
-      } ${available ? "border-accent/50 bg-accent/25" : "border-line bg-surface-sunken"}`}
+      } ${available ? "border-accent/50 bg-accent/25" : "border-line-strong bg-surface-sunken"}`}
     >
       <span
         aria-hidden="true"

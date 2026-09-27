@@ -8,10 +8,14 @@ import type { ComponentProps, ReactNode } from "react";
  * The one rule everything here follows is the 44px minimum interactive height,
  * rising to 56px for anything touched mid-set. Cold hands on a phone propped
  * against a rack are the design target.
+ *
+ * The other is `line-strong` rather than `line` on anything you operate. A field
+ * whose border is a hairline is a field you cannot find without tapping around
+ * for it, which is what WCAG 1.4.11's 3:1 on non-text boundaries is about.
  */
 
 const FIELD =
-  "w-full rounded-field border border-line bg-surface-sunken px-3 text-ink " +
+  "w-full rounded-field border border-line-strong bg-surface-sunken px-3 text-ink " +
   "placeholder:text-ink-faint focus:border-accent focus:outline-none " +
   "disabled:opacity-50";
 
@@ -76,8 +80,11 @@ export function Select({ className = "", ...props }: ComponentProps<"select">) {
       // light-mode arrow on some platforms even under `color-scheme: dark`.
       className={`${FIELD} h-11 appearance-none bg-[length:1.1rem] bg-[right_0.6rem_center] bg-no-repeat pr-9 ${className}`}
       style={{
+        // `%23898c91` is `--color-ink-faint` in sRGB. A data URI cannot read a
+        // custom property and a mask would fight the field's own background, so
+        // this one literal has to be changed with the token.
         backgroundImage:
-          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a8f94' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
+          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23898c91' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
       }}
     />
   );
@@ -91,7 +98,7 @@ export function Button({
   const styles = {
     primary: "bg-accent text-accent-ink hover:brightness-105",
     secondary:
-      "border border-line bg-surface-raised text-ink hover:border-ink-faint",
+      "border border-line-strong bg-surface-raised text-ink hover:border-ink-faint",
     danger: "border border-bad/40 bg-transparent text-bad hover:bg-bad/10",
   }[variant];
 

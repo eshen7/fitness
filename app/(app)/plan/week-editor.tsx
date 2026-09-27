@@ -133,12 +133,12 @@ export function WeekEditor({
                     onChange={(event) =>
                       onMoveSession?.(sessionIndex, event.target.value)
                     }
-                    className="h-9 text-xs"
+                    className="h-11 text-xs"
                   />
                   <button
                     type="button"
                     onClick={() => onDropSession?.(sessionIndex)}
-                    className="h-9 shrink-0 rounded-field border border-bad/40 px-3 text-xs font-semibold whitespace-nowrap text-bad transition hover:bg-bad/10"
+                    className="h-11 shrink-0 rounded-field border border-bad/40 px-3 text-xs font-semibold whitespace-nowrap text-bad transition hover:bg-bad/10"
                   >
                     Drop session
                   </button>
@@ -203,14 +203,14 @@ export function WeekEditor({
                                         : Number(event.target.value),
                                   })
                                 }
-                                className="h-9 text-xs tabular-nums"
+                                className="h-11 text-xs tabular-nums"
                               />
                             </label>
                           ))}
                           <button
                             type="button"
                             onClick={() => onDropItem?.(sessionIndex, item.exerciseId)}
-                            className="h-9 rounded-field border border-bad/40 px-3 text-xs font-semibold text-bad transition hover:bg-bad/10"
+                            className="h-11 rounded-field border border-bad/40 px-3 text-xs font-semibold text-bad transition hover:bg-bad/10"
                           >
                             Drop
                           </button>

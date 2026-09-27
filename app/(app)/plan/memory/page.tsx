@@ -39,7 +39,7 @@ export default async function MemoryPage() {
         reads as one more line of prose. Above the title it reads as the way out.
       */}
       <header className="mb-6">
-        <Link href="/plan" className="text-sm text-ink-faint hover:text-ink-muted">
+        <Link href="/plan" className="-my-2 inline-flex min-h-11 items-center text-sm text-ink-faint hover:text-ink-muted">
           ← Plan
         </Link>
         <h1 className="mt-2 text-2xl font-semibold text-ink">Memory</h1>

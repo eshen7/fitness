@@ -8,9 +8,14 @@ import { SESSION_COOKIE, verifySession } from "@/lib/auth/session";
  * scheduler calls with a bearer. All three authenticate themselves - the jobs through
  * `cronAuthorized`, which refuses the bearer path entirely when `CRON_SECRET` is unset
  * rather than accepting anything.
+ *
+ * `/offline` is public because it is the service worker's fallback and holds nothing:
+ * behind the gate it redirects to `/unlock`, which is a redirect the worker cannot
+ * store and would not want to, so the fallback would silently cache nothing at all.
  */
 const PUBLIC_PATHS = [
   "/unlock",
+  "/offline",
   "/api/whoop/webhook",
   "/api/whoop/sync",
   "/api/insights",
