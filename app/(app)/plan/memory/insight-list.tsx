@@ -74,7 +74,8 @@ function Asserted({ insight }: { insight: StoredInsight }) {
       {/*
         The figures carry `tnum`, the sentence above does not: `.tnum` also sets
         `white-space: nowrap`, which on a paragraph produces one long line that runs
-        off the side of the card.
+        off the side of the card. The unit stays outside it for the same reason,
+        since some units are a clause ("RPE, positive means harder than prescribed").
       */}
       <p className="mt-1.5 text-xs text-ink-faint">
         <span className="tnum">n = {insight.n}</span>
@@ -83,8 +84,8 @@ function Asserted({ insight }: { insight: StoredInsight }) {
             {" · "}
             <span className="tnum">
               95% CI {round(insight.ciLow)} to {round(insight.ciHigh)}
-              {insight.unit ? ` ${insight.unit}` : ""}
             </span>
+            {insight.unit ? ` ${insight.unit}` : ""}
           </>
         ) : null}
         {insight.pAdjusted !== null ? (

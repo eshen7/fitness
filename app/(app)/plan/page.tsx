@@ -35,7 +35,12 @@ export default async function PlanPage() {
   return (
     <>
       <PageHeader title="Plan" subtitle="Blocks up front, weeks rolling.">
-        <div className="flex flex-col items-end gap-1">
+        {/*
+          Start-aligned until `sm`: at phone widths `PageHeader` wraps this under the
+          subtitle, where right-aligning the link to the end of the spend line leaves it
+          floating mid-row.
+        */}
+        <div className="flex flex-col items-start gap-1 sm:items-end">
           <span className="text-xs text-ink-faint tabular-nums">
             {formatUsd(snapshot.spendUsd)} of {formatUsd(snapshot.spendCapUsd)} spent
           </span>
