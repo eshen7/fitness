@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
+import { assertableInsightCount } from "@/lib/analytics/persist";
 import { getUnitSystem } from "@/lib/log/queries";
 import {
   blockBands,
@@ -29,7 +31,7 @@ export const metadata = { title: "Progress" };
 const JUMP_WINDOW_DAYS = 180;
 
 export default async function ProgressPage() {
-  const [unitSystem, sittings, blocks, weeks, strength, sessions, depthJump] =
+  const [unitSystem, sittings, blocks, weeks, strength, sessions, depthJump, insights] =
     await Promise.all([
       getUnitSystem(),
       jumpSittings(JUMP_WINDOW_DAYS),
@@ -38,6 +40,7 @@ export default async function ProgressPage() {
       relativeStrength(180),
       sessionOutcomes(90),
       depthJumpReadings(365),
+      assertableInsightCount(),
     ]);
 
   return (
@@ -45,7 +48,27 @@ export default async function ProgressPage() {
       <PageHeader
         title="Progress"
         subtitle="Jump, tendon load, strength, adherence."
-      />
+      >
+        {/*
+          The charts show what happened; the insight suite says which of it is more
+          than noise. That distinction is the reason the statements live on their own
+          screen instead of as captions here.
+        */}
+        {/*
+          Accent and an arrow, because `PageHeader` wraps its children under the
+          subtitle at phone widths: a grey sentence on its own line there is
+          indistinguishable from the subtitle it sits below.
+        */}
+        <Link
+          href="/plan/memory"
+          className="text-sm font-medium text-accent underline-offset-2 hover:underline"
+        >
+          {insights === 0
+            ? "What the numbers support"
+            : `${insights} statement${insights === 1 ? "" : "s"} the numbers support`}
+          <span aria-hidden> →</span>
+        </Link>
+      </PageHeader>
       <div className="space-y-4">
         <JumpChart
           sittings={sittings}

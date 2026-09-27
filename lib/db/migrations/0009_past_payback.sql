@@ -1,0 +1,1 @@
+ALTER TABLE "derived_insights" ADD COLUMN "subject" text DEFAULT '' NOT NULL;

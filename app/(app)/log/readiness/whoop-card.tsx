@@ -1,5 +1,5 @@
 import { Button, Card, Tag } from "@/components/ui";
-import { formatDay, formatTime } from "@/lib/time";
+import { dayOf, formatDay, formatTime } from "@/lib/time";
 import { whoopConfigured } from "@/lib/whoop/config";
 import { getConnection } from "@/lib/whoop/tokens";
 import { WhoopControls } from "./whoop-controls";
@@ -77,7 +77,9 @@ export async function WhoopCard({
               <>
                 Recovery, sleep and strain arrive on their own. Last refreshed{" "}
                 {connection.lastRefreshedAt
-                  ? `${formatDay(connection.lastRefreshedAt.toISOString().slice(0, 10))} at ${formatTime(connection.lastRefreshedAt)}`
+                  ? // `dayOf`, not the UTC date: `formatTime` is already in the app's
+                    // zone, so a refresh at 9pm eastern read "tomorrow at 21:07".
+                    `${formatDay(dayOf(connection.lastRefreshedAt))} at ${formatTime(connection.lastRefreshedAt)}`
                   : "never"}
                 .
               </>

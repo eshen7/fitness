@@ -2,15 +2,18 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/auth/session";
 
 /**
- * Everything is behind the passcode except the unlock page itself and the two
- * WHOOP routes nothing with a session ever calls: the webhook, which WHOOP posts
- * to directly and which authenticates by HMAC signature, and the nightly sync,
- * which the scheduler calls with a bearer. Both authenticate themselves.
+ * Everything is behind the passcode except the unlock page itself and the routes
+ * nothing with a session ever calls: the WHOOP webhook, which WHOOP posts to directly
+ * and which authenticates by HMAC signature, and the two scheduled jobs, which the
+ * scheduler calls with a bearer. All three authenticate themselves - the jobs through
+ * `cronAuthorized`, which refuses the bearer path entirely when `CRON_SECRET` is unset
+ * rather than accepting anything.
  */
 const PUBLIC_PATHS = [
   "/unlock",
   "/api/whoop/webhook",
   "/api/whoop/sync",
+  "/api/insights",
   "/manifest.webmanifest",
   "/sw.js",
 ];

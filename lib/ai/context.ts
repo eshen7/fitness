@@ -20,6 +20,10 @@ import {
   muscleGroupLabels,
   tendonSiteLabels,
 } from "@/lib/labels";
+import { assertable, type Insight } from "@/lib/analytics/insight";
+import { storedInsights } from "@/lib/analytics/persist";
+import { factsText, promptFacts, type MemoryFact } from "@/lib/memory/facts";
+import { loadActiveFacts } from "@/lib/memory/store";
 import { DOMAIN_RULES, GATE_RULES, SYSTEM_PROMPT } from "./prompts";
 import {
   loadBlock,
@@ -48,10 +52,15 @@ import {
  * The ordering is the whole point and it is fragile in one specific way: anything
  * that varies per call, a timestamp most of all, placed inside the stable text
  * invalidates the prefix on every request and the cache silently reads zero. So
- * no part of `stableText` may derive from the clock. The candidate table is last
- * within the stable text because it is the part most likely to change - a tendon
- * entering protocol phase 2 rewrites it - and everything before it stays cached
- * when it does.
+ * no part of `stableText` may derive from the clock.
+ *
+ * Within the stable text the order is by how often each part changes, least first,
+ * because the cache covers everything up to the first altered byte. The prompt and
+ * the profile almost never move; the candidate table moves when a tendon enters
+ * protocol phase 2; the remembered facts move when a reflection writes one; the
+ * derived insights are recomputed nightly and so go last of all. None of the three
+ * is clock-derived - each is a stored value that happens to be rewritten on its own
+ * schedule - which is what lets them sit in the cached half at all.
  */
 
 export type GenerationContext = {
@@ -66,6 +75,10 @@ export type GenerationContext = {
   priorProposals: PriorProposal[];
   /** Null when declaring a block; present for every week within one. */
   block: BlockState | null;
+  /** Active memory facts. `promptFacts` decides which of them the model sees. */
+  facts: MemoryFact[];
+  /** Only the assertable insights. A withheld statement has no business in a prompt. */
+  insights: Insight[];
 };
 
 export async function loadContext(input: {
@@ -75,14 +88,17 @@ export async function loadContext(input: {
 }): Promise<GenerationContext> {
   const db = input.db ?? getDb();
   const asOf = input.asOf ?? new Date();
-  const [profile, directory, tendon, readiness, volume, priorProposals] = await Promise.all([
-    loadProfile(db),
-    loadDirectory(db),
-    loadTendonReadings(28, db),
-    loadReadiness(14, db),
-    loadRecentVolume(28, db),
-    loadPriorProposals(8, db),
-  ]);
+  const [profile, directory, tendon, readiness, volume, priorProposals, facts, insights] =
+    await Promise.all([
+      loadProfile(db),
+      loadDirectory(db),
+      loadTendonReadings(28, db),
+      loadReadiness(14, db),
+      loadRecentVolume(28, db),
+      loadPriorProposals(8, db),
+      loadActiveFacts({ db }),
+      storedInsights({ db }),
+    ]);
   const block =
     input.mesocycleId == null ? null : await loadBlock(input.mesocycleId, db);
 
@@ -102,6 +118,8 @@ export async function loadContext(input: {
     volume,
     priorProposals,
     block,
+    facts,
+    insights: assertable(insights),
   };
 }
 
@@ -160,6 +178,48 @@ function profileText(profile: AthleteProfile) {
   ].join("\n");
 }
 
+/**
+ * The remembered facts, or a line saying there are none.
+ *
+ * Every active fact rather than a per-request selection, which is the decision
+ * argued out in `lib/memory/facts.ts`: retrieval keyed on the request would make
+ * this prefix a function of the request, and a prefix that changes every call is a
+ * prefix that is never cached. At a few dozen one-sentence facts for one athlete
+ * there is nothing to retrieve from anyway.
+ */
+function memoryText(facts: readonly MemoryFact[]) {
+  const shown = promptFacts(facts);
+  if (shown.length === 0) return "Nothing remembered yet.";
+  return `Things the athlete said are marked stated and are not negotiable. The rest were inferred from their logs, and a plan may work around one but should not contradict it silently.\n\n${factsText(shown)}`;
+}
+
+/**
+ * The insights that passed the gate, as they are written for the athlete.
+ *
+ * Only the assertable ones, and the statements are passed through verbatim - second
+ * person and all - because they are the same strings the owner reads on the progress
+ * screen. Re-rendering them for the model would eventually produce a prompt that says
+ * 47 cm beside a card that says 45.
+ *
+ * The sample size goes on every line. The whole reason these come from
+ * `lib/analytics/` rather than from the model's own reading of the logs is that each
+ * one arrives with an n and an interval, and stripping those here would hand the model
+ * the confident version of a claim the gate only just let through.
+ */
+function insightText(insights: readonly Insight[]) {
+  if (insights.length === 0) {
+    return "None yet. Nothing measured has cleared its sample size and its interval, so plan from the training model rather than from this athlete's numbers.";
+  }
+  const lines = insights.map((insight) => {
+    const interval =
+      insight.ciLow === null || insight.ciHigh === null
+        ? ""
+        : `, 95% CI ${insight.ciLow.toFixed(2)} to ${insight.ciHigh.toFixed(2)} ${insight.unit}`;
+    return `- ${insight.statement} (n = ${insight.n}${interval})`;
+  });
+  return `Each line is addressed to the athlete and every number in it was measured, not estimated by you. Do not restate them; use them.\n\n${lines.join("\n")}`;
+}
+
 export function stableText(context: GenerationContext) {
   return [
     SYSTEM_PROMPT,
@@ -170,6 +230,8 @@ export function stableText(context: GenerationContext) {
       `Candidate exercises (${context.prefiltered.candidates.length} of ${context.exercises.length})`,
       `Every exercise you prescribe must be one of these ids. The other ${context.exercises.length - context.prefiltered.candidates.length} are excluded for reasons listed in the request that follows, and naming one is a rejection.\n\n${candidateTable(context.prefiltered.candidates)}`,
     ),
+    section("What the app remembers about this athlete", memoryText(context.facts)),
+    section("What the numbers support saying", insightText(context.insights)),
   ].join("\n\n");
 }
 

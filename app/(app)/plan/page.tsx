@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { Card, EmptyState, Tag } from "@/components/ui";
 import { planSnapshot } from "@/lib/ai/proposals";
@@ -5,6 +6,7 @@ import { formatUsd } from "@/lib/ai/pricing";
 import { formatDay } from "@/lib/days";
 import type { Directory } from "@/lib/engine/types";
 import { mesocycleTypeLabels, motorAbilityLabels } from "@/lib/labels";
+import { pendingFactCount } from "@/lib/memory/queries";
 import { today } from "@/lib/time";
 import { CloseBlock } from "./close-block";
 import { DeclareBlock } from "./declare-block";
@@ -23,16 +25,38 @@ export const metadata = { title: "Plan" };
  * another" next to it is how you end up paying twice for the same week.
  */
 export default async function PlanPage() {
-  const snapshot = await planSnapshot();
+  const [snapshot, pendingFacts] = await Promise.all([
+    planSnapshot(),
+    pendingFactCount(),
+  ]);
   const { block, pending, nextWeek } = snapshot;
   const names = namesOf(snapshot.directory);
 
   return (
     <>
       <PageHeader title="Plan" subtitle="Blocks up front, weeks rolling.">
-        <span className="text-xs text-ink-faint tabular-nums">
-          {formatUsd(snapshot.spendUsd)} of {formatUsd(snapshot.spendCapUsd)} spent
-        </span>
+        <div className="flex flex-col items-end gap-1">
+          <span className="text-xs text-ink-faint tabular-nums">
+            {formatUsd(snapshot.spendUsd)} of {formatUsd(snapshot.spendCapUsd)} spent
+          </span>
+          {/*
+            Here rather than in the nav, which stays at six items: memory is what the
+            generator reads, so the screen it is generated from is where a wrong fact
+            gets noticed.
+          */}
+          <Link
+            href="/plan/memory"
+            className="text-sm font-medium text-accent underline-offset-2 hover:underline"
+          >
+            Memory
+            {pendingFacts > 0 ? (
+              <span className="ml-1.5 text-warn tabular-nums">
+                {pendingFacts} waiting
+              </span>
+            ) : null}
+            <span aria-hidden> →</span>
+          </Link>
+        </div>
       </PageHeader>
 
       <VerdictOutcomeProvider>

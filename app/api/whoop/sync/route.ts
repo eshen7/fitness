@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { SESSION_COOKIE, verifySession } from "@/lib/auth/session";
-import { env } from "@/lib/env";
+import { cronAuthorized } from "@/lib/auth/cron";
 import { backfill } from "@/lib/whoop/ingest";
 import { projectPending } from "@/lib/whoop/project";
 import { getConnection } from "@/lib/whoop/tokens";
@@ -12,21 +11,13 @@ import { getConnection } from "@/lib/whoop/tokens";
  * while the app was asleep is never redelivered, so a schedule is the only thing
  * that makes the series whole. `?days=` widens the window after an outage.
  *
- * This route is outside the passcode gate, because the scheduler has no session,
- * so it authenticates itself: either the cron secret or a real session. Without a
- * configured secret the scheduled call is refused rather than left open.
+ * This route is outside the passcode gate, because the scheduler has no session, so
+ * it authenticates itself through `cronAuthorized`.
  */
 export const maxDuration = 60;
 
-async function authorized(request: NextRequest) {
-  const { CRON_SECRET } = env();
-  const bearer = request.headers.get("authorization");
-  if (CRON_SECRET && bearer === `Bearer ${CRON_SECRET}`) return true;
-  return verifySession(request.cookies.get(SESSION_COOKIE)?.value);
-}
-
 async function run(request: NextRequest) {
-  if (!(await authorized(request))) {
+  if (!(await cronAuthorized(request))) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   if (!(await getConnection())) {

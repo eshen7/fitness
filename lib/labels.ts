@@ -1,3 +1,4 @@
+import type { InsightFamily } from "@/lib/analytics/insight";
 import type {
   CouplingClass,
   EnergyDirection,
@@ -8,6 +9,7 @@ import type {
   LoadType,
   MealSlot,
   MeasurementKind,
+  MemoryFactType,
   MesocycleType,
   MotorAbility,
   MovementPattern,
@@ -244,3 +246,31 @@ export const PROTOCOL_PHASES = [
 
 /** 1 gentle to 5 severe, and 1 trivial to 5 highly technical. */
 export const RATING_SCALE = [1, 2, 3, 4, 5] as const;
+
+/**
+ * Fact types as the owner reads them, singular because each labels one fact on the
+ * memory screen rather than a heading over several.
+ *
+ * `lib/memory/facts.ts` keeps its own plural set for the prompt on purpose: those are
+ * addressed to the model, these to the person, and they are free to diverge.
+ */
+export const memoryFactTypeLabels = labels<MemoryFactType>({
+  preference: "Preference",
+  constraint: "Constraint",
+  schedule: "Schedule",
+  injury_history: "Injury history",
+  response_pattern: "Response pattern",
+  goal: "Goal",
+  equipment: "Equipment",
+});
+
+/** Groups the insight list. Named for the area of training, not for the producer. */
+export const insightFamilyLabels = labels<InsightFamily>({
+  load: "Load and tendons",
+  whoop: "Readiness",
+  jump: "Jumping",
+  strength: "Strength",
+  plyometrics: "Plyometrics",
+  programming: "Programming",
+  nutrition: "Nutrition",
+});

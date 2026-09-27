@@ -6,6 +6,7 @@ import type {
   ResponseInputItem,
 } from "openai/resources/responses/responses";
 import type * as z from "zod";
+import { EMBEDDING_DIMENSIONS } from "@/lib/db/schema/memory";
 
 /**
  * The one place the OpenAI SDK is called.
@@ -31,6 +32,22 @@ import type * as z from "zod";
  * function tools, and automatic prefix caching.
  */
 export const GENERATION_MODEL = "gpt-6-luna";
+
+/**
+ * The model memory retrieval embeds against.
+ *
+ * `text-embedding-3-small` at USD 0.02 per million tokens is the cheapest thing
+ * the account can reach, and its native width is `EMBEDDING_DIMENSIONS`, which is
+ * what `memory_facts.embedding` was declared as. A larger model would mean a
+ * migration and a re-embed of the whole store for a retrieval problem that, over
+ * one athlete's few dozen facts, is not hard enough to need one.
+ *
+ * Embeddings go through this seam rather than straight to the SDK for the same
+ * reason generation does, plus one more: they are billed, and `SPEND_CAP_USD` is
+ * one ceiling over the whole account. A vector quietly bought outside the meter
+ * is a hole in the cap.
+ */
+export const EMBEDDING_MODEL = "text-embedding-3-small";
 
 /** Low, per the brief: this is structured planning, not open-ended reasoning. */
 const REASONING_EFFORT = "low" as const;
@@ -100,8 +117,26 @@ export type AiResult<T> = {
   toolCalls: AiToolCall[];
 };
 
+/**
+ * One embedding request, batched. Every text in one call, because the per-request
+ * overhead dwarfs the tokens when the texts are single sentences.
+ */
+export type AiEmbedCall = {
+  texts: readonly string[];
+  /** Names the call in errors and on the ledger. */
+  label: string;
+};
+
+export type AiEmbedResult = {
+  /** One vector per input text, in the order the texts were given. */
+  vectors: number[][];
+  model: string;
+  usage: AiUsage;
+};
+
 export interface AiClient {
   propose<T>(call: AiCall<T>): Promise<AiResult<T>>;
+  embed(call: AiEmbedCall): Promise<AiEmbedResult>;
 }
 
 const EMPTY_USAGE: AiUsage = {
@@ -173,7 +208,7 @@ function sdk() {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "OPENAI_API_KEY is not set, so generation cannot run. Set it in the environment; it is never read from anywhere else.",
+      "OPENAI_API_KEY is not set, so no live call can run. Set it in the environment; it is never read from anywhere else.",
     );
   }
   return new OpenAI({ apiKey });
@@ -309,6 +344,56 @@ export const openaiClient: AiClient = {
     } catch (error) {
       if (error instanceof AiOutputError) throw error;
       throw new BilledFailure(error, usage, GENERATION_MODEL);
+    }
+  },
+
+  /**
+   * Embeds a batch.
+   *
+   * An empty batch answers without calling: retrieval asks for the query vector
+   * only when it has more facts than it can show, so "nothing to embed" is the
+   * common path and it must cost nothing.
+   *
+   * `dimensions` is sent explicitly even though it is the model's native width,
+   * because a silently wider vector is an insert that fails on the column and a
+   * silently narrower one is a distance that means nothing.
+   */
+  async embed(call: AiEmbedCall): Promise<AiEmbedResult> {
+    if (call.texts.length === 0) {
+      return { vectors: [], model: EMBEDDING_MODEL, usage: EMPTY_USAGE };
+    }
+    const client = sdk();
+    try {
+      const response = await client.embeddings.create({
+        model: EMBEDDING_MODEL,
+        input: [...call.texts],
+        dimensions: EMBEDDING_DIMENSIONS,
+      });
+      // Ordered by the response's own index rather than by arrival: the API does
+      // not promise the batch comes back in the order it went in, and a vector
+      // attached to the wrong fact is a retrieval bug with no symptom.
+      const vectors = [...response.data]
+        .sort((a, b) => a.index - b.index)
+        .map((item) => item.embedding);
+      if (vectors.length !== call.texts.length) {
+        throw new Error(
+          `${call.label}: asked for ${call.texts.length} embeddings and got ${vectors.length}.`,
+        );
+      }
+      return {
+        vectors,
+        model: response.model,
+        usage: {
+          inputTokens: response.usage.prompt_tokens,
+          outputTokens: 0,
+          cachedInputTokens: 0,
+          reasoningTokens: 0,
+        },
+      };
+    } catch (error) {
+      // No usage to report: the embeddings endpoint is one round trip, so a
+      // failure either billed nothing or billed something it never told us about.
+      throw new BilledFailure(error, EMPTY_USAGE, EMBEDDING_MODEL);
     }
   },
 };
