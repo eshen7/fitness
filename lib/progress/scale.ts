@@ -1,3 +1,5 @@
+import { quadraticFit } from "@/lib/analytics/stats";
+
 /**
  * The chart math, kept pure and separate from anything that draws.
  *
@@ -182,50 +184,24 @@ export function minimalDetectableChange(sittings: number[][]) {
  *
  * This is the ebook's depth jump protocol as arithmetic: jump height rises with
  * drop height and then falls once the landing can no longer be absorbed, so the
- * turning point is the height to train at. Needs three distinct heights, a
- * downward-opening fit, and a peak inside the tested range, or there is no peak
- * to report yet: a vertex past the highest or below the lowest box is a height
- * nobody tested, and the curve out there is extrapolation rather than data.
+ * turning point is the height to train at. Needs a downward-opening fit and a
+ * peak inside the tested range, or there is no peak to report yet: a vertex past
+ * the highest or below the lowest box is a height nobody tested, and the curve
+ * out there is extrapolation rather than data.
+ *
+ * The fit itself is `lib/analytics/stats.ts`, which is the same arithmetic the
+ * depth-jump insight runs. Sharing it is not only about the duplicate solver: the
+ * card and the insight are two renderings of one claim, and a chart marking 45 cm
+ * beside a statement naming 47 cm is worse than either of them alone.
  */
 export function quadraticVertex(points: Point[]) {
-  const distinct = new Set(points.map((p) => p.x));
-  if (distinct.size < 3) return null;
+  const fit = quadraticFit(points);
+  if (!fit || fit.vertexX === null) return null;
 
-  const n = points.length;
-  let sx = 0, sx2 = 0, sx3 = 0, sx4 = 0, sy = 0, sxy = 0, sx2y = 0;
-  for (const { x, y } of points) {
-    sx += x; sx2 += x * x; sx3 += x ** 3; sx4 += x ** 4;
-    sy += y; sxy += x * y; sx2y += x * x * y;
-  }
-
-  // Normal equations for y = a x^2 + b x + c, solved by elimination. Three
-  // unknowns, so this is written out rather than reaching for a matrix library.
-  const m = [
-    [sx4, sx3, sx2, sx2y],
-    [sx3, sx2, sx, sxy],
-    [sx2, sx, n, sy],
-  ];
-  for (let col = 0; col < 3; col++) {
-    let pivot = col;
-    for (let row = col + 1; row < 3; row++) {
-      if (Math.abs(m[row][col]) > Math.abs(m[pivot][col])) pivot = row;
-    }
-    if (Math.abs(m[pivot][col]) < 1e-9) return null;
-    [m[col], m[pivot]] = [m[pivot], m[col]];
-    for (let row = 0; row < 3; row++) {
-      if (row === col) continue;
-      const factor = m[row][col] / m[col][col];
-      for (let k = col; k < 4; k++) m[row][k] -= factor * m[col][k];
-    }
-  }
-  const a = m[0][3] / m[0][0];
-  const b = m[1][3] / m[1][1];
-  const c = m[2][3] / m[2][2];
-
-  // Opening upward means the data has no peak in it, only a rise or a fall.
-  if (a >= 0) return null;
-  const boxHeightCm = -b / (2 * a);
+  // In-range only, which `quadraticFit` deliberately leaves to its callers: the
+  // insight wants the vertex even when it falls outside so it can say why it is
+  // withholding, and the chart has nowhere to draw it.
   const xs = points.map((p) => p.x);
-  if (boxHeightCm < Math.min(...xs) || boxHeightCm > Math.max(...xs)) return null;
-  return { boxHeightCm, jumpCm: a * boxHeightCm ** 2 + b * boxHeightCm + c };
+  if (fit.vertexX < Math.min(...xs) || fit.vertexX > Math.max(...xs)) return null;
+  return { boxHeightCm: fit.vertexX, jumpCm: fit.at(fit.vertexX) };
 }

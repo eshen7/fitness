@@ -14,15 +14,15 @@ const schema = z.object({
   /** Signing key for the session cookie. 32+ random bytes, base64 or hex. */
   SESSION_SECRET: z.string().min(32),
 
-  /** Generation. Read at call time in `lib/ai/client.ts`, never at import time. */
+  /** Every model call. Read at call time in `lib/ai/client.ts`, never at import time. */
   OPENAI_API_KEY: z.string().optional(),
 
   WHOOP_CLIENT_ID: z.string().optional(),
   WHOOP_CLIENT_SECRET: z.string().optional(),
   /**
-   * Bearer the scheduler presents to the sync route, which sits outside the
-   * passcode gate because a cron has no session. Unset means scheduled calls are
-   * refused; a manual sync from inside the app still works.
+   * Bearer the scheduler presents to the scheduled jobs in `vercel.json`, which sit
+   * outside the passcode gate because a cron has no session (see `lib/auth/cron.ts`).
+   * Unset means scheduled calls are refused; running them from inside the app still works.
    */
   CRON_SECRET: z.string().optional(),
   /** Public origin used to build the OAuth redirect URI and webhook URL. */

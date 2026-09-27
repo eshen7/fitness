@@ -3,7 +3,9 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { getDb, schema } from "@/lib/db";
+import { runReflection } from "@/lib/memory";
 import { getUnitSystem } from "@/lib/log/queries";
 import type { ActionResult } from "@/lib/log/schemas";
 import {
@@ -279,6 +281,17 @@ export async function finishSession(
       updatedAt: new Date(),
     })
     .where(eq(schema.sessions.id, sessionId));
+
+  // After the response, never before it. Reflection is a model call, and the athlete
+  // tapping "finish" is standing in a gym: a second or two of spinner to learn
+  // something about them next month is the wrong trade. `after` also means a failed
+  // reflection cannot fail the close, which matters because the close is the write
+  // that must not be lost - `/api/reflect` can run the reflection again, and nothing
+  // can re-close a session the athlete has walked away from.
+  after(async () => {
+    const result = await runReflection(sessionId);
+    if (result.skipped) console.warn(`Reflection skipped: ${result.skipped}`);
+  });
 
   revalidatePath("/log");
   revalidatePath("/progress");

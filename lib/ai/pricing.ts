@@ -32,6 +32,13 @@ export const MODEL_PRICES: Record<string, ModelPrice> = {
   "gpt-5.4-mini": { input: 0.75, cachedInput: 0.075, output: 4.5 },
   "gpt-5.4": { input: 2.5, cachedInput: 0.25, output: 15 },
   "gpt-5.5": { input: 5, cachedInput: 0.5, output: 30 },
+  /**
+   * Embeddings. There is no prompt cache and no output on this endpoint, so the
+   * cached rate is the input rate and the output rate is zero; writing them that
+   * way lets `costOf` stay one function rather than branching on the kind of call.
+   */
+  "text-embedding-3-small": { input: 0.02, cachedInput: 0.02, output: 0 },
+  "text-embedding-3-large": { input: 0.13, cachedInput: 0.13, output: 0 },
 };
 
 /** The owner's ceiling on total spend across every live call, experiments included. */

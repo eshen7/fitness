@@ -38,14 +38,14 @@ Local Postgres is 17 with pgvector 0.8.6, matching Neon.
 ```
 app/(auth)/unlock/   passcode gate
 app/(app)/           today, log, progress, nutrition, plan, library
-app/api/             health, generation, set logging, WHOOP, nutrition parsing
+app/api/             health, generation, set logging, WHOOP, nutrition parsing, insights, reflection
 lib/db/schema/       one file per domain area
 lib/whoop/           OAuth, signed webhook, ingest, and projection into readiness
 lib/engine/          prefilter, normalize, gate (validate.ts), advisories (pure TS, no LLM)
 lib/ai/              OpenAI client and seam, prompts, schemas, cached context, spend meter
 lib/nutrition/       food parse resolution and caches, targets, weight trend
 lib/analytics/       trend math and derived insights (pure functions)
-lib/memory/          preference and insight store
+lib/memory/          remembered facts, embeddings, post-session reflection
 ```
 
 ## Conventions that are easy to get wrong
@@ -62,10 +62,11 @@ lib/memory/          preference and insight store
 - **Every rule message is pinned.** `lib/engine/fixtures/invalid.ts` holds one invalid plan per rule with its exact messages, checked against the stock seed, so rewording a message or re-tagging a stock exercise means updating the fixture in the same change.
 - **`export const dynamic = "force-dynamic"` in `app/(app)/layout.tsx` covers the whole segment.** Without it every database-backed page prerenders at build time and production serves a snapshot of whatever the database held during the build, which looks like a working app right up to the moment it stops updating.
 - **Numerics cross the driver as strings.** Convert at every boundary: `.toFixed(n)` on the way in, `Number()` on the way out. Selecting a column that does not exist is worse than a type error - drizzle treats the `undefined` field as a nested object and throws `Cannot convert undefined or null to object` from inside `orderSelectedFields`.
+- **A timestamp becomes a day through `dayOf`, never `toISOString().slice(0, 10)`.** Vercel's clock is UTC and a training day is the owner's, so the shortcut labels anything written after 8pm eastern with tomorrow's date - on the screen of the person who was there when it happened. `lib/time.ts` reads `APP_TIMEZONE`, which makes any module using it server-only.
 - **The WHOOP signature is over the raw bytes.** Read `request.text()` before parsing; re-serializing parsed JSON changes the bytes and every delivery then fails verification.
 - **A WHOOP refresh rotates both tokens.** The old access token dies with the old refresh token, so the pair is one row written in one statement; a partial write silently kills the connection and the only repair is re-authorizing. `scope=offline` must be sent on the refresh too.
 - **A v2 recovery event names its *sleep*, not its cycle.** Recovery rows are keyed by `sleep_id` and dated from the stored sleep, so a recovery arriving before its sleep is deferred rather than guessed at.
-- **The nightly sync in `vercel.json` runs at 09:20 UTC** (about 05:20 ET): late enough that WHOOP has scored the night, early enough to be there before a morning check-in. JSON cannot hold that comment, which is why it is here.
+- **The nightly sync in `vercel.json` runs at 09:20 UTC** (about 05:20 ET): late enough that WHOOP has scored the night, early enough to be there before a morning check-in. The insight recompute at 09:40 must stay after it, so the night just scored is in what the suite reads. JSON cannot hold that comment, which is why it is here.
 - **Every rule in `app/globals.css` belongs inside a cascade layer.** Tailwind v4 ships its utilities in `@layer utilities`, and unlayered CSS beats every layered rule regardless of specificity. An element default written at the top level therefore silently defeats the utility for it everywhere: a bare `:where(svg) { height: auto }` cost an afternoon by making every chart render at its viewBox aspect ratio instead of `h-full`. Element defaults go in `@layer base`, class rules a utility should be able to override go in `@layer components`.
 - **A percentage height needs a parent with a definite one.** The chart primitives position every mark as a percentage, so a wrapper sized only by its contents collapses its children to nothing rather than erroring. `Columns` is `inset-y-0` with the bar bottom-aligned inside it for exactly this reason.
 - **A `w-*` handed to `Input`, `Select` or `Textarea` is a coin toss.** `FIELD` in `components/ui.tsx` already carries `w-full`, and two utilities of equal specificity are resolved by their order in the generated stylesheet rather than by the order of the `className` string. Size the wrapper, or let the field flex and mark its siblings `shrink-0`.

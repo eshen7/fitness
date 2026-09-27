@@ -1,5 +1,5 @@
 import type { Db } from "@/lib/db";
-import { BilledFailure } from "./client";
+import { AiOutputError, BilledFailure, GENERATION_MODEL } from "./client";
 import { formatUsd, SPEND_CAP_USD } from "./pricing";
 import { recordSpend, totalSpendUsd } from "./proposals";
 
@@ -64,18 +64,29 @@ export function reasonOf(error: unknown) {
 }
 
 /**
- * Puts a call that died in transport on the ledger.
+ * Puts a call that died in transport, or answered with nothing usable, on the ledger.
  *
  * Such a call writes nothing else - no proposal, no food - but it was billed, and a
- * spend cap that forgets the failures is not a cap. Failing to record is logged
+ * spend cap that forgets the failures is not a cap. A truncated or refused answer is
+ * as billed as a dropped connection, and usually dearer. Failing to record is logged
  * rather than thrown: the owner's problem is the call that failed, not the
  * bookkeeping behind it.
  */
-export async function recordBilledFailure(error: unknown, label: string): Promise<void> {
-  if (!(error instanceof BilledFailure)) return;
-  if (!Object.values(error.usage).some((tokens) => tokens > 0)) return;
+export async function recordBilledFailure(
+  error: unknown,
+  label: string,
+  db?: Db,
+): Promise<void> {
+  const billed =
+    error instanceof BilledFailure
+      ? { model: error.model, usage: error.usage }
+      : error instanceof AiOutputError
+        ? { model: GENERATION_MODEL, usage: error.usage }
+        : null;
+  if (!billed) return;
+  if (!Object.values(billed.usage).some((tokens) => tokens > 0)) return;
   try {
-    await recordSpend({ source: "app", label, model: error.model, usage: error.usage });
+    await recordSpend({ source: "app", label, ...billed }, db);
   } catch (unrecorded) {
     console.error("Could not record the spend of a failed call.", unrecorded);
   }

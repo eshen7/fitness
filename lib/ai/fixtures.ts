@@ -129,6 +129,11 @@ export function fixtureContext(
     volume: overrides.volume ?? FIXTURE_VOLUME,
     priorProposals: overrides.priorProposals ?? FIXTURE_PROPOSALS,
     block: overrides.block === undefined ? null : overrides.block,
+    // Empty by default. Memory and insights are additive context, so the fixture that
+    // exercises the pipeline should see the prompt an athlete gets on their first week
+    // rather than one carrying facts no test asked for.
+    facts: overrides.facts ?? [],
+    insights: overrides.insights ?? [],
   };
 }
 
