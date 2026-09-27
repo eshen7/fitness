@@ -142,6 +142,8 @@ export type FlushOutcome = {
   remaining: number;
   /** Set when the flush could not complete. */
   error?: string;
+  /** The request never reached the app, as opposed to the app refusing it. */
+  unreachable: boolean;
 };
 
 /**
@@ -152,12 +154,18 @@ export type FlushOutcome = {
 export async function flushQueue(): Promise<FlushOutcome> {
   const sets = getQueueSnapshot().items;
   if (sets.length === 0) {
-    return { accepted: 0, rejected: NO_REJECTIONS, remaining: 0 };
+    return { accepted: 0, rejected: NO_REJECTIONS, remaining: 0, unreachable: false };
   }
 
   const unsent = (error: string, unreachable = false): FlushOutcome => {
     set({ error: unreachable ? null : error, unreachable });
-    return { accepted: 0, rejected: NO_REJECTIONS, remaining: sets.length, error };
+    return {
+      accepted: 0,
+      rejected: NO_REJECTIONS,
+      remaining: sets.length,
+      error,
+      unreachable,
+    };
   };
 
   let response: Response;
@@ -197,5 +205,10 @@ export async function flushQueue(): Promise<FlushOutcome> {
   );
   commit(remaining, { error: null, unreachable: false, rejected });
 
-  return { accepted: accepted.length, rejected, remaining: remaining.length };
+  return {
+    accepted: accepted.length,
+    rejected,
+    remaining: remaining.length,
+    unreachable: false,
+  };
 }

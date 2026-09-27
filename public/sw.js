@@ -134,21 +134,38 @@ function cached(request, cacheName) {
   return caches.match(request, { cacheName, ignoreVary: true });
 }
 
+/** Build output a document names: its scripts, stylesheets and preloads. */
+const STATIC_REF = /\/_next\/static\/[^"'\\\s<>)]+/g;
+
+/**
+ * A shell screen and the build output it names, read out of the document itself
+ * rather than listed here, since every build renames every chunk. Without them a
+ * screen never visited online is stored but can never hydrate.
+ */
+async function precache(path) {
+  const response = await fetch(path, { cache: "reload", credentials: "same-origin" });
+  if (!storable(response)) return;
+  const html = await response.clone().text();
+  await store(PAGES, new Request(new URL(path, self.location.origin).href), response);
+
+  const refs = new Set(html.match(STATIC_REF) ?? []);
+  await Promise.allSettled(
+    [...refs].map(async (ref) => {
+      const request = new Request(new URL(ref, self.location.origin).href);
+      if (await cached(request, ASSETS)) return;
+      await store(ASSETS, request, await fetch(request));
+    }),
+  );
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
       // One request at a time, each allowed to fail on its own: `addAll` is
       // atomic, so under the old code a single 404 or a redirect to `/unlock`
       // meant the whole shell - including the offline page - cached nothing.
-      await Promise.allSettled(
-        SHELL.map(async (path) => {
-          const response = await fetch(path, {
-            cache: "reload",
-            credentials: "same-origin",
-          });
-          await store(PAGES, new Request(new URL(path, self.location.origin).href), response);
-        }),
-      );
+      await Promise.allSettled(SHELL.map(precache));
+      await trim(ASSETS, ASSET_LIMIT);
       await self.skipWaiting();
     })(),
   );

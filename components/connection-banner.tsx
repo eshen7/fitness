@@ -66,8 +66,12 @@ export function ConnectionBanner() {
     if (!mounted.current) return;
     setOnline(reachable);
     // Coming back is the moment the queue should empty itself, whether or not
-    // the logger is the screen on show.
-    if (reachable) void flushQueue();
+    // the logger is the screen on show. A flush that then cannot land outranks
+    // the probe that answered, so the bar goes back to offline and keeps asking.
+    if (!reachable) return;
+    void flushQueue().then(({ unreachable }) => {
+      if (unreachable && mounted.current) setOnline(false);
+    });
   }, []);
 
   /** The background check. Touches no state until the probe has answered. */
