@@ -46,7 +46,7 @@ export function RecomputeInsights() {
         type="button"
         onClick={recompute}
         disabled={pending}
-        className="inline-flex h-11 shrink-0 items-center rounded-field px-2 text-xs font-medium text-ink-faint transition hover:text-ink disabled:opacity-50"
+        className="inline-flex h-11 min-w-11 shrink-0 items-center justify-center rounded-field px-3 text-xs font-medium text-ink-faint transition hover:text-ink disabled:opacity-50"
       >
         {pending ? "Recomputing" : "Recompute"}
       </button>

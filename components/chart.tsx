@@ -582,7 +582,13 @@ export function TableView({
   if (!rows.length) return null;
   return (
     <details className="group mt-3">
-      <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[11px] text-ink-faint hover:text-ink-muted">
+      {/*
+        A 44px target in both directions. The word is only 37px wide, so the width
+        comes from `min-w-11` rather than padding, which would push the caret out
+        of line with the chart's left edge; the negative margin keeps the height
+        off the layout.
+      */}
+      <summary className="-my-2 inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center gap-1 text-[11px] text-ink-faint hover:text-ink-muted">
         <span className="transition-transform group-open:rotate-90">›</span>
         Table
       </summary>

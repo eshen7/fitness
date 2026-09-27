@@ -61,7 +61,7 @@ export default async function ProgressPage() {
         */}
         <Link
           href="/plan/memory"
-          className="text-sm font-medium text-accent underline-offset-2 hover:underline"
+          className="-my-2 inline-flex min-h-11 flex-wrap items-center text-sm font-medium text-accent underline-offset-2 hover:underline"
         >
           {insights === 0
             ? "What the numbers support"

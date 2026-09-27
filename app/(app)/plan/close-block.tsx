@@ -21,7 +21,7 @@ export function CloseBlock() {
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="text-xs font-semibold text-ink-faint underline-offset-2 hover:text-bad hover:underline"
+        className="-my-2 inline-flex min-h-11 items-center text-xs font-semibold text-ink-faint underline-offset-2 hover:text-bad hover:underline"
       >
         End block
       </button>
@@ -33,7 +33,7 @@ export function CloseBlock() {
       <Button
         type="button"
         variant="danger"
-        className="h-9 text-xs"
+        className="text-xs"
         disabled={pending}
         onClick={() =>
           start(async () => {
@@ -49,7 +49,7 @@ export function CloseBlock() {
       <button
         type="button"
         onClick={() => setConfirming(false)}
-        className="text-xs text-ink-faint underline-offset-2 hover:underline"
+        className="inline-flex min-h-11 items-center px-1 text-xs text-ink-faint underline-offset-2 hover:underline"
       >
         Keep it
       </button>

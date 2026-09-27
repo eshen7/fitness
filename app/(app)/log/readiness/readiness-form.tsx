@@ -70,7 +70,7 @@ export function ReadinessForm({ prefill }: { prefill: ReadinessPrefill }) {
               );
               setOpenGroup(null);
             }}
-            className="text-xs font-medium text-accent hover:underline"
+            className="-my-2 inline-flex min-h-11 items-center text-xs font-medium text-accent hover:underline"
           >
             None anywhere
           </button>

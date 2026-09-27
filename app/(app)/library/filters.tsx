@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Select } from "@/components/ui";
+import { Input, Select } from "@/components/ui";
 import {
   forceVelocityLabels,
   movementPatternLabels,
@@ -59,13 +59,14 @@ export function LibraryFilters({ resultCount }: { resultCount: number }) {
       className={`space-y-2 transition-opacity ${pending ? "opacity-60" : ""}`}
       aria-busy={pending}
     >
-      <input
+      {/* `Input` rather than a hand-rolled copy of its classes, which had already
+          drifted: the shared field is where the border weight is decided. */}
+      <Input
         type="search"
         value={text}
         onChange={(event) => search(event.target.value)}
         placeholder="Search exercises"
         aria-label="Search exercises"
-        className="h-11 w-full rounded-field border border-line bg-surface-sunken px-3 text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
       />
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

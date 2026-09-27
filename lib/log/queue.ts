@@ -29,8 +29,17 @@ export type Rejection = { clientId: string; message: string };
  */
 export type QueueState = {
   items: LoggedSetInput[];
-  /** Why the last flush did not land, if it did not. */
+  /** Why the last flush did not land, when the app answered and said no. */
   error: string | null;
+  /**
+   * The last flush could not reach the app at all.
+   *
+   * Held apart from `error` because it is a fact about the connection rather than
+   * about these sets, and the connection bar is what says it. Folded together, a
+   * screen that logs a set with no signal shows the same sentence twice: once in
+   * the bar across the top and once in the form's own notice.
+   */
+  unreachable: boolean;
   /** Sets the server refused. Dropped from the queue, kept here to be told about. */
   rejected: Rejection[];
 };
@@ -39,7 +48,12 @@ export type QueueState = {
 const EMPTY: LoggedSetInput[] = [];
 const NO_REJECTIONS: Rejection[] = [];
 
-let state: QueueState = { items: EMPTY, error: null, rejected: NO_REJECTIONS };
+let state: QueueState = {
+  items: EMPTY,
+  error: null,
+  unreachable: false,
+  rejected: NO_REJECTIONS,
+};
 let loaded = false;
 const listeners = new Set<() => void>();
 
@@ -97,6 +111,7 @@ export function getQueueSnapshot(): QueueState {
 const SERVER_STATE: QueueState = {
   items: EMPTY,
   error: null,
+  unreachable: false,
   rejected: NO_REJECTIONS,
 };
 
@@ -140,8 +155,8 @@ export async function flushQueue(): Promise<FlushOutcome> {
     return { accepted: 0, rejected: NO_REJECTIONS, remaining: 0 };
   }
 
-  const unsent = (error: string): FlushOutcome => {
-    set({ error });
+  const unsent = (error: string, unreachable = false): FlushOutcome => {
+    set({ error: unreachable ? null : error, unreachable });
     return { accepted: 0, rejected: NO_REJECTIONS, remaining: sets.length, error };
   };
 
@@ -153,9 +168,9 @@ export async function flushQueue(): Promise<FlushOutcome> {
       body: JSON.stringify({ sets }),
     });
   } catch {
-    return unsent(
-      "Offline. Sets are saved on this device and will send themselves.",
-    );
+    // The only branch where nothing answered. The message is for the caller's
+    // own reporting; on screen the connection bar has already said it.
+    return unsent("Offline. Sets are saved on this device.", true);
   }
 
   if (response.status === 401) {
@@ -180,7 +195,7 @@ export async function flushQueue(): Promise<FlushOutcome> {
   const remaining = getQueueSnapshot().items.filter(
     (item) => !drop.has(item.clientId),
   );
-  commit(remaining, { error: null, rejected });
+  commit(remaining, { error: null, unreachable: false, rejected });
 
   return { accepted: accepted.length, rejected, remaining: remaining.length };
 }

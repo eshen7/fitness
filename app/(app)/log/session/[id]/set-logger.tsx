@@ -317,7 +317,7 @@ export function SetLogger({
               setFormError(null);
               acknowledgeQueue();
             }}
-            className="shrink-0 text-xs font-medium text-warn hover:underline"
+            className="-my-2 inline-flex min-h-11 shrink-0 items-center text-xs font-medium text-warn hover:underline"
           >
             Dismiss
           </button>
@@ -465,7 +465,7 @@ export function SetLogger({
                       className={`tnum h-11 rounded-field border text-sm font-medium transition ${
                         fields.quality === score
                           ? "border-accent bg-accent/15 text-accent"
-                          : "border-line bg-surface-sunken text-ink-muted hover:border-ink-faint"
+                          : "border-line-strong bg-surface-sunken text-ink-muted hover:border-ink-faint"
                       }`}
                     >
                       {score}
@@ -499,7 +499,7 @@ export function SetLogger({
                     <button
                       type="button"
                       onClick={() => pick(row.id)}
-                      className="flex min-h-11 w-full items-center justify-between gap-3 rounded-field border border-line bg-surface-sunken px-3 py-2 text-left text-sm text-ink transition hover:border-ink-faint"
+                      className="flex min-h-11 w-full items-center justify-between gap-3 rounded-field border border-line-strong bg-surface-sunken px-3 py-2 text-left text-sm text-ink transition hover:border-ink-faint"
                     >
                       <span>{row.name}</span>
                       <span className="flex shrink-0 items-center gap-1.5">
@@ -587,7 +587,7 @@ export function SetLogger({
                             onClick={() => removeEntry(entry)}
                             disabled={busy}
                             aria-label={`Remove set ${entry.setIndex}`}
-                            className="flex size-9 items-center justify-center rounded-field text-ink-faint transition hover:text-bad disabled:opacity-40"
+                            className="-my-1 flex size-11 items-center justify-center rounded-field text-ink-faint transition hover:text-bad disabled:opacity-40"
                           >
                             <svg
                               viewBox="0 0 24 24"
@@ -641,8 +641,10 @@ export function SetLogger({
           {queued.length ? (
             <p className="text-xs text-warn">
               {queued.length} {queued.length === 1 ? "set is" : "sets are"} still on
-              this device. They send themselves when the connection returns; finish
-              after that so the session closes over a complete log.
+              this device.{" "}
+              {queued.length === 1 ? "It sends itself" : "They send themselves"} when
+              the connection returns; finish after that so the session closes over a
+              complete log.
             </p>
           ) : null}
           <Button

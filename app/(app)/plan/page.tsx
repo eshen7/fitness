@@ -45,22 +45,32 @@ export default async function PlanPage() {
             {formatUsd(snapshot.spendUsd)} of {formatUsd(snapshot.spendCapUsd)} spent
           </span>
           {/*
-            Here rather than in the nav, which stays at six items: memory is what the
-            generator reads, so the screen it is generated from is where a wrong fact
-            gets noticed.
+            Both here rather than in the nav, which stays at six items. Memory is what
+            the generator reads, so the screen it is generated from is where a wrong
+            fact gets noticed; the export is the same kind of thing one level up - it
+            is what you reach for when you want the data out from under the app.
           */}
-          <Link
-            href="/plan/memory"
-            className="text-sm font-medium text-accent underline-offset-2 hover:underline"
-          >
-            Memory
-            {pendingFacts > 0 ? (
-              <span className="ml-1.5 text-warn tabular-nums">
-                {pendingFacts} waiting
-              </span>
-            ) : null}
-            <span aria-hidden> →</span>
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/plan/memory"
+              className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-accent underline-offset-2 hover:underline"
+            >
+              Memory
+              {pendingFacts > 0 ? (
+                <span className="ml-1.5 text-warn tabular-nums">
+                  {pendingFacts} waiting
+                </span>
+              ) : null}
+              <span aria-hidden> →</span>
+            </Link>
+            <Link
+              href="/export"
+              className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-ink-faint underline-offset-2 hover:text-ink-muted hover:underline"
+            >
+              Export
+              <span aria-hidden> ↓</span>
+            </Link>
+          </div>
         </div>
       </PageHeader>
 

@@ -64,7 +64,7 @@ export function ScoreRow({
                   ? warn
                     ? "border-warn bg-warn/15 text-warn"
                     : "border-accent bg-accent/15 text-accent"
-                  : "border-line bg-surface-sunken text-ink-muted hover:border-ink-faint"
+                  : "border-line-strong bg-surface-sunken text-ink-muted hover:border-ink-faint"
               }`}
             >
               {score}
@@ -80,7 +80,7 @@ export function ScoreRow({
           className={`h-11 rounded-field border text-xs font-medium transition ${
             value === null
               ? "border-ink-faint bg-surface-raised text-ink-muted"
-              : "border-line border-dashed bg-transparent text-ink-faint hover:border-ink-faint"
+              : "border-line-strong border-dashed bg-transparent text-ink-faint hover:border-ink-faint"
           }`}
         >
           Skip

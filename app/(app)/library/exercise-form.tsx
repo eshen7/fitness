@@ -40,7 +40,7 @@ function CheckGroup({
       {entries.map(([value, label]) => (
         <label
           key={value}
-          className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-field border border-line bg-surface-sunken px-3 py-2 text-sm text-ink-muted has-checked:border-accent/50 has-checked:text-ink"
+          className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-field border border-line-strong bg-surface-sunken px-3 py-2 text-sm text-ink-muted has-checked:border-accent/50 has-checked:text-ink"
         >
           <input
             type="checkbox"
@@ -270,7 +270,7 @@ export function ExerciseForm({
           </Field>
         </div>
 
-        <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-field border border-line bg-surface-sunken px-3 py-2.5">
+        <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-field border border-line-strong bg-surface-sunken px-3 py-2.5">
           <input
             type="checkbox"
             name="highImpact"

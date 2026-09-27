@@ -12,7 +12,7 @@ export default function NewExercisePage() {
         title="Add exercise"
         subtitle="Everything tagged here is read by the pre-filter, the normalizer, or the session ordering."
       >
-        <Link href="/library" className="text-sm text-ink-faint hover:text-ink-muted">
+        <Link href="/library" className="-my-2 inline-flex min-h-11 items-center text-sm text-ink-faint hover:text-ink-muted">
           Cancel
         </Link>
       </PageHeader>
