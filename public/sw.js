@@ -30,15 +30,28 @@
 const VERSION = "v2";
 const PAGES = `pages-${VERSION}`;
 const ASSETS = `assets-${VERSION}`;
-const KEEP = [PAGES, ASSETS];
+/** The offline notice and exactly the build output it names, nothing else. */
+const BUNDLE = `offline-${VERSION}`;
+const KEEP = [PAGES, ASSETS, BUNDLE];
 
 /*
  * The screens worth having before they are first visited: the two the app opens
- * on, and the offline notice itself. `/` is deliberately absent - it only
- * redirects to `/today`, and a redirected response cannot be stored at all.
+ * on. `/` is deliberately absent - it only redirects to `/today`, and a
+ * redirected response cannot be stored at all. The offline notice is kept apart
+ * in BUNDLE, because it is never visited online and so has to be refreshed here.
  */
-const SHELL = ["/today", "/log", "/offline"];
+const SHELL = ["/today", "/log"];
 const OFFLINE = "/offline";
+
+/*
+ * How often a working connection re-fetches the offline bundle. `/sw.js` is the
+ * same bytes on every deploy, so install runs once and cannot be what keeps the
+ * bundle on the current build.
+ */
+const REFRESH_MS = 60 * 60 * 1000;
+/** Kept on the stored document, since a worker is stopped whenever it idles. */
+const FETCHED_AT = "x-fetched-at";
+let refreshing = null;
 
 /** Content-hashed, so a URL match is an exact-bytes match and cannot go stale. */
 const IMMUTABLE = ["/_next/static/", "/icons/"];
@@ -158,13 +171,71 @@ async function precache(path) {
   );
 }
 
+/**
+ * Re-fetches the offline notice and the build output it names, as one bundle.
+ *
+ * Chunks go in before the document and stale entries leave after it, so the
+ * stored document never names a chunk the cache does not hold. A refresh that
+ * could not fetch every chunk keeps the bundle it had; only a first fill, with
+ * nothing to fall back on, stores what it got.
+ */
+async function refreshOffline() {
+  const origin = self.location.origin;
+  const response = await fetch(OFFLINE, { cache: "reload", credentials: "same-origin" });
+  if (!storable(response)) return;
+  const html = await response.clone().text();
+  const cache = await caches.open(BUNDLE);
+  const documentHref = new URL(OFFLINE, origin).href;
+
+  const refs = [...new Set(html.match(STATIC_REF) ?? [])].map((ref) => new URL(ref, origin).href);
+  const chunks = await Promise.all(
+    refs.map(async (href) => {
+      if (await cache.match(href)) return { href, response: null };
+      try {
+        const chunk = await fetch(href);
+        return storable(chunk) ? { href, response: await normalize(chunk) } : null;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  if (chunks.includes(null) && (await cache.match(documentHref))) return;
+
+  const kept = chunks.filter(Boolean);
+  await Promise.all(
+    kept.filter((chunk) => chunk.response).map((chunk) => cache.put(chunk.href, chunk.response)),
+  );
+  const stored = await normalize(response);
+  const headers = new Headers(stored.headers);
+  headers.set(FETCHED_AT, String(Date.now()));
+  await cache.put(documentHref, new Response(await stored.arrayBuffer(), { headers }));
+
+  const live = new Set([documentHref, ...kept.map((chunk) => chunk.href)]);
+  const keys = await cache.keys();
+  await Promise.all(keys.filter((key) => !live.has(key.url)).map((key) => cache.delete(key)));
+}
+
+/** Never awaited by a response, and never allowed to throw into one. */
+function refreshOfflineSoon() {
+  refreshing ??= (async () => {
+    const current = await cached(OFFLINE, BUNDLE);
+    const fetchedAt = Number(current?.headers.get(FETCHED_AT) ?? 0);
+    if (Date.now() - fetchedAt >= REFRESH_MS) await refreshOffline();
+  })()
+    .catch(() => {})
+    .finally(() => {
+      refreshing = null;
+    });
+  return refreshing;
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
       // One request at a time, each allowed to fail on its own: `addAll` is
       // atomic, so under the old code a single 404 or a redirect to `/unlock`
       // meant the whole shell - including the offline page - cached nothing.
-      await Promise.allSettled(SHELL.map(precache));
+      await Promise.allSettled([...SHELL.map(precache), refreshOfflineSoon()]);
       await trim(ASSETS, ASSET_LIMIT);
       await self.skipWaiting();
     })(),
@@ -185,7 +256,7 @@ self.addEventListener("activate", (event) => {
 
 /** Immutable build output: cache first, since a hit is by definition correct. */
 async function assetFirst(request) {
-  const hit = await cached(request, ASSETS);
+  const hit = (await cached(request, ASSETS)) ?? (await cached(request, BUNDLE));
   if (hit) return hit;
   const response = await fetch(request);
   if (storable(response)) {
@@ -203,18 +274,21 @@ async function assetFirst(request) {
  * screen is a snapshot of an earlier day. It is the right thing to show when
  * there is no signal and the wrong thing to show when there is.
  */
-async function pageFirst(request) {
+async function pageFirst(event) {
+  const { request } = event;
   try {
     const response = await fetch(request);
     if (storable(response)) {
       const copy = response.clone();
       store(PAGES, request, copy);
+      // A navigation that just answered is the proof of a working connection.
+      event.waitUntil(refreshOfflineSoon());
     }
     return response;
   } catch {
     return (
       (await cached(request, PAGES)) ??
-      (await cached(OFFLINE, PAGES)) ??
+      (await cached(OFFLINE, BUNDLE)) ??
       offlineDocument()
     );
   }
@@ -237,7 +311,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
-    event.respondWith(pageFirst(request));
+    event.respondWith(pageFirst(event));
     return;
   }
 
