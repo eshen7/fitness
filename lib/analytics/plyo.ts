@@ -17,7 +17,7 @@ import {
   mean,
   median,
   quadraticFit,
-  quantile,
+  tCritical,
   type Point,
 } from "./stats";
 
@@ -67,8 +67,8 @@ const MIN_DROP_HEIGHTS = 3;
  *
  * Both are kept because they fail differently. The protocol rule is robust and
  * coarse. The fit is precise and can be nonsense - three heights and a flat response
- * put the vertex anywhere - which is why the interval is a leave-one-out jackknife
- * and the insight is discarded outright when that interval escapes the range of
+ * put the vertex anywhere - which is why the interval comes from the leave-one-out
+ * jackknife's standard error and the insight is discarded outright when that interval escapes the range of
  * heights actually jumped from. A recommendation to drop from a box nobody has
  * dropped from is extrapolation, and this is the one insight in the suite where
  * acting on extrapolation means landing on it.
@@ -98,8 +98,13 @@ export function depthJumpVertex(inputs: AnalyticsInputs): Insight[] {
     if (without?.vertexX != null) jackknife.push(without.vertexX);
   }
   if (jackknife.length < points.length - 1) return [];
-  const ciLow = quantile(jackknife, 0.025);
-  const ciHigh = quantile(jackknife, 0.975);
+  const m = jackknife.length;
+  const centre = mean(jackknife);
+  const se = Math.sqrt(
+    ((m - 1) / m) * jackknife.reduce((sum, vertex) => sum + (vertex - centre) ** 2, 0),
+  );
+  const ciLow = fit.vertexX - tCritical(m - 1) * se;
+  const ciHigh = fit.vertexX + tCritical(m - 1) * se;
   if (ciLow < lowest || ciHigh > highest) return [];
 
   return [
@@ -129,8 +134,11 @@ export function depthJumpVertex(inputs: AnalyticsInputs): Insight[] {
 // Protocol progression
 // -----------------------------------------------------------------------------
 
-/** Pain at or below this, and not rising, is the readiness condition to progress. */
+/** Pain at or below this, and measurably not rising, is the readiness condition to progress. */
 const PROGRESSION_PAIN_CEILING = 3;
+
+/** Readings in the window before a trend can be read at all. */
+const MIN_PROGRESSION_READINGS = 6;
 
 /** Days the pain trend is read over. Three weeks, which is a phase's worth of sessions. */
 const PROGRESSION_WINDOW = 21;
@@ -141,8 +149,14 @@ const PROGRESSION_WINDOW = 21;
  * A measured decision rather than a judgement call, because the judgement call has a
  * known bias: the phases get more fun as they go and the athlete is the one deciding.
  * Two conditions, both from the protocol's own logic - pain low enough to load
- * through, and not trending upward - so progressing is allowed on a settled 3 and
- * refused on a 2 that was a 0 last week.
+ * through, and not trending upward - and the second has to be shown rather than
+ * merely not disproved: the whole interval on the weekly pain slope must sit at or
+ * below zero. A noisy series whose slope cannot be told from a rise reads as hold,
+ * so every doubt resolves toward staying in the phase.
+ *
+ * The value is the slope, so the interval and the p are about one quantity in one
+ * unit; the current level is a separate condition and is reported beside it. This only
+ * recommends. Moving a site to the next phase is still the owner's confirmation.
  *
  * Reported per site, and only for sites actually in a phase. A site with no protocol
  * has nothing to progress.
@@ -151,7 +165,7 @@ export function protocolReadiness(inputs: AnalyticsInputs): Insight[] {
   const from = addDays(inputs.asOf, -PROGRESSION_WINDOW);
   const bySite = new Map<TendonSite, typeof inputs.tendon>();
   for (const row of inputs.tendon) {
-    if (row.day < from) continue;
+    if (row.day < from || row.day > inputs.asOf) continue;
     const held = bySite.get(row.site) ?? [];
     held.push(row);
     bySite.set(row.site, held);
@@ -173,28 +187,46 @@ export function protocolReadiness(inputs: AnalyticsInputs): Insight[] {
     if (!fit) return [];
 
     const recent = worst.filter((entry) => entry.day >= addDays(inputs.asOf, -7));
-    const level = mean((recent.length ? recent : worst).map((entry) => entry.value));
-    const ready = level <= PROGRESSION_PAIN_CEILING && fit.slopeCiLow <= 0;
+    const level = recent.length ? mean(recent.map((entry) => entry.value)) : null;
+    const ready =
+      ordered.length >= MIN_PROGRESSION_READINGS &&
+      level !== null &&
+      level <= PROGRESSION_PAIN_CEILING &&
+      fit.slopeCiHigh <= 0;
+
+    const label = tendonSiteLabels.of(site);
+    const where =
+      level === null
+        ? `${label} is in protocol phase ${phase} with no reading in the last week`
+        : `${label} is in protocol phase ${phase} at ${level.toFixed(1)}/10`;
+    const next =
+      phase >= 4
+        ? "return to full jumping and sprinting load"
+        : `move to phase ${phase + 1}`;
 
     return [
       draft({
         key: `plyo.protocol-readiness.${site}`,
         family: "plyometrics",
         tier: 1,
-        subject: `Readiness to leave protocol phase ${phase} at ${tendonSiteLabels.of(site)}`,
+        subject: `Readiness to leave protocol phase ${phase} at ${label}`,
         statement: ready
-          ? `${tendonSiteLabels.of(site)} is in protocol phase ${phase} at ${level.toFixed(1)}/10 and not rising, which meets the conditions to progress to phase ${phase + 1}.`
-          : `${tendonSiteLabels.of(site)} is in protocol phase ${phase} at ${level.toFixed(1)}/10 and moving ${signed(fit.slope)} a week, so hold this phase.`,
-        value: level,
-        unit: "pain 0 to 10",
+          ? `${where} and measurably not rising, which meets the conditions to recommend you ${next}; advancing still needs your confirmation.`
+          : `${where} and moving ${signed(fit.slope)} a week, which is not yet shown to be settled, so hold this phase.`,
+        value: fit.slope,
+        unit: "pain points per week",
         n: ordered.length,
-        minN: 6,
-        ciLow: Math.max(0, level + fit.slopeCiLow),
-        ciHigh: level + fit.slopeCiHigh,
+        minN: MIN_PROGRESSION_READINGS,
+        ciLow: fit.slopeCiLow,
+        ciHigh: fit.slopeCiHigh,
+        p: fit.p,
+        nullValue: 0,
         detail: {
           site,
           phase,
           readyToProgress: ready,
+          recentPainLevel: level === null ? null : round(level),
+          painCeiling: PROGRESSION_PAIN_CEILING,
           painSlopePerWeek: round(fit.slope),
           readings: worst,
         },
@@ -237,7 +269,9 @@ export function painLag(inputs: AnalyticsInputs): Insight[] {
   });
   if (lags.length === 0) return [];
 
-  const best = lags.reduce((worst, entry) => (entry.r > worst.r ? entry : worst));
+  const best = lags.reduce((strongest, entry) =>
+    Math.abs(entry.r) > Math.abs(strongest.r) ? entry : strongest,
+  );
   const when =
     best.lag === 0 ? "the same day" : `${best.lag} day${best.lag === 1 ? "" : "s"} later`;
 
@@ -248,17 +282,19 @@ export function painLag(inputs: AnalyticsInputs): Insight[] {
       tier: 2,
       subject: "How long tendon pain lags contacts",
       statement: `High-impact contacts track tendon pain most strongly ${when} (r = ${best.r.toFixed(2)}), so a warning has to be built from planned contacts rather than from today's pain.`,
-      value: best.lag,
-      unit: "days",
+      // The correlation at the chosen lag, not the lag itself. A lag is an integer
+      // chosen from five, and no interval on it would mean anything; the interval
+      // that matters is on whether there is an effect, and the lag is in `detail`.
+      value: best.r,
+      unit: "r",
       n: best.n,
       minN: 12,
-      // The interval belongs to the correlation at the reported lag, not to the lag
-      // itself. A lag is an integer chosen from five, and no interval on it would
-      // mean anything; the interval that matters is on whether there is an effect.
       ciLow: best.ciLow,
       ciHigh: best.ciHigh,
       p: Math.min(1, best.p * lags.length),
+      nullValue: 0,
       detail: {
+        lagDays: best.lag,
         lagsExamined: lags.length,
         byLag: lags.map((entry) => ({
           lagDays: entry.lag,
@@ -340,6 +376,10 @@ export function tendonLoadCeiling(inputs: AnalyticsInputs): Insight[] {
   if (ceiling > highest * 1.25) return [];
 
   const [, slope] = contactsOnly.coefficients;
+  // A ceiling only exists if more contacts make a flare more likely. On a negative
+  // slope the 50% crossing is a floor below which flares are likelier, and reporting
+  // it as a ceiling would tell the athlete to train above it.
+  if (!(slope > 0)) return [];
   const slopeSe = contactsOnly.standardErrors[1];
   // The interval on the ceiling comes from the interval on the slope, which is where
   // nearly all the uncertainty is. Delta-method rather than a bootstrap: with twelve

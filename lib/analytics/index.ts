@@ -2,7 +2,7 @@ import type { Db } from "@/lib/db";
 import { assertable, type Insight } from "./insight";
 import { saveInsights } from "./persist";
 import { loadAnalyticsInputs } from "./queries";
-import { computeInsights, rank } from "./suite";
+import { computeInsights, IncompleteSuiteError, rank } from "./suite";
 
 /**
  * The analytics layer: statistics over the owner's own history, no model involved.
@@ -26,12 +26,14 @@ export * from "./queries";
 export * from "./suite";
 
 export type Recompute = {
-  /** Every insight the suite produced, gated and ranked. */
+  /** Every insight the suite produced, gated and ranked. Empty when it was refused. */
   insights: Insight[];
   /** How many cleared the gate, which is how many the owner will actually see. */
   assertableCount: number;
-  /** Producers that threw, by index into `PRODUCERS`. Empty on a healthy run. */
-  failures: number[];
+  /** Producers that threw, by name. Empty on a healthy run. */
+  failures: string[];
+  /** Whether the stored suite was replaced. False keeps the last whole one. */
+  saved: boolean;
 };
 
 /**
@@ -43,30 +45,36 @@ export type Recompute = {
  * fresh q values with stale ones and quietly make the untouched insights easier to
  * assert than they have any right to be. This is a few hundred rows of arithmetic on
  * one athlete's history, so there is nothing to save by being clever.
+ *
+ * For the same reason a suite with a failed producer is not written at all. The stored
+ * suite stays as the last whole one, and the failure is logged and returned by name.
  */
 export async function recomputeInsights(
   options: { asOf?: string; windowDays?: number; db?: Db } = {},
 ): Promise<Recompute> {
   const inputs = await loadAnalyticsInputs(options);
-  const failures: number[] = [];
-  const insights = rank(
-    computeInsights(inputs, {
-      // A producer that throws costs its own statements and nothing else. The
-      // alternative - letting one bad division take down the run - would mean the
-      // screen went blank rather than showing one fewer insight, and the nightly job
-      // would stop writing anything at all until someone noticed.
-      onError: (error, index) => {
-        failures.push(index);
-        console.error(`analytics producer ${index} failed`, error);
-      },
-    }),
-  );
+  let insights: Insight[];
+  try {
+    insights = rank(computeInsights(inputs));
+  } catch (error) {
+    if (!(error instanceof IncompleteSuiteError)) throw error;
+    for (const failure of error.failures) {
+      console.error(`analytics producer ${failure.producer} failed`, failure.error);
+    }
+    return {
+      insights: [],
+      assertableCount: 0,
+      failures: error.failures.map((failure) => failure.producer),
+      saved: false,
+    };
+  }
 
   await saveInsights(insights, { db: options.db });
 
   return {
     insights,
     assertableCount: assertable(insights).length,
-    failures,
+    failures: [],
+    saved: true,
   };
 }

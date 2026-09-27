@@ -1,5 +1,6 @@
 import { daysBetween } from "@/lib/days";
 import type { JumpSitting } from "@/lib/progress/derive";
+import { measurementKindLabels } from "@/lib/labels";
 import { draft, type Insight } from "./insight";
 import type { AnalyticsInputs } from "./inputs";
 import { linearFit, mean, meanEstimate, sampleSd } from "./stats";
@@ -53,13 +54,15 @@ export function noiseFloor(inputs: AnalyticsInputs): Insight[] {
   );
   if (sittings.length < MIN_SITTINGS) return [];
 
-  const spreads = sittings.map((sitting) => sampleSd(sitting.attempts));
-  const pooled = Math.sqrt(mean(spreads.map((spread) => spread * spread)));
-  // The interval is carried across from the per-sitting spreads rather than derived
+  const variances = sittings.map((sitting) => sampleSd(sitting.attempts) ** 2);
+  const pooled = Math.sqrt(mean(variances));
+  // The interval is carried across from the per-sitting variances rather than derived
   // from a chi-square on the pooled variance. Less elegant, and it is the honest
   // spread of the thing actually measured: how noisy a sitting is varies by sitting.
-  const spreadEstimate = meanEstimate(spreads);
-  if (!spreadEstimate) return [];
+  // Variances rather than spreads, because the value is the root of their mean and
+  // an interval on the mean spread would sit below it.
+  const varianceEstimate = meanEstimate(variances);
+  if (!varianceEstimate) return [];
 
   return [
     draft({
@@ -72,8 +75,8 @@ export function noiseFloor(inputs: AnalyticsInputs): Insight[] {
       unit: "cm",
       n: sittings.length,
       minN: MIN_SITTINGS,
-      ciLow: Math.max(0, spreadEstimate.ciLow) * MDC_MULTIPLIER,
-      ciHigh: spreadEstimate.ciHigh * MDC_MULTIPLIER,
+      ciLow: Math.sqrt(Math.max(0, varianceEstimate.ciLow)) * MDC_MULTIPLIER,
+      ciHigh: Math.sqrt(Math.max(0, varianceEstimate.ciHigh)) * MDC_MULTIPLIER,
       detail: {
         withinSittingSd: round(pooled),
         byKind: Object.fromEntries(
@@ -103,11 +106,17 @@ export function noiseFloor(inputs: AnalyticsInputs): Insight[] {
  * A narrowing gap means consistency, which is what a technical block is for.
  *
  * Tested against a zero slope, so a stable gap - the expected state - is correctly
- * reported as nothing to say.
+ * reported as nothing to say. One per test kind, because a standing vertical and a
+ * one-foot approach have gaps of different sizes, and a series mixing them drifts
+ * with whichever was tested more often lately.
  */
 export function bestVersusMeanDrift(inputs: AnalyticsInputs): Insight[] {
+  return NOISE_KINDS.flatMap((kind) => driftOf(inputs, kind));
+}
+
+function driftOf(inputs: AnalyticsInputs, kind: (typeof NOISE_KINDS)[number]): Insight[] {
   const sittings = inputs.tests
-    .filter((sitting) => sitting.attempts.length >= 3)
+    .filter((sitting) => sitting.kind === kind && sitting.attempts.length >= 3)
     .sort((a, b) => a.day.localeCompare(b.day));
   if (sittings.length < MIN_SITTINGS) return [];
 
@@ -124,11 +133,11 @@ export function bestVersusMeanDrift(inputs: AnalyticsInputs): Insight[] {
 
   return [
     draft({
-      key: "jump.best-vs-mean-drift",
+      key: `jump.best-vs-mean-drift.${kind}`,
       family: "jump",
       tier: 1,
-      subject: "Best attempt against average attempt",
-      statement: `The gap between your best attempt and your average attempt is ${direction} by ${Math.abs(fit.slope).toFixed(2)} cm a week, currently averaging ${level ? level.value.toFixed(1) : "?"} cm.`,
+      subject: `${measurementKindLabels.of(kind)}: best attempt against average attempt`,
+      statement: `${measurementKindLabels.of(kind)}: the gap between your best attempt and your average attempt is ${direction} by ${Math.abs(fit.slope).toFixed(2)} cm a week, currently averaging ${level ? level.value.toFixed(1) : "?"} cm.`,
       value: fit.slope,
       unit: "cm per week",
       n: fit.n,
@@ -140,9 +149,9 @@ export function bestVersusMeanDrift(inputs: AnalyticsInputs): Insight[] {
       detail: {
         meanGapCm: level ? round(level.value) : null,
         r2: round(fit.r2),
+        kind,
         sittings: sittings.map((sitting) => ({
           day: sitting.day,
-          kind: sitting.kind,
           best: sitting.best,
           mean: round(mean(sitting.attempts)),
         })),

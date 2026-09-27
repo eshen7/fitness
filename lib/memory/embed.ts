@@ -1,7 +1,7 @@
-import type { Db } from "@/lib/db";
+import { getDb, type Db } from "@/lib/db";
 import { getAiClient } from "@/lib/ai/client";
 import { recordSpend } from "@/lib/ai/proposals";
-import { recordBilledFailure } from "@/lib/ai/guards";
+import { capReached, recordBilledFailure } from "@/lib/ai/guards";
 
 /**
  * Turning fact sentences into vectors, on the meter.
@@ -29,7 +29,8 @@ export const EMBED_LABEL = "memory embedding";
  * Embeds a batch and puts the spend on the ledger.
  *
  * An empty batch short-circuits without a call, which is the common path: most
- * reflections propose no facts, and "nothing to embed" must cost nothing.
+ * reflections propose no facts, and "nothing to embed" must cost nothing. A batch
+ * over the cap throws before the call, like any other live call past it.
  *
  * Recording is awaited rather than fired off, because the next thing the caller does
  * is usually write the facts, and a ledger row that lost a race with a crash is spend
@@ -41,19 +42,20 @@ export async function embedFacts(
 ): Promise<number[][]> {
   if (texts.length === 0) return [];
   const label = options.label ?? EMBED_LABEL;
+  const db = options.db ?? getDb();
+
+  const capped = await capReached(db, "Memory embedding");
+  if (capped) throw new Error(capped.message);
 
   try {
     const result = await getAiClient().embed({ texts, label });
-    await recordSpend(
-      { source: "app", label, model: result.model, usage: result.usage },
-      options.db,
-    );
+    await recordSpend({ source: "app", label, model: result.model, usage: result.usage }, db);
     return result.vectors;
   } catch (error) {
     // A `BilledFailure` may still have been billed. `recordBilledFailure` only
     // writes when the usage is nonzero, so the ordinary "connection refused" case
     // adds no row.
-    await recordBilledFailure(error, label);
+    await recordBilledFailure(error, label, db);
     throw error;
   }
 }
@@ -61,11 +63,11 @@ export async function embedFacts(
 /**
  * One text, or null when the embedding could not be had.
  *
- * Null rather than a throw, because every caller of this is a write that should still
- * happen: a fact with no vector is a fact that cannot be deduplicated, which is worth
- * far less than a fact that was never stored because the embeddings endpoint was
- * having a bad afternoon. `lib/memory/facts.ts` treats a null embedding as "matches
- * nothing", so the fact lands as new knowledge and the feed shows it.
+ * Null rather than a throw, because every caller of this is a write of the owner's own
+ * words that should still happen: a stated fact with no vector cannot be deduplicated,
+ * which is far better than a correction lost because the embeddings endpoint was
+ * having a bad afternoon. Inferences are held to more: `uncheckedAgainstStated` in
+ * `lib/memory/facts.ts` drops any that cannot be compared against a stated fact.
  */
 export async function embedOne(
   text: string,

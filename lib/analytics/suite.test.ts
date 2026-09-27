@@ -9,7 +9,7 @@ import {
   type PrescribedSetRow,
   type SessionRow,
 } from "./inputs";
-import { computeInsights, PRODUCERS, rank } from "./suite";
+import { computeInsights, IncompleteSuiteError, PRODUCERS, rank } from "./suite";
 
 /**
  * The suite as a whole, over one synthetic history and no database.
@@ -230,34 +230,31 @@ function byKey(insights: readonly Insight[], key: string): Insight | undefined {
 
 describe("computeInsights", () => {
   it("returns nothing at all from an empty history rather than throwing", () => {
-    const thrown: unknown[] = [];
-    const insights = computeInsights(emptyInputs(AS_OF), {
-      onError: (error) => thrown.push(error),
-    });
-    expect(thrown).toEqual([]);
-    expect(insights).toEqual([]);
+    expect(computeInsights(emptyInputs(AS_OF))).toEqual([]);
   });
 
-  it("isolates a producer that throws, keeping the rest of the suite", () => {
-    // Nothing in the real suite throws, so the isolation is checked by handing one
-    // producer an input it cannot read: `exercises` is what almost all of them join
+  it("refuses the whole suite when a producer throws, naming every one that did", () => {
+    // Nothing in the real suite throws, so the refusal is checked by handing the
+    // producers an input they cannot read: `exercises` is what almost all of them join
     // through, and a null map makes every lookup fail.
     const broken = { ...history(), exercises: null } as unknown as AnalyticsInputs;
-    const errors: number[] = [];
-    const insights = computeInsights(broken, {
-      onError: (_error, index) => errors.push(index),
-    });
-    expect(errors.length).toBeGreaterThan(0);
-    expect(errors.length).toBeLessThan(PRODUCERS.length);
-    expect(insights.length).toBeGreaterThan(0);
+    let thrown: unknown = null;
+    try {
+      computeInsights(broken);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(IncompleteSuiteError);
+    const failures = (thrown as IncompleteSuiteError).failures;
+    expect(failures.length).toBeGreaterThan(0);
+    expect(failures.length).toBeLessThan(PRODUCERS.length);
+    for (const failure of failures) {
+      expect(failure.producer).toBe(PRODUCERS[failure.index].name);
+    }
   });
 
   describe("over twenty weeks of history", () => {
-    const insights = computeInsights(history(), {
-      onError: (error, index) => {
-        throw new Error(`producer ${index} threw: ${String(error)}`);
-      },
-    });
+    const insights = computeInsights(history());
 
     it("computes a suite with both assertable and withheld statements in it", () => {
       expect(insights.length).toBeGreaterThan(10);

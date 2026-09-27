@@ -43,6 +43,9 @@ const MIN_LIFT_DAYS = 6;
  */
 const MAX_LIFTS = 6;
 
+/** Weeks in an average calendar month, for turning a weekly slope into a monthly one. */
+const WEEKS_PER_MONTH = 365.25 / 12 / 7;
+
 /**
  * Estimated one-rep max per lift, robust-fit, with an interval on the slope.
  *
@@ -73,7 +76,7 @@ export function oneRmTrends(inputs: AnalyticsInputs): Insight[] {
         family: "strength",
         tier: 1,
         subject: `Estimated ${name} one-rep max`,
-        statement: `Estimated ${name} one-rep max is moving ${signed(fit.slope * 4)} kg a month, from ${points.length} days of logged reps at load.`,
+        statement: `Estimated ${name} one-rep max is moving ${signed(fit.slope * WEEKS_PER_MONTH)} kg a month, from ${points.length} days of logged reps at load.`,
         value: fit.slope,
         unit: "kg per week",
         n: points.length,
@@ -136,7 +139,7 @@ export function relativeStrengthTrends(inputs: AnalyticsInputs): Insight[] {
         family: "strength",
         tier: 1,
         subject: `Relative ${name} strength`,
-        statement: `Relative ${name} strength is ${latest.toFixed(2)}x bodyweight and moving ${signed(fit.slope * 4)}x a month, which is the strength figure the jump follows rather than the absolute load.`,
+        statement: `Relative ${name} strength is ${latest.toFixed(2)}x bodyweight and moving ${signed(fit.slope * WEEKS_PER_MONTH)}x a month, which is the strength figure the jump follows rather than the absolute load.`,
         value: fit.slope,
         unit: "bodyweight multiples per week",
         n: ratios.length,

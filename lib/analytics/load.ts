@@ -34,8 +34,11 @@ import {
 const ACUTE_WEEKS = 1;
 const CHRONIC_WEEKS = 4;
 
-/** Weeks of history before a ratio means anything. Four, so acute has three to sit against. */
+/** Weeks of history before a monotony average means anything. */
 const MIN_RATIO_WEEKS = 4;
+
+/** Baseline weeks the acute week is compared against. */
+const BASELINE_WEEKS = CHRONIC_WEEKS - ACUTE_WEEKS;
 
 type Currency = {
   key: string;
@@ -71,11 +74,16 @@ const CURRENCIES: readonly Currency[] = [
  * some published threshold - which is the right test, since the published thresholds
  * come from team-sport cohorts and this is one jumper.
  *
- * The null is 1: a week exactly as hard as the four before it.
+ * The null is 1: a week exactly as hard as the three before it.
+ *
+ * Weeks are whole Monday-to-Sunday weeks ending on the last Sunday on or before
+ * `asOf`. A week still in progress would be compared against full ones and read as
+ * a deload every Tuesday.
  */
 export function workloadRatios(inputs: AnalyticsInputs): Insight[] {
-  const weeks = weeklyLoads(dailyLoads(inputs, CHRONIC_WEEKS * 7));
-  if (weeks.length < MIN_RATIO_WEEKS) return [];
+  const end = addDays(weekStart(addDays(inputs.asOf, 1)), -1);
+  const weeks = weeklyLoads(dailyLoads({ ...inputs, asOf: end }, CHRONIC_WEEKS * 7));
+  if (weeks.length < CHRONIC_WEEKS) return [];
 
   const acute = weeks.slice(-ACUTE_WEEKS);
   const chronic = weeks.slice(0, -ACUTE_WEEKS);
@@ -90,7 +98,6 @@ export function workloadRatios(inputs: AnalyticsInputs): Insight[] {
     if (chronicLoad === 0) return [];
 
     const spread = sampleSd(baseline);
-    const n = weeks.length;
     // A prediction interval for one more week, not a confidence interval for the
     // baseline mean: the question is whether *this* week is unusual, and the extra
     // 1/n under the root is what accounts for the baseline itself being estimated.
@@ -105,16 +112,17 @@ export function workloadRatios(inputs: AnalyticsInputs): Insight[] {
         family: "load",
         tier: 1,
         subject: `Acute versus chronic ${currency.label}`,
-        statement: `This week's ${currency.label} are ${ratio.toFixed(2)}x the average of the previous ${baseline.length} weeks.`,
+        statement: `The latest full week's ${currency.label} are ${ratio.toFixed(2)}x the average of the ${baseline.length} weeks before it.`,
         value: ratio,
         unit: currency.unit,
-        n,
-        minN: MIN_RATIO_WEEKS,
+        n: baseline.length,
+        minN: BASELINE_WEEKS,
         ciLow: ratio - half,
         ciHigh: ratio + half,
         p: se === 0 ? null : studentTP((acuteLoad - chronicLoad) / se, df),
         nullValue: 1,
         detail: {
+          weekEnding: end,
           acute: round(acuteLoad),
           chronicPerWeek: round(chronicLoad),
           weeks: weeks.map((week) => ({ week: week.day, value: round(currency.of(week)) })),

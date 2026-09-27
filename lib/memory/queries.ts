@@ -1,8 +1,10 @@
-import { and, asc, count, eq, gte, isNull, lte } from "drizzle-orm";
+import { and, asc, count, eq, gte, isNull, lt } from "drizzle-orm";
 import { getDb, schema, type Db } from "@/lib/db";
 import { sessionKindLabels, tendonSiteLabels } from "@/lib/labels";
 import type { ReflectionSession, ReflectionSet } from "@/lib/ai/reflect";
+import { recordSpend } from "@/lib/ai/proposals";
 import { addDays } from "@/lib/days";
+import { dayOf } from "@/lib/time";
 import { embedFacts } from "./embed";
 import { isPending, type Embedded, type MemoryFact } from "./facts";
 import type { MemoryPort } from "./reflect";
@@ -93,19 +95,22 @@ export async function loadReflectionSession(
     db
       .select({
         site: schema.tendonStatus.site,
+        recordedAt: schema.tendonStatus.recordedAt,
         painDuringLoad: schema.tendonStatus.painDuringLoad,
         painAfterLoad: schema.tendonStatus.painAfterLoad,
       })
       .from(schema.tendonStatus)
+      // A day wider than the window on each side in UTC, then cut by the owner's day
+      // below, because a UTC midnight is not the owner's.
       .where(
         and(
           gte(
             schema.tendonStatus.recordedAt,
-            new Date(`${addDays(session.day, -TENDON_WINDOW_DAYS)}T00:00:00Z`),
+            new Date(`${addDays(session.day, -TENDON_WINDOW_DAYS - 1)}T00:00:00Z`),
           ),
-          lte(
+          lt(
             schema.tendonStatus.recordedAt,
-            new Date(`${addDays(session.day, TENDON_WINDOW_DAYS + 1)}T00:00:00Z`),
+            new Date(`${addDays(session.day, TENDON_WINDOW_DAYS + 2)}T00:00:00Z`),
           ),
         ),
       )
@@ -145,11 +150,19 @@ export async function loadReflectionSession(
     skipped: prescribed
       .filter((row) => !loggedIds.has(row.id))
       .map((row) => `- ${row.exerciseName}: ${describePrescription(row)}`),
-    tendon: tendon.map((row) => ({
-      site: tendonSiteLabels.of(row.site),
-      painDuringLoad: row.painDuringLoad,
-      painAfterLoad: row.painAfterLoad,
-    })),
+    tendon: tendon
+      .filter((row) => {
+        const day = dayOf(row.recordedAt);
+        return (
+          day >= addDays(session.day, -TENDON_WINDOW_DAYS) &&
+          day <= addDays(session.day, TENDON_WINDOW_DAYS)
+        );
+      })
+      .map((row) => ({
+        site: tendonSiteLabels.of(row.site),
+        painDuringLoad: row.painDuringLoad,
+        painAfterLoad: row.painAfterLoad,
+      })),
   };
 }
 
@@ -196,12 +209,11 @@ function numeric(value: string | null): number | null {
  * The live port. One embedding batch per reflection, on the meter.
  *
  * A failed batch degrades to one null per text rather than failing the reflection,
- * matching the port's contract: the facts still get written, they just cannot
- * deduplicate themselves this time round. That is the right trade because the
- * alternative loses the observation entirely, and the feed makes a duplicate visible
- * in a way a missing fact never is.
+ * matching the port's contract: those proposals are dropped, since they cannot be
+ * checked against what the owner stated, and the session is still there for the next
+ * reflection to derive them from.
  */
-export function databasePort(db: Db = getDb()): MemoryPort {
+export function databasePort(db: Db = getDb(), label = "reflection"): MemoryPort {
   return {
     session: (sessionId) => loadReflectionSession(sessionId, db),
     facts: () => loadFacts({ db }),
@@ -209,10 +221,11 @@ export function databasePort(db: Db = getDb()): MemoryPort {
       try {
         return await embedFacts(texts, { db });
       } catch (error) {
-        console.error("Reflection could not embed its facts; storing them bare.", error);
+        console.error("Reflection could not embed its facts; none will be written.", error);
         return texts.map(() => null);
       }
     },
+    billed: (usage, model) => recordSpend({ source: "app", label, model, usage }, db),
     apply: (input) => applyFactProposal(input, { db }),
   };
 }

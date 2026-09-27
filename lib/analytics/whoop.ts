@@ -128,8 +128,7 @@ export function recoveryIndex(inputs: AnalyticsInputs): Insight[] {
   if (!scoreFit) return [];
 
   const comparison = compareModels(rows, withScore, available);
-  const better =
-    comparison && comparison.indexR2 > comparison.scoreR2 ? "index" : "score";
+  const better = comparison && comparison.indexR2 > comparison.scoreR2 ? "index" : "score";
 
   const detail = {
     outcome: "target RPE minus actual RPE, averaged over the day's prescribed sets",
@@ -154,10 +153,12 @@ export function recoveryIndex(inputs: AnalyticsInputs): Insight[] {
     strongestSingleInput: strongestInput(rows, available),
   };
 
-  const statement =
-    better === "index" && comparison
+  const correlates = `WHOOP's recovery score correlates with how a session goes at r = ${scoreFit.r.toFixed(2)} over ${scoreFit.n} days`;
+  const statement = !comparison
+    ? `${correlates}; there is not yet enough held-out history to compare it against an index weighted for you.`
+    : better === "index"
       ? `A personally weighted index over your raw WHOOP inputs predicts how a session goes better than WHOOP's own recovery score does (${round(comparison.indexR2)} against ${round(comparison.scoreR2)} on weeks the fit did not see), while the score itself correlates at r = ${scoreFit.r.toFixed(2)}.`
-      : `WHOOP's recovery score correlates with how a session goes at r = ${scoreFit.r.toFixed(2)} over ${scoreFit.n} days, and reweighting its raw inputs for you does not beat it.`;
+      : `${correlates}, and reweighting its raw inputs for you does not beat it on weeks the fit did not see.`;
 
   return [
     draft({

@@ -250,6 +250,35 @@ export function conflictsWithStated(
   return null;
 }
 
+/**
+ * Why this proposal cannot be checked against what the owner stated, or null.
+ *
+ * `conflictsWithStated` can only find a contradiction it has vectors for, so a
+ * proposal with no embedding, or a stated fact of its type stored without one, would
+ * pass it by default. An inference that could not be checked is not written: the
+ * observation is still in the session, and the next reflection can derive it again.
+ */
+export function uncheckedAgainstStated(
+  proposal: Embedded<{ type: MemoryFactType }>,
+  existing: readonly Embedded<MemoryFact>[],
+): string | null {
+  if (!proposal.embedding) {
+    return "It has no embedding, so it could not be checked against what the athlete stated.";
+  }
+  const bare = existing.find(
+    (fact) =>
+      fact.source === "stated" &&
+      fact.retiredAt === null &&
+      fact.supersededById === null &&
+      fact.type === proposal.type &&
+      !fact.embedding,
+  );
+  if (bare) {
+    return `The athlete's stated "${bare.body}" has no embedding, so it could not be checked against it.`;
+  }
+  return null;
+}
+
 // -----------------------------------------------------------------------------
 // What reaches the prompt
 // -----------------------------------------------------------------------------

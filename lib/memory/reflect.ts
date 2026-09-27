@@ -21,9 +21,12 @@ import type { FactOutcome } from "./store";
 /**
  * Everything the pipeline needs, as a port.
  *
- * `embed` returns one entry per text, nullable, rather than throwing. A fact with no
- * vector cannot be deduplicated, which is worth far more than a fact that was never
- * written because the embeddings endpoint was down.
+ * `embed` returns one entry per text, nullable, rather than throwing. A proposal with
+ * no vector cannot be checked against what the owner stated, so `apply` drops it and
+ * the next reflection can derive it again.
+ *
+ * `billed` puts the reflection call itself on the meter, and is called as soon as the
+ * call returns, so a failure in anything after it cannot lose spend already incurred.
  */
 export interface MemoryPort {
   /** The session as the prompt renders it, or null if there is no such session. */
@@ -31,6 +34,7 @@ export interface MemoryPort {
   /** Every fact, so `isActive` can be applied here rather than in SQL. */
   facts(): Promise<Embedded<MemoryFact>[]>;
   embed(texts: readonly string[]): Promise<(number[] | null)[]>;
+  billed(usage: AiUsage, model: string): Promise<void>;
   apply(input: {
     proposal: FactProposal;
     embedding: number[] | null;
@@ -89,6 +93,7 @@ export async function reflect(input: {
       source: fact.source,
     })),
   });
+  await input.port.billed(result.usage, result.model);
 
   const proposals = result.output.facts.map(toProposal);
   const embeddings = await input.port.embed(proposals.map((proposal) => proposal.body));

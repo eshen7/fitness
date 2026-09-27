@@ -1,6 +1,5 @@
 import { hasApiKey } from "@/lib/ai/client";
 import { capReached, reasonOf, recordBilledFailure } from "@/lib/ai/guards";
-import { recordSpend } from "@/lib/ai/proposals";
 import { getDb, type Db } from "@/lib/db";
 import { databasePort } from "./queries";
 import { reflect, type ReflectionResult } from "./reflect";
@@ -44,20 +43,10 @@ export async function runReflection(
   if (capped) return { ...empty, ok: false, skipped: capped.message };
 
   try {
-    const result = await reflect({ sessionId, port: databasePort(db) });
-
-    // The embeddings are already on the ledger, recorded by `embedFacts` as they were
-    // bought. This is the reflection call itself, which has no proposal row behind it.
-    if (result.usage && result.model) {
-      await recordSpend(
-        { source: "app", label: SPEND_LABEL, model: result.model, usage: result.usage },
-        db,
-      );
-    }
-
+    const result = await reflect({ sessionId, port: databasePort(db, SPEND_LABEL) });
     return { ...result, ok: result.skipped === null };
   } catch (error) {
-    await recordBilledFailure(error, SPEND_LABEL);
+    await recordBilledFailure(error, SPEND_LABEL, db);
     console.error(`Reflection on session ${sessionId} failed.`, error);
     return { ...empty, ok: false, skipped: `Reflection failed: ${reasonOf(error)}.` };
   }

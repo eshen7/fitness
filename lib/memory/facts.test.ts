@@ -10,6 +10,7 @@ import {
   promptFacts,
   supersedes,
   SUPERSEDE_SIMILARITY,
+  uncheckedAgainstStated,
   type Embedded,
   type FactProposal,
   type MemoryFact,
@@ -230,6 +231,41 @@ describe("conflictsWithStated", () => {
     const existing = [fact({ id: 5, type: "schedule", body, embedding: fakeEmbedding(body) })];
     expect(
       conflictsWithStated({ type: "schedule", embedding: fakeEmbedding(body) }, existing),
+    ).toBeNull();
+  });
+});
+
+describe("uncheckedAgainstStated", () => {
+  const body = "The athlete cannot train on Thursdays.";
+  const stated = fact({
+    id: 5,
+    type: "schedule",
+    body,
+    source: "stated",
+    embedding: fakeEmbedding(body),
+  });
+
+  it("refuses a proposal with no embedding, which no stated fact could be checked against", () => {
+    expect(uncheckedAgainstStated({ type: "schedule", embedding: null }, [stated])).not.toBeNull();
+    expect(uncheckedAgainstStated({ type: "schedule", embedding: null }, [])).not.toBeNull();
+  });
+
+  it("refuses when a live stated fact of the same type was stored without a vector", () => {
+    const bare = { ...stated, embedding: null };
+    const reason = uncheckedAgainstStated(
+      { type: "schedule", embedding: fakeEmbedding("Trains on Saturdays.") },
+      [bare],
+    );
+    expect(reason).toContain(body);
+  });
+
+  it("passes an embedded proposal whose stated facts all carry vectors, or are elsewhere", () => {
+    const embedding = fakeEmbedding("Trains on Saturdays.");
+    expect(uncheckedAgainstStated({ type: "schedule", embedding }, [stated])).toBeNull();
+    const otherType = { ...stated, type: "preference" as const, embedding: null };
+    const retired = { ...stated, embedding: null, retiredAt: new Date() };
+    expect(
+      uncheckedAgainstStated({ type: "schedule", embedding }, [otherType, retired]),
     ).toBeNull();
   });
 });

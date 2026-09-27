@@ -146,7 +146,8 @@ export function maintenanceCalories(inputs: AnalyticsInputs): Insight[] {
 
   const intakeByWeek = new Map<string, number[]>();
   for (const day of inputs.intake) {
-    if (day.day < from || day.kcal <= 0) continue;
+    // Today is still being logged, and a half-eaten day would read as a deficit.
+    if (day.day < from || day.day >= inputs.asOf || day.kcal <= 0) continue;
     const week = weekStart(day.day);
     const held = intakeByWeek.get(week) ?? [];
     held.push(day.kcal);
@@ -159,13 +160,15 @@ export function maintenanceCalories(inputs: AnalyticsInputs): Insight[] {
     const start = weightOn(trend, week);
     const end = weightOn(trend, addDays(week, 6));
     if (start === null || end === null || start === end) continue;
-    weeks.push({ week, kcal: mean(kcals), kgPerDay: (end - start) / 7 });
+    weeks.push({ week, kcal: mean(kcals), kgPerDay: (end - start) / 6 });
   }
   if (weeks.length < MIN_INTAKE_WEEKS) return [];
 
   const points: Point[] = weeks.map((week) => ({ x: week.kgPerDay, y: week.kcal }));
   const fit = linearFit(points);
-  if (!fit) return [];
+  // Eating more has to go with gaining. A flat or falling line has no intake at which
+  // the weight holds, only a figure the arithmetic lands on.
+  if (!fit || fit.slope <= 0) return [];
 
   const maintenance = fit.at(0);
   if (!Number.isFinite(maintenance) || maintenance <= 0) return [];

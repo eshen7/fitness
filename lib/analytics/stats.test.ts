@@ -108,6 +108,28 @@ describe("theilSen", () => {
     expect(robust.slope).toBeCloseTo(2, 1);
     expect(naive.slope).toBeGreaterThan(5);
   });
+  /** A slope of one under scatter of about two, from a fixed sequence so it never flakes. */
+  function noisy(count: number): Point[] {
+    return Array.from({ length: count }, (_, index) => {
+      const x = index + 1;
+      return { x, y: x + (((x * 7919) % 13) - 6) / 2 };
+    });
+  }
+
+  it("puts the interval on the slope, so a real trend under noise excludes zero", () => {
+    const fit = theilSen(noisy(20))!;
+    expect(fit.slopeCiLow).toBeGreaterThan(0);
+    expect(fit.slopeCiLow).toBeLessThan(1);
+    expect(fit.slopeCiHigh).toBeGreaterThan(1);
+  });
+
+  it("narrows the interval as points accumulate", () => {
+    const short = theilSen(noisy(10))!;
+    const long = theilSen(noisy(40))!;
+    expect(long.slopeCiHigh - long.slopeCiLow).toBeLessThan(
+      (short.slopeCiHigh - short.slopeCiLow) / 2,
+    );
+  });
 });
 
 describe("quadraticFit", () => {

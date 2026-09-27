@@ -6,6 +6,7 @@ import {
   conflictsWithStated,
   isActive,
   supersedes,
+  uncheckedAgainstStated,
   type Embedded,
   type FactProposal,
   type MemoryFact,
@@ -213,14 +214,16 @@ async function linkSupersession(tx: Writer, input: { newId: number; oldId: numbe
  *
  * Returns what happened rather than a bare id, because three of the four outcomes are
  * things the feed should be able to say: committed, queued for confirmation, replaced
- * an older fact, or dropped for contradicting something the owner stated.
+ * an older fact, or dropped for contradicting something the owner stated or for
+ * not being checkable against it.
  */
 export type FactOutcome =
   /** Live now. `supersedesId` names the fact it retired, if any. */
   | { kind: "committed"; id: number; supersedesId: number | null }
   /** Written but inert until confirmed, at which point it retires `supersedesId`. */
   | { kind: "pending"; id: number; reason: string; supersedesId: number | null }
-  | { kind: "dropped"; reason: string; conflictsWith: number };
+  /** Not written. `conflictsWith` is the stated fact it contradicted, if that is why. */
+  | { kind: "dropped"; reason: string; conflictsWith: number | null };
 
 export async function applyFactProposal(
   input: {
@@ -234,6 +237,12 @@ export async function applyFactProposal(
 ): Promise<FactOutcome> {
   const { proposal, embedding, existing } = input;
   const embedded = { type: proposal.type, embedding };
+
+  const unchecked = uncheckedAgainstStated(embedded, existing);
+  if (unchecked) {
+    console.warn(`Memory fact not written: "${proposal.body}". ${unchecked}`);
+    return { kind: "dropped", reason: unchecked, conflictsWith: null };
+  }
 
   const stated = conflictsWithStated(embedded, existing);
   if (stated) {

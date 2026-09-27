@@ -25,13 +25,16 @@ async function run(request: NextRequest) {
   }
 
   const result = await recomputeInsights();
+  if (!result.saved) {
+    return NextResponse.json(
+      { ok: false, error: "incomplete suite", failedProducers: result.failures },
+      { status: 500 },
+    );
+  }
   return NextResponse.json({
     ok: true,
     computed: result.insights.length,
     assertable: result.assertableCount,
-    // Named rather than counted, because a producer that throws leaves a gap in the
-    // suite with nothing on screen to say so, and the index is the only handle on it.
-    failedProducers: result.failures,
   });
 }
 

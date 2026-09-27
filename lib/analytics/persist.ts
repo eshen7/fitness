@@ -45,67 +45,71 @@ export async function saveInsights(
     return deleted.length;
   }
 
-  await db
-    .insert(derivedInsights)
-    .values(
-      rows.map((insight) => ({
-        key: insight.key,
-        family: insight.family,
-        subject: insight.subject,
-        statement: insight.statement,
-        value: insight.value.toFixed(VALUE_SCALE),
-        unit: insight.unit,
-        n: insight.n,
-        minN: insight.minN,
-        ciLow: fixed(insight.ciLow, VALUE_SCALE),
-        ciHigh: fixed(insight.ciHigh, VALUE_SCALE),
-        p: fixed(insight.p, P_SCALE),
-        pAdjusted: fixed(insight.pAdjusted, P_SCALE),
-        nullValue: fixed(insight.nullValue, VALUE_SCALE),
-        tier: insight.tier,
-        assertable: insight.assertable,
-        blockedBy: insight.blockedBy,
-        detail: insight.detail,
-        computedAt,
-      })),
-    )
-    .onConflictDoUpdate({
-      target: derivedInsights.key,
-      set: {
-        family: sql`excluded.family`,
-        subject: sql`excluded.subject`,
-        statement: sql`excluded.statement`,
-        value: sql`excluded.value`,
-        unit: sql`excluded.unit`,
-        n: sql`excluded.n`,
-        minN: sql`excluded.min_n`,
-        ciLow: sql`excluded.ci_low`,
-        ciHigh: sql`excluded.ci_high`,
-        p: sql`excluded.p`,
-        pAdjusted: sql`excluded.p_adjusted`,
-        nullValue: sql`excluded.null_value`,
-        tier: sql`excluded.tier`,
-        assertable: sql`excluded.assertable`,
-        blockedBy: sql`excluded.blocked_by`,
-        detail: sql`excluded.detail`,
-        computedAt: sql`excluded.computed_at`,
-        // The row's own current value, before this statement overwrites it.
-        previousValue: sql`${derivedInsights.value}`,
-        updatedAt: computedAt,
-      },
-    });
+  // One transaction, so a failed delete leaves the old suite whole rather than fresh
+  // rows beside stale ones.
+  return db.transaction(async (tx) => {
+    await tx
+      .insert(derivedInsights)
+      .values(
+        rows.map((insight) => ({
+          key: insight.key,
+          family: insight.family,
+          subject: insight.subject,
+          statement: insight.statement,
+          value: insight.value.toFixed(VALUE_SCALE),
+          unit: insight.unit,
+          n: insight.n,
+          minN: insight.minN,
+          ciLow: fixed(insight.ciLow, VALUE_SCALE),
+          ciHigh: fixed(insight.ciHigh, VALUE_SCALE),
+          p: fixed(insight.p, P_SCALE),
+          pAdjusted: fixed(insight.pAdjusted, P_SCALE),
+          nullValue: fixed(insight.nullValue, VALUE_SCALE),
+          tier: insight.tier,
+          assertable: insight.assertable,
+          blockedBy: insight.blockedBy,
+          detail: insight.detail,
+          computedAt,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: derivedInsights.key,
+        set: {
+          family: sql`excluded.family`,
+          subject: sql`excluded.subject`,
+          statement: sql`excluded.statement`,
+          value: sql`excluded.value`,
+          unit: sql`excluded.unit`,
+          n: sql`excluded.n`,
+          minN: sql`excluded.min_n`,
+          ciLow: sql`excluded.ci_low`,
+          ciHigh: sql`excluded.ci_high`,
+          p: sql`excluded.p`,
+          pAdjusted: sql`excluded.p_adjusted`,
+          nullValue: sql`excluded.null_value`,
+          tier: sql`excluded.tier`,
+          assertable: sql`excluded.assertable`,
+          blockedBy: sql`excluded.blocked_by`,
+          detail: sql`excluded.detail`,
+          computedAt: sql`excluded.computed_at`,
+          // The row's own current value, before this statement overwrites it.
+          previousValue: sql`${derivedInsights.value}`,
+          updatedAt: computedAt,
+        },
+      });
 
-  const stale = await db
-    .delete(derivedInsights)
-    .where(
-      notInArray(
-        derivedInsights.key,
-        rows.map((insight) => insight.key),
-      ),
-    )
-    .returning({ key: derivedInsights.key });
+    const stale = await tx
+      .delete(derivedInsights)
+      .where(
+        notInArray(
+          derivedInsights.key,
+          rows.map((insight) => insight.key),
+        ),
+      )
+      .returning({ key: derivedInsights.key });
 
-  return rows.length + stale.length;
+    return rows.length + stale.length;
+  });
 }
 
 export type StoredInsight = Insight & {

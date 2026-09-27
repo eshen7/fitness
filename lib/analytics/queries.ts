@@ -1,4 +1,5 @@
-import { and, asc, eq, gte } from "drizzle-orm";
+import { and, asc, eq, gte, lt, lte } from "drizzle-orm";
+import { daysBetween } from "@/lib/days";
 import { getDb, schema, type Db } from "@/lib/db";
 import { blockBands, jumpSittings } from "@/lib/progress/queries";
 import type {
@@ -56,7 +57,11 @@ export async function loadAnalyticsInputs(
   const asOf = options.asOf ?? today();
   const windowDays = options.windowDays ?? ANALYTICS_WINDOW_DAYS;
   const fromDay = dayMinus(windowDays, asOf);
-  const fromInstant = new Date(`${fromDay}T00:00:00Z`);
+  // Instants are read a day wide on either side and then cut by the owner's day,
+  // because a UTC midnight is not the owner's midnight at either end.
+  const fromInstant = new Date(`${dayMinus(1, fromDay)}T00:00:00Z`);
+  const toInstant = new Date(`${dayMinus(-2, asOf)}T00:00:00Z`);
+  const inWindow = (day: string) => day >= fromDay && day <= asOf;
 
   const {
     exercises,
@@ -114,7 +119,7 @@ export async function loadAnalyticsInputs(
         microcycleId: sessions.microcycleId,
       })
       .from(sessions)
-      .where(gte(sessions.day, fromDay))
+      .where(and(gte(sessions.day, fromDay), lte(sessions.day, asOf)))
       .orderBy(asc(sessions.day), asc(sessions.id)),
     // Prescribed sets hang off a session block rather than the session, so the join
     // is what carries the session id the producers group by.
@@ -131,7 +136,7 @@ export async function loadAnalyticsInputs(
       .from(prescribedSets)
       .innerJoin(sessionBlocks, eq(sessionBlocks.id, prescribedSets.blockId))
       .innerJoin(sessions, eq(sessions.id, sessionBlocks.sessionId))
-      .where(gte(sessions.day, fromDay)),
+      .where(and(gte(sessions.day, fromDay), lte(sessions.day, asOf))),
     // Dated by the session's day rather than by `performedAt`, so a set logged at
     // half past midnight belongs to the training day it was part of. Every weekly
     // and daily bucket in the suite depends on that agreeing with the plan.
@@ -150,7 +155,7 @@ export async function loadAnalyticsInputs(
       })
       .from(loggedSets)
       .innerJoin(sessions, eq(sessions.id, loggedSets.sessionId))
-      .where(gte(sessions.day, fromDay))
+      .where(and(gte(sessions.day, fromDay), lte(sessions.day, asOf)))
       .orderBy(asc(sessions.day)),
     db
       .select({
@@ -162,7 +167,9 @@ export async function loadAnalyticsInputs(
         protocolPhase: tendonStatus.protocolPhase,
       })
       .from(tendonStatus)
-      .where(gte(tendonStatus.recordedAt, fromInstant))
+      .where(
+        and(gte(tendonStatus.recordedAt, fromInstant), lt(tendonStatus.recordedAt, toInstant)),
+      )
       .orderBy(asc(tendonStatus.recordedAt)),
     db
       .select({
@@ -179,7 +186,7 @@ export async function loadAnalyticsInputs(
         sorenessByRegion: readinessCheckins.sorenessByRegion,
       })
       .from(readinessCheckins)
-      .where(gte(readinessCheckins.day, fromDay))
+      .where(and(gte(readinessCheckins.day, fromDay), lte(readinessCheckins.day, asOf)))
       .orderBy(asc(readinessCheckins.day)),
     db
       .select({ value: measurements.value, measuredAt: measurements.measuredAt })
@@ -188,6 +195,7 @@ export async function loadAnalyticsInputs(
         and(
           eq(measurements.kind, "bodyweight"),
           gte(measurements.measuredAt, fromInstant),
+          lt(measurements.measuredAt, toInstant),
         ),
       )
       .orderBy(asc(measurements.measuredAt)),
@@ -199,7 +207,7 @@ export async function loadAnalyticsInputs(
       })
       .from(foodLogEntries)
       .innerJoin(foods, eq(foods.id, foodLogEntries.foodId))
-      .where(gte(foodLogEntries.day, fromDay)),
+      .where(and(gte(foodLogEntries.day, fromDay), lte(foodLogEntries.day, asOf))),
     db
       .select({
         id: planProposals.id,
@@ -208,15 +216,18 @@ export async function loadAnalyticsInputs(
         repairAttempts: planProposals.repairAttempts,
         isFallback: planProposals.isFallback,
         ownerEdits: planProposals.ownerEdits,
+        createdAt: planProposals.createdAt,
       })
       .from(planProposals)
-      .where(gte(planProposals.createdAt, fromInstant))
+      .where(
+        and(gte(planProposals.createdAt, fromInstant), lt(planProposals.createdAt, toInstant)),
+      )
       .orderBy(asc(planProposals.createdAt)),
     db
       .select({ trainableWeekdays: profile.trainableWeekdays })
       .from(profile)
       .limit(1),
-    jumpSittings(windowDays),
+    jumpSittings(daysBetween(fromDay, today()) + 1),
     blockBands(fromDay),
   ]);
 
@@ -286,24 +297,25 @@ export async function loadAnalyticsInputs(
         microcycleId: row.microcycleId,
       }),
     ),
-    tests,
-    bodyweight: weightRows.map((row) => ({
-      day: dayOf(row.measuredAt),
-      kg: Number(row.value),
-    })),
+    tests: tests.filter((sitting) => inWindow(sitting.day)),
+    bodyweight: weightRows
+      .map((row) => ({ day: dayOf(row.measuredAt), kg: Number(row.value) }))
+      .filter((reading) => inWindow(reading.day)),
     intake: [...intakeByDay.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([day, kcal]) => ({ day, kcal })),
-    tendon: tendonRows.map(
-      (row): TendonRow => ({
-        day: dayOf(row.recordedAt),
-        site: row.site as TendonSite,
-        painDuringLoad: row.painDuringLoad,
-        painAfterLoad: row.painAfterLoad,
-        morningStiffness: row.morningStiffness,
-        protocolPhase: row.protocolPhase,
-      }),
-    ),
+    tendon: tendonRows
+      .map(
+        (row): TendonRow => ({
+          day: dayOf(row.recordedAt),
+          site: row.site as TendonSite,
+          painDuringLoad: row.painDuringLoad,
+          painAfterLoad: row.painAfterLoad,
+          morningStiffness: row.morningStiffness,
+          protocolPhase: row.protocolPhase,
+        }),
+      )
+      .filter((row) => inWindow(row.day)),
     readiness: readinessRows.map(
       (row): ReadinessRow => ({
         day: row.day,
@@ -320,20 +332,22 @@ export async function loadAnalyticsInputs(
       }),
     ),
     blocks,
-    proposals: proposalRows.map(
-      (row): ProposalRow => ({
-        id: row.id,
-        scope: row.scope as ProposalScope,
-        verdict: row.verdict as ProposalVerdict,
-        repairAttempts: row.repairAttempts,
-        isFallback: row.isFallback,
-        // A first-attempt pass is zero repairs *and* no fallback. Reading only the
-        // repair count would score a plan that was abandoned after a failed repair
-        // loop as having passed cleanly, which is the opposite of what happened.
-        passedFirstAttempt: row.repairAttempts === 0 && !row.isFallback,
-        editedFields: countEdits(row.ownerEdits),
-      }),
-    ),
+    proposals: proposalRows
+      .filter((row) => inWindow(dayOf(row.createdAt)))
+      .map(
+        (row): ProposalRow => ({
+          id: row.id,
+          scope: row.scope as ProposalScope,
+          verdict: row.verdict as ProposalVerdict,
+          repairAttempts: row.repairAttempts,
+          isFallback: row.isFallback,
+          // A first-attempt pass is zero repairs *and* no fallback. Reading only the
+          // repair count would score a plan that was abandoned after a failed repair
+          // loop as having passed cleanly, which is the opposite of what happened.
+          passedFirstAttempt: row.repairAttempts === 0 && !row.isFallback,
+          editedFields: countEdits(row.ownerEdits),
+        }),
+      ),
   };
 }
 

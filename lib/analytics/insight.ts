@@ -167,6 +167,7 @@ export function gateSuite(
 function firstFailure(input: {
   n: number;
   minN: number;
+  p: number | null;
   pAdjusted: number | null;
   rate: number;
   ciLow: number | null;
@@ -180,7 +181,14 @@ function firstFailure(input: {
     return `not distinguishable from chance once the whole suite is corrected for (q = ${input.pAdjusted.toFixed(3)})`;
   }
   if (input.nullValue !== null) {
-    if (input.ciLow === null || input.ciHigh === null) {
+    if (input.p === null || input.pAdjusted === null) {
+      return "no test of the effect, so it cannot be separated from none";
+    }
+    if (
+      input.ciLow === null ||
+      input.ciHigh === null ||
+      input.ciLow === input.ciHigh
+    ) {
       return "no interval, so the effect cannot be separated from none";
     }
     if (input.ciLow <= input.nullValue && input.ciHigh >= input.nullValue) {

@@ -81,28 +81,38 @@ export const PRODUCERS: readonly ((inputs: AnalyticsInputs) => Insight[])[] = [
   maintenanceCalories,
 ];
 
+export type ProducerFailure = { index: number; producer: string; error: unknown };
+
+/** A suite with a hole in it, which is not a suite the gate may correct. */
+export class IncompleteSuiteError extends Error {
+  constructor(readonly failures: readonly ProducerFailure[]) {
+    super(
+      `analytics producers failed: ${failures.map((failure) => failure.producer).join(", ")}`,
+    );
+    this.name = "IncompleteSuiteError";
+  }
+}
+
 /**
- * Compute every insight and gate the result as one suite.
+ * Compute every insight and gate the result as one suite, or not at all.
  *
- * A producer that throws is a bug, and it is a bug that would otherwise take the
- * whole nightly recompute with it and leave the owner's insight list frozen at
- * whatever it held a week ago with no sign anything was wrong. So each is isolated and
- * a thrown error costs that producer's insights and nothing else. `onError` exists so
- * the route can log it; the default swallows, because the alternative in a page render
- * is a blank screen where a slightly shorter list would do.
+ * A producer that throws is a bug, and dropping its statements would quietly shrink
+ * the correction's denominator and make every other insight easier to assert than
+ * the suite that should have been computed. So every producer is run, every failure
+ * is collected, and any failure refuses the whole suite with an
+ * `IncompleteSuiteError` naming them. The caller keeps the last whole suite it has.
  */
-export function computeInsights(
-  inputs: AnalyticsInputs,
-  options: { onError?: (error: unknown, index: number) => void } = {},
-): Insight[] {
+export function computeInsights(inputs: AnalyticsInputs): Insight[] {
   const drafted: Insight[] = [];
+  const failures: ProducerFailure[] = [];
   for (const [index, producer] of PRODUCERS.entries()) {
     try {
       drafted.push(...producer(inputs));
     } catch (error) {
-      options.onError?.(error, index);
+      failures.push({ index, producer: producer.name, error });
     }
   }
+  if (failures.length > 0) throw new IncompleteSuiteError(failures);
   return gateSuite(deduplicate(drafted));
 }
 

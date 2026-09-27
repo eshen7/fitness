@@ -74,6 +74,18 @@ describe("gateSuite", () => {
     expect(gated.blockedBy).toContain("cannot be separated from none");
   });
 
+  it("withholds a claim against a null that arrived with no test of it", () => {
+    const [gated] = gateSuite([insight({ p: null })]);
+    expect(gated.assertable).toBe(false);
+    expect(gated.blockedBy).toContain("no test of the effect");
+  });
+
+  it("withholds a claim whose interval has no width, which is no interval", () => {
+    const [gated] = gateSuite([insight({ ciLow: 2, ciHigh: 2, p: 0 })]);
+    expect(gated.assertable).toBe(false);
+    expect(gated.blockedBy).toContain("cannot be separated from none");
+  });
+
   /**
    * A descriptive level - a noise floor, a maintenance calorie estimate - has no null
    * to exclude and no effect to test, so it passes on sample size alone. Reporting one

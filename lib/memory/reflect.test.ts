@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { setAiClient } from "@/lib/ai/client";
+import { setAiClient, type AiUsage } from "@/lib/ai/client";
 import { fakeAiClient, fakeEmbedding } from "@/lib/ai/fake";
 import type { ProposedFact, ReflectionSession } from "@/lib/ai/reflect";
 import {
   confirmationReason,
   conflictsWithStated,
   supersedes,
+  uncheckedAgainstStated,
   type Embedded,
   type FactProposal,
   type MemoryFact,
@@ -16,8 +17,8 @@ import type { FactOutcome } from "./store";
 /**
  * The reflection pipeline end to end with no database and no network.
  *
- * The port is an in-memory store that applies the same three rules the real one does -
- * drop against a stated fact, hold on `confirmationReason`, supersede a near-duplicate
+ * The port is an in-memory store that applies the same rules the real one does - drop
+ * what cannot be checked against a stated fact, drop against a stated fact, hold on `confirmationReason`, supersede a near-duplicate
  * - by calling the same pure functions `lib/memory/store.ts` calls. That is the payoff
  * of the port: the policy under test is the policy that ships, and the only thing
  * faked is Postgres.
@@ -92,11 +93,13 @@ function memoryPort(
     session?: ReflectionSession | null;
     facts?: Embedded<MemoryFact>[];
     embed?: (texts: readonly string[]) => (number[] | null)[];
+    apply?: MemoryPort["apply"];
   } = {},
 ) {
   const rows = [...(options.facts ?? [])];
   let nextId = Math.max(0, ...rows.map((row) => row.id)) + 1;
   const applied: { proposal: FactProposal; existingCount: number }[] = [];
+  const billed: { usage: AiUsage; model: string }[] = [];
 
   const port: MemoryPort = {
     async session() {
@@ -108,9 +111,16 @@ function memoryPort(
     async embed(texts) {
       return options.embed ? options.embed(texts) : texts.map((text) => fakeEmbedding(text));
     },
+    async billed(usage, model) {
+      billed.push({ usage, model });
+    },
     async apply(input) {
+      if (options.apply) return options.apply(input);
       applied.push({ proposal: input.proposal, existingCount: input.existing.length });
       const embedded = { type: input.proposal.type, embedding: input.embedding };
+
+      const unchecked = uncheckedAgainstStated(embedded, input.existing);
+      if (unchecked) return { kind: "dropped", reason: unchecked, conflictsWith: null };
 
       const stated = conflictsWithStated(embedded, input.existing);
       if (stated) {
@@ -145,7 +155,7 @@ function memoryPort(
     },
   };
 
-  return { port, rows, applied };
+  return { port, rows, applied, billed };
 }
 
 describe("reflect", () => {
@@ -286,15 +296,44 @@ describe("reflect", () => {
     expect(stable).not.toContain("Replaced fact.");
   });
 
-  it("still writes the fact when the embedding could not be had", async () => {
-    const client = fakeAiClient([{ output: { facts: [proposed()], summary: null } }]);
+  it("writes nothing it could not check against a stated fact, when the embedding failed", async () => {
+    const body = "The athlete cannot train on Thursdays.";
+    const client = fakeAiClient([
+      { output: { facts: [proposed({ type: "schedule", body })], summary: null } },
+    ]);
     setAiClient(client);
-    const { port, rows } = memoryPort({ embed: (texts) => texts.map(() => null) });
+    const { port, rows } = memoryPort({
+      facts: [
+        storedFact({
+          id: 4,
+          type: "schedule",
+          body,
+          source: "stated",
+          embedding: fakeEmbedding(body),
+        }),
+      ],
+      embed: (texts) => texts.map(() => null),
+    });
 
     const result = await reflect({ sessionId: 42, port });
 
-    expect(result.outcomes[0].kind).toBe("committed");
-    expect(rows[0].embedding).toBeNull();
+    expect(result.outcomes[0]).toMatchObject({ kind: "dropped", conflictsWith: null });
+    expect(rows).toHaveLength(1);
+  });
+
+  it("puts the reflection call on the meter even when applying its facts fails", async () => {
+    const client = fakeAiClient([{ output: { facts: [proposed()], summary: null } }]);
+    setAiClient(client);
+    const { port, billed } = memoryPort({
+      apply: async () => {
+        throw new Error("the database went away");
+      },
+    });
+
+    await expect(reflect({ sessionId: 42, port })).rejects.toThrow("the database went away");
+
+    expect(billed).toHaveLength(1);
+    expect(billed[0].usage.outputTokens).toBeGreaterThan(0);
   });
 
   it("clamps a confidence the model overstated and de-duplicates its lists", async () => {

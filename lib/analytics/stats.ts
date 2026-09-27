@@ -352,8 +352,8 @@ export function linearFit(points: readonly Point[], confidence = 0.95): LinearFi
  * Used where one bad reading would otherwise steer the answer, which for this app
  * is most strength series - a mistyped load or a set logged against the wrong
  * exercise moves an OLS slope a long way and moves this one not at all. The
- * interval is the bootstrap-free one implied by the spread of the pairwise
- * slopes, which is wider than a least-squares interval and honestly so.
+ * interval is Sen's: ranks into the sorted pairwise slopes set by the variance of
+ * Kendall's S, so it narrows as points accumulate the way a slope interval should.
  */
 export type RobustFit = {
   slope: number;
@@ -382,13 +382,16 @@ export function theilSen(points: readonly Point[], confidence = 0.95): RobustFit
 
   const slope = median(slopes);
   const intercept = median(usable.map((point) => point.y - slope * point.x));
-  const tail = (1 - confidence) / 2;
+  const n = usable.length;
+  const sorted = [...slopes].sort((a, b) => a - b);
+  const count = sorted.length;
+  const reach = zCritical(confidence) * Math.sqrt((n * (n - 1) * (2 * n + 5)) / 18);
   return {
     slope,
     intercept,
-    n: usable.length,
-    slopeCiLow: quantile(slopes, tail),
-    slopeCiHigh: quantile(slopes, 1 - tail),
+    n,
+    slopeCiLow: sorted[Math.max(0, Math.floor((count - reach) / 2) - 1)],
+    slopeCiHigh: sorted[Math.min(count - 1, Math.ceil((count + reach) / 2))],
     at: (x: number) => intercept + slope * x,
   };
 }
