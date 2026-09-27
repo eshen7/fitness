@@ -37,8 +37,9 @@ Local Postgres is 17 with pgvector 0.8.6, matching Neon.
 
 ```
 app/(auth)/unlock/   passcode gate
-app/(app)/           today, log, progress, nutrition, plan, library
-app/api/             health, generation, set logging, WHOOP, nutrition parsing, insights, reflection
+app/(app)/           today, log, progress, nutrition, plan, library, export
+app/offline/         service worker fallback, public
+app/api/             health, generation, set logging, WHOOP, nutrition parsing, insights, reflection, export
 lib/db/schema/       one file per domain area
 lib/whoop/           OAuth, signed webhook, ingest, and projection into readiness
 lib/engine/          prefilter, normalize, gate (validate.ts), advisories (pure TS, no LLM)
@@ -46,6 +47,7 @@ lib/ai/              OpenAI client and seam, prompts, schemas, cached context, s
 lib/nutrition/       food parse resolution and caches, targets, weight trend
 lib/analytics/       trend math and derived insights (pure functions)
 lib/memory/          remembered facts, embeddings, post-session reflection
+lib/export/          JSON archive and CSV export of every table
 ```
 
 ## Conventions that are easy to get wrong
