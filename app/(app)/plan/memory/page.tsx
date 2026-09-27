@@ -3,7 +3,7 @@ import { Card, EmptyState, Tag } from "@/components/ui";
 import { storedInsights } from "@/lib/analytics/persist";
 import { dayOf, formatDay } from "@/lib/time";
 import { memoryFactTypeLabels } from "@/lib/labels";
-import { factSummary, type MemoryFact } from "@/lib/memory/facts";
+import { factSummary, unindexedStated, type MemoryFact } from "@/lib/memory/facts";
 import { memoryFeed } from "@/lib/memory/queries";
 import { FactActions } from "./fact-actions";
 import { InsightList } from "./insight-list";
@@ -24,6 +24,11 @@ export const metadata = { title: "Memory" };
  */
 export default async function MemoryPage() {
   const [feed, insights] = await Promise.all([memoryFeed(), storedInsights()]);
+  const bare = unindexedStated(feed.active);
+  const unindexed = new Set(bare.map((fact) => fact.id));
+  const pausedTypes = [
+    ...new Set(bare.map((fact) => memoryFactTypeLabels.of(fact.type).toLowerCase())),
+  ];
 
   return (
     <>
@@ -69,6 +74,13 @@ export default async function MemoryPage() {
           <h2 className="mb-2.5 text-base font-semibold text-ink">
             What it remembers
           </h2>
+          {pausedTypes.length > 0 ? (
+            <p className="mb-2.5 text-sm text-warn">
+              Some of what you told it is not indexed yet, so it cannot check new
+              inferences against it. Inferences about {pausedTypes.join(", ")} are
+              paused until the next reflection indexes it.
+            </p>
+          ) : null}
           {feed.active.length === 0 ? (
             <EmptyState title="Nothing learned yet">
               Reflection reads each session after you finish it, against what was
@@ -79,7 +91,7 @@ export default async function MemoryPage() {
             <ul className="space-y-2.5">
               {feed.active.map((fact) => (
                 <li key={fact.id}>
-                  <FactCard fact={fact} />
+                  <FactCard fact={fact} unindexed={unindexed.has(fact.id)} />
                 </li>
               ))}
             </ul>
@@ -168,9 +180,11 @@ export default async function MemoryPage() {
 function FactCard({
   fact,
   pending = false,
+  unindexed = false,
 }: {
   fact: MemoryFact;
   pending?: boolean;
+  unindexed?: boolean;
 }) {
   return (
     <Card className="p-3.5 sm:p-4">
@@ -180,6 +194,7 @@ function FactCard({
         </Tag>
         {fact.source === "stated" ? <Tag tone="accent">yours</Tag> : null}
         {pending ? <Tag tone="warn">held</Tag> : null}
+        {unindexed ? <Tag tone="warn">not indexed</Tag> : null}
         {fact.supersedesId !== null ? (
           <span className="text-xs text-ink-faint">
             replaces an earlier fact

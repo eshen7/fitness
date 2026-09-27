@@ -265,18 +265,28 @@ export function uncheckedAgainstStated(
   if (!proposal.embedding) {
     return "It has no embedding, so it could not be checked against what the athlete stated.";
   }
-  const bare = existing.find(
-    (fact) =>
-      fact.source === "stated" &&
-      fact.retiredAt === null &&
-      fact.supersededById === null &&
-      fact.type === proposal.type &&
-      !fact.embedding,
-  );
+  const bare = unindexedStated(existing).find((fact) => fact.type === proposal.type);
   if (bare) {
     return `The athlete's stated "${bare.body}" has no embedding, so it could not be checked against it.`;
   }
   return null;
+}
+
+/**
+ * The live stated facts stored without a vector.
+ *
+ * Each one pauses every inference of its type, since none of them can be checked
+ * against it. Reflection retries embedding them before anything else, and the memory
+ * screen shows the ones still waiting.
+ */
+export function unindexedStated<T extends Embedded<MemoryFact>>(facts: readonly T[]): T[] {
+  return facts.filter(
+    (fact) =>
+      fact.source === "stated" &&
+      fact.retiredAt === null &&
+      fact.supersededById === null &&
+      !fact.embedding,
+  );
 }
 
 // -----------------------------------------------------------------------------

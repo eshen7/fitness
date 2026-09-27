@@ -188,17 +188,21 @@ export function protocolReadiness(inputs: AnalyticsInputs): Insight[] {
 
     const recent = worst.filter((entry) => entry.day >= addDays(inputs.asOf, -7));
     const level = recent.length ? mean(recent.map((entry) => entry.value)) : null;
-    const ready =
-      ordered.length >= MIN_PROGRESSION_READINGS &&
-      level !== null &&
-      level <= PROGRESSION_PAIN_CEILING &&
-      fit.slopeCiHigh <= 0;
+    const holds = [
+      ordered.length < MIN_PROGRESSION_READINGS
+        ? `only ${ordered.length} readings in ${PROGRESSION_WINDOW} days, short of the ${MIN_PROGRESSION_READINGS} a trend needs`
+        : null,
+      level === null ? "no reading in the last week" : null,
+      level !== null && level > PROGRESSION_PAIN_CEILING
+        ? `pain at ${level.toFixed(1)}/10 over the last week, above the ${PROGRESSION_PAIN_CEILING}/10 ceiling`
+        : null,
+      fit.slopeCiHigh > 0
+        ? `a trend of ${signed(fit.slope)} a week that could still be a rise`
+        : null,
+    ].filter((reason): reason is string => reason !== null);
+    const ready = holds.length === 0;
 
     const label = tendonSiteLabels.of(site);
-    const where =
-      level === null
-        ? `${label} is in protocol phase ${phase} with no reading in the last week`
-        : `${label} is in protocol phase ${phase} at ${level.toFixed(1)}/10`;
     const next =
       phase >= 4
         ? "return to full jumping and sprinting load"
@@ -210,9 +214,10 @@ export function protocolReadiness(inputs: AnalyticsInputs): Insight[] {
         family: "plyometrics",
         tier: 1,
         subject: `Readiness to leave protocol phase ${phase} at ${label}`,
-        statement: ready
-          ? `${where} and measurably not rising, which meets the conditions to recommend you ${next}; advancing still needs your confirmation.`
-          : `${where} and moving ${signed(fit.slope)} a week, which is not yet shown to be settled, so hold this phase.`,
+        statement:
+          ready && level !== null
+            ? `${label} is in protocol phase ${phase} at ${level.toFixed(1)}/10 and measurably not rising, which meets the conditions to recommend you ${next}; advancing still needs your confirmation.`
+            : `${label} is in protocol phase ${phase}, so hold this phase: ${holds.join("; ")}.`,
         value: fit.slope,
         unit: "pain points per week",
         n: ordered.length,
@@ -251,9 +256,12 @@ const PAIN_LAGS = 4;
  * is two days gone and the next one is already planned. Knowing the lag is what turns
  * a lagging indicator into a leading one.
  *
- * Every lag is correlated and the strongest is reported, so its p is multiplied by
- * the number of lags before it reaches the suite's correction. Without that the
- * insight would be significant on pure noise about a quarter of the time.
+ * Every lag is correlated and the strongest positive one is reported, so its p is
+ * multiplied by the number of lags before it reaches the suite's correction. Without
+ * that the insight would be significant on pure noise about a quarter of the time.
+ * Only a positive one, because the claim is that load leads to pain: a negative
+ * correlation is the athlete cutting contacts on painful days, and reporting it would
+ * say the opposite of what the data shows.
  */
 export function painLag(inputs: AnalyticsInputs): Insight[] {
   const loads = dailyLoads(inputs, WINDOW_DAYS);
@@ -269,9 +277,8 @@ export function painLag(inputs: AnalyticsInputs): Insight[] {
   });
   if (lags.length === 0) return [];
 
-  const best = lags.reduce((strongest, entry) =>
-    Math.abs(entry.r) > Math.abs(strongest.r) ? entry : strongest,
-  );
+  const best = lags.reduce((strongest, entry) => (entry.r > strongest.r ? entry : strongest));
+  if (!(best.r > 0)) return [];
   const when =
     best.lag === 0 ? "the same day" : `${best.lag} day${best.lag === 1 ? "" : "s"} later`;
 

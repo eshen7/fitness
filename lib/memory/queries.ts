@@ -8,7 +8,7 @@ import { dayOf } from "@/lib/time";
 import { embedFacts } from "./embed";
 import { isPending, type Embedded, type MemoryFact } from "./facts";
 import type { MemoryPort } from "./reflect";
-import { applyFactProposal, loadFacts } from "./store";
+import { applyFactProposal, loadFacts, storeEmbedding } from "./store";
 
 /**
  * The database side of memory: the reflection port, and the feed.
@@ -206,12 +206,13 @@ function numeric(value: string | null): number | null {
 // -----------------------------------------------------------------------------
 
 /**
- * The live port. One embedding batch per reflection, on the meter.
+ * The live port. Every embedding batch is on the meter.
  *
- * A failed batch degrades to one null per text rather than failing the reflection,
- * matching the port's contract: those proposals are dropped, since they cannot be
- * checked against what the owner stated, and the session is still there for the next
- * reflection to derive them from.
+ * A failed batch, including one refused at the cap, degrades to one null per text
+ * rather than failing the reflection, matching the port's contract: those proposals are
+ * dropped, since they cannot be checked against what the owner stated, and the session
+ * is still there for the next reflection to derive them from. A stated fact that could
+ * not be re-embedded stays bare until a later reflection tries again.
  */
 export function databasePort(db: Db = getDb(), label = "reflection"): MemoryPort {
   return {
@@ -221,11 +222,12 @@ export function databasePort(db: Db = getDb(), label = "reflection"): MemoryPort
       try {
         return await embedFacts(texts, { db });
       } catch (error) {
-        console.error("Reflection could not embed its facts; none will be written.", error);
+        console.error("Reflection could not embed; those texts stay without a vector.", error);
         return texts.map(() => null);
       }
     },
     billed: (usage, model) => recordSpend({ source: "app", label, model, usage }, db),
+    indexed: (id, embedding) => storeEmbedding({ id, embedding }, { db }),
     apply: (input) => applyFactProposal(input, { db }),
   };
 }

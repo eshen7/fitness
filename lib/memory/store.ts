@@ -380,6 +380,18 @@ export async function confirmFact(
   });
 }
 
+/** Stores the vector a fact was written without. */
+export async function storeEmbedding(
+  input: { id: number; embedding: number[] },
+  options: { db?: Db } = {},
+): Promise<void> {
+  const db = options.db ?? getDb();
+  await db
+    .update(schema.memoryFacts)
+    .set({ embedding: input.embedding, updatedAt: new Date() })
+    .where(eq(schema.memoryFacts.id, input.id));
+}
+
 /**
  * Records something the owner told the app directly.
  *

@@ -46,7 +46,7 @@ import { recoveryIndex } from "./whoop";
  */
 
 /**
- * Every producer, in the order their output is presented.
+ * Every producer by name, in the order their output is presented.
  *
  * A producer takes the whole input object and returns zero or more insights, and
  * returning zero is the normal early state rather than an error. None of them throws:
@@ -54,7 +54,7 @@ import { recoveryIndex } from "./whoop";
  * what lets the first run against a nearly empty database return a short list instead
  * of a stack trace.
  */
-export const PRODUCERS: readonly ((inputs: AnalyticsInputs) => Insight[])[] = [
+export const PRODUCERS: Readonly<Record<string, (inputs: AnalyticsInputs) => Insight[]>> = {
   // Load first, because the ratios are what the owner looks at before deciding
   // whether to train today, and because they need the least history.
   workloadRatios,
@@ -79,9 +79,9 @@ export const PRODUCERS: readonly ((inputs: AnalyticsInputs) => Insight[])[] = [
   generationQuality,
   bodyweightTrend,
   maintenanceCalories,
-];
+};
 
-export type ProducerFailure = { index: number; producer: string; error: unknown };
+export type ProducerFailure = { producer: string; error: unknown };
 
 /** A suite with a hole in it, which is not a suite the gate may correct. */
 export class IncompleteSuiteError extends Error {
@@ -105,11 +105,11 @@ export class IncompleteSuiteError extends Error {
 export function computeInsights(inputs: AnalyticsInputs): Insight[] {
   const drafted: Insight[] = [];
   const failures: ProducerFailure[] = [];
-  for (const [index, producer] of PRODUCERS.entries()) {
+  for (const [name, producer] of Object.entries(PRODUCERS)) {
     try {
       drafted.push(...producer(inputs));
     } catch (error) {
-      failures.push({ index, producer: producer.name, error });
+      failures.push({ producer: name, error });
     }
   }
   if (failures.length > 0) throw new IncompleteSuiteError(failures);

@@ -247,9 +247,9 @@ describe("computeInsights", () => {
     expect(thrown).toBeInstanceOf(IncompleteSuiteError);
     const failures = (thrown as IncompleteSuiteError).failures;
     expect(failures.length).toBeGreaterThan(0);
-    expect(failures.length).toBeLessThan(PRODUCERS.length);
+    expect(failures.length).toBeLessThan(Object.keys(PRODUCERS).length);
     for (const failure of failures) {
-      expect(failure.producer).toBe(PRODUCERS[failure.index].name);
+      expect(Object.keys(PRODUCERS)).toContain(failure.producer);
     }
   });
 

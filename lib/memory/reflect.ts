@@ -1,6 +1,6 @@
 import type { AiUsage } from "@/lib/ai/client";
 import { reflectOnSession, type ProposedFact, type ReflectionSession } from "@/lib/ai/reflect";
-import type { Embedded, FactProposal, MemoryFact } from "./facts";
+import { unindexedStated, type Embedded, type FactProposal, type MemoryFact } from "./facts";
 import type { FactOutcome } from "./store";
 
 /**
@@ -27,6 +27,8 @@ import type { FactOutcome } from "./store";
  *
  * `billed` puts the reflection call itself on the meter, and is called as soon as the
  * call returns, so a failure in anything after it cannot lose spend already incurred.
+ *
+ * `indexed` stores the vector for a stated fact that was written without one.
  */
 export interface MemoryPort {
   /** The session as the prompt renders it, or null if there is no such session. */
@@ -35,6 +37,7 @@ export interface MemoryPort {
   facts(): Promise<Embedded<MemoryFact>[]>;
   embed(texts: readonly string[]): Promise<(number[] | null)[]>;
   billed(usage: AiUsage, model: string): Promise<void>;
+  indexed(id: number, embedding: number[]): Promise<void>;
   apply(input: {
     proposal: FactProposal;
     embedding: number[] | null;
@@ -79,7 +82,7 @@ export async function reflect(input: {
     };
   }
 
-  const stored = await input.port.facts();
+  const stored = await withStatedIndexed(input.port, await input.port.facts());
   // Only the live facts are shown to the model. A retired fact is one the owner
   // deleted, and putting it back in front of the model as "already remembered" is how
   // a corrected inference gets proposed again next week.
@@ -127,6 +130,35 @@ export async function reflect(input: {
     model: result.model,
     skipped: null,
   };
+}
+
+/**
+ * The facts, with every live stated fact that was stored without a vector embedded now.
+ *
+ * Done before anything is checked against them, because each such fact pauses every
+ * inference of its type. Through the same embedding port, so it is on the meter and
+ * stops at the cap; a fact that still cannot be embedded stays bare, and its type
+ * stays paused until a later reflection gets a vector for it.
+ */
+async function withStatedIndexed(
+  port: MemoryPort,
+  facts: Embedded<MemoryFact>[],
+): Promise<Embedded<MemoryFact>[]> {
+  const bare = unindexedStated(facts);
+  if (bare.length === 0) return facts;
+
+  const vectors = await port.embed(bare.map((fact) => fact.body));
+  const found = new Map<number, number[]>();
+  for (const [index, fact] of bare.entries()) {
+    const vector = vectors[index];
+    if (!vector) continue;
+    await port.indexed(fact.id, vector);
+    found.set(fact.id, vector);
+  }
+  return facts.map((fact) => {
+    const vector = found.get(fact.id);
+    return vector ? { ...fact, embedding: vector } : fact;
+  });
 }
 
 /**

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { addDays } from "@/lib/days";
 import { gateSuite } from "./insight";
-import { emptyInputs, type TendonRow } from "./inputs";
-import { protocolReadiness } from "./plyo";
+import { emptyInputs, type AnalyticsExercise, type LoggedSetRow, type TendonRow } from "./inputs";
+import { painLag, protocolReadiness } from "./plyo";
 
 /**
  * Protocol readiness, the one insight that recommends doing more to a painful tendon.
@@ -37,6 +37,7 @@ describe("protocolReadiness", () => {
     const insight = readiness(series([0, 2, 0, 3, 1, 3]));
     expect(insight.detail?.readyToProgress).toBe(false);
     expect(insight.statement).toContain("hold this phase");
+    expect(insight.statement).toContain("could still be a rise");
     expect(insight.ciHigh as number).toBeGreaterThan(0);
   });
 
@@ -67,12 +68,17 @@ describe("protocolReadiness", () => {
   it("holds a falling series that is still above the protocol's pain ceiling", () => {
     const insight = readiness(series([9, 8, 7, 6, 5, 4]));
     expect(insight.detail?.readyToProgress).toBe(false);
+    expect(insight.ciHigh as number).toBeLessThan(0);
+    expect(insight.statement).toContain("above the 3/10 ceiling");
+    expect(insight.statement).not.toContain("could still be a rise");
   });
 
   it("holds a settled series with too few readings to read a trend from", () => {
     const insight = readiness(series([3, 2, 1, 0, 0]));
     expect(insight.detail?.readyToProgress).toBe(false);
     expect(insight.n).toBeLessThan(insight.minN);
+    expect(insight.statement).toContain("short of the 6 a trend needs");
+    expect(insight.statement).not.toContain("ceiling");
   });
 
   it("says return to full load from phase 4, never phase 5", () => {
@@ -95,5 +101,56 @@ describe("protocolReadiness", () => {
   it("reports nothing for a site with no protocol", () => {
     const tendon = series([1, 1, 1, 1, 1, 1], null);
     expect(protocolReadiness({ ...emptyInputs(AS_OF), tendon })).toEqual([]);
+  });
+});
+
+const POGO: AnalyticsExercise = {
+  id: 1,
+  name: "Pogo hop",
+  primaryMuscleGroup: "lower_leg",
+  movementPattern: "hop",
+  forceVelocity: "reactive",
+  couplingClass: "short_ssc",
+  highImpact: true,
+  loadsTendonSites: ["patellar_left"],
+  tendonLoadRating: 3,
+};
+
+/** Twenty days of rising contacts, with the pain on each day given by `pain(index)`. */
+function contactsAndPain(pain: (index: number) => number) {
+  const days = Array.from({ length: 20 }, (_, index) => addDays(AS_OF, index - 20));
+  const loggedSets: LoggedSetRow[] = days.map((day, index) => ({
+    day,
+    sessionId: index + 1,
+    exerciseId: POGO.id,
+    reps: 20 + 5 * index,
+    loadKg: null,
+    holdSeconds: null,
+    boxHeightCm: null,
+    rpe: null,
+    qualityRating: null,
+    prescribedSetId: null,
+  }));
+  const tendon: TendonRow[] = days.map((day, index) => ({
+    day,
+    site: "patellar_left",
+    painDuringLoad: pain(index),
+    painAfterLoad: 0,
+    morningStiffness: 0,
+    protocolPhase: null,
+  }));
+  return { ...emptyInputs(AS_OF), exercises: new Map([[POGO.id, POGO]]), loggedSets, tendon };
+}
+
+describe("painLag", () => {
+  it("reports how long pain follows contacts when more contacts mean more pain", () => {
+    const [insight] = painLag(contactsAndPain((index) => Math.floor(index / 2)));
+    expect(insight.value).toBeGreaterThan(0);
+    expect(insight.nullValue).toBe(0);
+    expect(gateSuite([insight])[0].assertable).toBe(true);
+  });
+
+  it("says nothing when pain falls as contacts rise, which is load being cut on painful days", () => {
+    expect(painLag(contactsAndPain((index) => Math.floor((19 - index) / 2)))).toEqual([]);
   });
 });

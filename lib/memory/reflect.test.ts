@@ -100,6 +100,7 @@ function memoryPort(
   let nextId = Math.max(0, ...rows.map((row) => row.id)) + 1;
   const applied: { proposal: FactProposal; existingCount: number }[] = [];
   const billed: { usage: AiUsage; model: string }[] = [];
+  const indexed: number[] = [];
 
   const port: MemoryPort = {
     async session() {
@@ -113,6 +114,11 @@ function memoryPort(
     },
     async billed(usage, model) {
       billed.push({ usage, model });
+    },
+    async indexed(id, embedding) {
+      indexed.push(id);
+      const index = rows.findIndex((row) => row.id === id);
+      rows[index] = { ...rows[index], embedding };
     },
     async apply(input) {
       if (options.apply) return options.apply(input);
@@ -155,7 +161,7 @@ function memoryPort(
     },
   };
 
-  return { port, rows, applied, billed };
+  return { port, rows, applied, billed, indexed };
 }
 
 describe("reflect", () => {
@@ -319,6 +325,55 @@ describe("reflect", () => {
 
     expect(result.outcomes[0]).toMatchObject({ kind: "dropped", conflictsWith: null });
     expect(rows).toHaveLength(1);
+  });
+
+  it("indexes a stated fact stored without a vector before checking against it", async () => {
+    const body = "The athlete cannot train on Thursdays.";
+    const client = fakeAiClient([
+      { output: { facts: [proposed({ type: "schedule", body })], summary: null } },
+    ]);
+    setAiClient(client);
+    const { port, rows, indexed } = memoryPort({
+      facts: [storedFact({ id: 4, type: "schedule", body, source: "stated" })],
+    });
+
+    const result = await reflect({ sessionId: 42, port });
+
+    expect(indexed).toEqual([4]);
+    expect(rows[0].embedding).toEqual(fakeEmbedding(body));
+    expect(result.outcomes[0]).toMatchObject({ kind: "dropped", conflictsWith: 4 });
+    expect(rows).toHaveLength(1);
+  });
+
+  it("keeps inferences of that type paused while the cap refuses to index the stated fact", async () => {
+    const client = fakeAiClient([
+      {
+        output: {
+          facts: [proposed({ type: "schedule", body: "The athlete trains early on Mondays." })],
+          summary: null,
+        },
+      },
+    ]);
+    setAiClient(client);
+    // What the database port does when `embedFacts` refuses at the cap: a null per text.
+    const { port, rows, indexed } = memoryPort({
+      facts: [
+        storedFact({
+          id: 4,
+          type: "schedule",
+          body: "The athlete cannot train on Thursdays.",
+          source: "stated",
+        }),
+      ],
+      embed: (texts) => texts.map(() => null),
+    });
+
+    const result = await reflect({ sessionId: 42, port });
+
+    expect(indexed).toEqual([]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].embedding).toBeNull();
+    expect(result.outcomes[0]).toMatchObject({ kind: "dropped", conflictsWith: null });
   });
 
   it("puts the reflection call on the meter even when applying its facts fails", async () => {
