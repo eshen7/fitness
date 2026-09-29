@@ -238,7 +238,7 @@ export function ProposalReview({
                 key={`${violation.rule}-${index}`}
                 className="border-l-2 border-bad py-0.5 pl-4 text-sm text-ink-muted"
               >
-                <span className="font-mono text-xs text-bad">{violation.rule}</span>{" "}
+                <RuleName rule={violation.rule} className="text-bad" />{" "}
                 {violation.message}
                 {violation.day ? (
                   <span className="text-ink-faint"> ({formatDay(violation.day)})</span>
@@ -284,7 +284,7 @@ export function ProposalReview({
           <ul className="mt-1.5 space-y-1">
             {proposal.changes.map((change, index) => (
               <li key={index} className="text-sm text-ink-muted">
-                <span className="font-mono text-xs text-cool">{change.rule}</span>{" "}
+                <RuleName rule={change.rule} className="text-cool" />{" "}
                 {names[String(change.exerciseId)] ?? `Exercise ${change.exerciseId}`}
                 {" · "}
                 {/* The day, because one exercise runs on several days of a week and
@@ -317,7 +317,9 @@ export function ProposalReview({
                   className="border-l-2 border-warn py-0.5 pl-4 text-sm text-ink-muted"
                 >
                   {rule ? (
-                    <span className="font-mono text-xs text-warn">{rule} </span>
+                    <>
+                      <RuleName rule={rule} className="text-warn" />{" "}
+                    </>
                   ) : null}
                   {message ?? advisory}
                 </li>
@@ -420,6 +422,21 @@ export function ProposalReview({
         ) : null}
       </div>
     </Card>
+  );
+}
+
+/**
+ * A rule's id as a label rather than as code: the same condensed capitals as a
+ * section title, in the colour of what the rule did, so `target-share` reads as
+ * TARGET SHARE ahead of its sentence instead of as a stray identifier.
+ */
+function RuleName({ rule, className }: { rule: string; className: string }) {
+  return (
+    <span
+      className={`font-display text-xs font-semibold tracking-[0.08em] uppercase ${className}`}
+    >
+      {rule.replaceAll("-", " ")}
+    </span>
   );
 }
 
