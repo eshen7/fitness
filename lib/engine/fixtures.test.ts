@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { reviewDeclaration, reviewWeek } from "./index";
 import { prefilter } from "./prefilter";
-import { RULES, type RuleId } from "./rules";
+import { INVARIANTS, RULES, type RuleId } from "./rules";
 import { baselineReview, DECLARATION, EVERYTHING } from "./fixtures/baseline";
 import { DIRECTORY, idOf } from "./fixtures/directory";
 import { findingsOf, INVALID_PLANS } from "./fixtures/invalid";
@@ -34,9 +34,9 @@ describe("the baseline plan", () => {
 });
 
 describe("the invalid plans", () => {
-  it("cover every rule, and the closed set", () => {
+  it("cover every rule, and every invariant", () => {
     const covered = new Set(INVALID_PLANS.map((fixture) => fixture.rule));
-    for (const rule of [...Object.keys(RULES), "closed-set"]) {
+    for (const rule of [...Object.keys(RULES), ...INVARIANTS]) {
       expect(covered, `no fixture for ${rule}`).toContain(rule);
     }
   });
@@ -67,7 +67,7 @@ describe("the invalid plans", () => {
 
       if (fixture.stage === "week") {
         const { violations } = reviewWeek(fixture.input);
-        const stage = fixture.rule === "closed-set" ? "gate" : RULES[fixture.rule].stage;
+        const stage = fixture.rule in RULES ? RULES[fixture.rule as RuleId].stage : "gate";
         it(stage === "gate" ? "and fails the gate" : "and still passes the gate", () => {
           expect(violations.length > 0).toBe(stage === "gate");
         });

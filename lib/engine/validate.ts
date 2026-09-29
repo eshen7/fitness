@@ -23,9 +23,10 @@ import type {
 
 /**
  * Stage 4, the gate: the five rules that need structural judgment, which code
- * cannot repair without rewriting the plan. Every failure is a specific message
- * naming what to change, because it goes back to the model as a repair request
- * and a generic "invalid plan" gives it nothing to repair.
+ * cannot repair without rewriting the plan, and the two invariants in `rules.ts`.
+ * Every failure is a specific message naming what to change, because it goes
+ * back to the model as a repair request and a generic "invalid plan" gives it
+ * nothing to repair.
  *
  * The mesocycle-scope rules run at block declaration, with no week, and again at
  * every weekly generation. Nothing here runs per session.
@@ -110,6 +111,42 @@ export function closedSet(input: GateInput): Violation[] {
     });
   }
   return violations;
+}
+
+// -----------------------------------------------------------------------------
+// target-rpe
+// -----------------------------------------------------------------------------
+
+/**
+ * Every working set in a training session names a target RPE. It is judgment
+ * rather than arithmetic, so the normalizer cannot fill it in, and a plan without
+ * one is a plan whose effort can never be checked. Mobility work is not rated for
+ * effort, and the non-training sessions keep their own prescriptions: a tendon
+ * protocol's share of a maximal contraction, a test's count of attempts.
+ *
+ * One violation per session, naming every set missing one, so a single repair
+ * turn can fill them all.
+ */
+export function targetRpe(input: GateInput): Violation[] {
+  if (!input.week) return [];
+  return input.week.sessions.filter(isTraining).flatMap((session): Violation[] => {
+    const missing = unique(
+      itemsOf(session)
+        .filter((item) => item.targetRpe == null)
+        .filter((item) => input.directory.get(item.exerciseId)?.movementPattern !== "mobility")
+        .map((item) => item.exerciseId),
+    );
+    if (missing.length === 0) return [];
+    return [
+      {
+        rule: "target-rpe",
+        scope: "session",
+        day: session.day,
+        exerciseIds: missing,
+        message: `${formatDay(session.day)} prescribes ${missing.length} exercise${missing.length === 1 ? "" : "s"} with no target RPE (${list(missing.map((id) => nameOf(input.directory, id)))}). Every working set in a training session names one, from 1 to 10, so how hard it felt can be held against how hard it was meant to be.`,
+      },
+    ];
+  });
 }
 
 // -----------------------------------------------------------------------------
@@ -429,5 +466,6 @@ export function gate(input: GateInput): Violation[] {
     ...loadNotComplex(input),
     ...plyoFrequency(input),
     ...backToBack(input),
+    ...targetRpe(input),
   ];
 }

@@ -64,7 +64,7 @@ Dosage the normalizer will enforce, so you may simply follow it:
 - Coupling time: short SSC under ${SHORT_SSC_LIMIT * 1000} ms, long SSC over. Nothing above ${SHOCK_CONTACT_LIMIT} s of ground contact is shock-method work.
 - Roughly 20 sets is a full session. More than that is an advisory, not a rejection, but it is a real ceiling.`;
 
-/** The five rules the gate actually enforces, stated in the gate's own numbers. */
+/** The rules the gate actually enforces, stated in the gate's own numbers. */
 export const GATE_RULES = `Hard rules. The gate rejects a plan that breaks any of these.
 
 Block scope, checked when the block is declared and again at every week:
@@ -73,7 +73,8 @@ Block scope, checked when the block is declared and again at every week:
 2. Stable complex: one complex of ${COMPLEX_SIZE.min} to ${COMPLEX_SIZE.max} distinct exercises, roughly ten, no repeats. Every complex exercise appears on at least ${MIN_WEEKLY_FREQUENCY} days of each week.
 3. Load varies, the complex does not: a week may only prescribe exercises from the complex, plus mobility work, plus one stand-in for each complex exercise the pre-filter has removed. Consecutive weeks must differ: move relative load by at least ${LOAD_STEP}, or total training sets by at least ${VOLUME_STEP * 100} percent.
 4. Plyometric frequency: plyometrics on ${PLYO_DAYS.min} to ${PLYO_DAYS.max} days a week, dropping to ${PLYO_DAYS.maxWhenIntense} days when the week contains shock-method work or a plyometric session at planned intensity ${INTENSE_PLYO_SESSION} or above. The floor is waived in a detraining week. The complex must contain at least one plyometric, or no week could ever meet the floor.
-5. Back to back: sessions on the same day or on consecutive days must not both train the same large muscle group as a primary mover, nor repeat the same coordination pattern. Large groups are the full body, posterior chain, knee extensors, upper push and upper pull. Holds, bracing, carries and mobility do not count as coordination patterns. This is checked across the week boundary too, against the last session of the previous week.`;
+5. Back to back: sessions on the same day or on consecutive days must not both train the same large muscle group as a primary mover, nor repeat the same coordination pattern. Large groups are the full body, posterior chain, knee extensors, upper push and upper pull. Holds, bracing, carries and mobility do not count as coordination patterns. This is checked across the week boundary too, against the last session of the previous week.
+6. Target RPE: every set sets targetRpe, 1 to 10, for how hard it should feel. Only mobility work, and sessions of kind tendon_protocol, test, mobility or rest, may leave it null. It is how the athlete's reported effort is held against the plan, so set it from the week's load type and the set's place in the session: a stimulating week works closer to the limit than a retaining one, and a detraining week further from it.`;
 
 // -----------------------------------------------------------------------------
 // The asks
@@ -107,7 +108,7 @@ export function weekAsk(input: {
       : `Trainable weekdays, 0 for Sunday: ${input.trainableWeekdays.join(", ")}. Sessions land only on those days.`;
   return [
     `Generate week ${input.ordinal} of this block, the microcycle starting ${formatDay(input.startDate)}.`,
-    "Set loadType and relativeLoad for the week, then write each session with its day, kind, planned intensity 1 to 10, and blocks of prescribed sets. Every set names an exercise by id from the candidate set.",
+    "Set loadType and relativeLoad for the week, then write each session with its day, kind, planned intensity 1 to 10, and blocks of prescribed sets. Every set names an exercise by id from the candidate set and, unless it is mobility work or in a session that is not training, a targetRpe.",
     days,
     input.note ? `The athlete adds: ${input.note}` : null,
   ]

@@ -2,7 +2,7 @@ import { addDays } from "@/lib/days";
 import type { TendonSite } from "@/lib/taxonomy";
 import { reviewDeclaration, reviewWeek } from "../index";
 import { prefilter, type PrefilterInput } from "../prefilter";
-import type { RuleId } from "../rules";
+import type { Invariant, RuleId } from "../rules";
 import type {
   MesocycleDeclaration,
   MicrocyclePlan,
@@ -43,11 +43,11 @@ import { DIRECTORY, FULL_GYM, idOf, STOCK } from "./directory";
  *   and assert the complete list of findings across all three.
  */
 
-export type Finding = { rule: RuleId | "closed-set"; message: string };
+export type Finding = { rule: RuleId | Invariant; message: string };
 
 type Common = {
   name: string;
-  rule: RuleId | "closed-set";
+  rule: RuleId | Invariant;
   /** The exact messages, in order. */
   messages: readonly string[];
 };
@@ -339,6 +339,7 @@ export const INVALID_PLANS: readonly InvalidPlan[] = [
         sets: 2,
         reps: 8,
         loadPctOf1rm: 65,
+        targetRpe: 7,
         restSeconds: 120,
       });
     }),
@@ -470,6 +471,20 @@ export const INVALID_PLANS: readonly InvalidPlan[] = [
     }),
     messages: [
       "Mon 21 Sept runs 24 sets. The most intense sessions run about 20, because the aim is as much work as possible while staying as fresh as possible.",
+    ],
+  },
+
+  // --- target RPE ------------------------------------------------------------
+  {
+    name: "Wednesday's squat and deadlift written with no target RPE",
+    stage: "week",
+    rule: "target-rpe",
+    input: editWeek((week) => {
+      item(week.sessions[WED], BACK_SQUAT).targetRpe = null;
+      item(week.sessions[WED], TRAP_BAR).targetRpe = null;
+    }),
+    messages: [
+      "Wed 23 Sept prescribes 2 exercises with no target RPE (Back squat and Trap bar deadlift). Every working set in a training session names one, from 1 to 10, so how hard it felt can be held against how hard it was meant to be.",
     ],
   },
 

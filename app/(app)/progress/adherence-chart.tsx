@@ -175,8 +175,23 @@ export function AdherenceChart({ sessions }: { sessions: SessionOutcome[] }) {
               sessions puts them closer together than the 8px dot is wide, so they
               merge into a caterpillar that hides the line they sit on; past that
               the line alone carries the shape and the hover readout carries the
-              values.
+              values. Until then the target gets one too, smaller, because a
+              session with no neighbour draws no segment and its target would
+              otherwise not be on the chart at all.
             */}
+            {planned.length > 30
+              ? null
+              : planned.map((session, i) =>
+                  session.targetRpe === null ? null : (
+                    <Dot
+                      key={`target-${session.id}`}
+                      leftPct={centre(i)}
+                      topPct={yPct(session.targetRpe, rpe)}
+                      color={SERIES[1]}
+                      small
+                    />
+                  ),
+                )}
             {planned.length > 30
               ? null
               : planned.map((session, i) =>
