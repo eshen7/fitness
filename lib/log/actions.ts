@@ -10,6 +10,7 @@ import { getUnitSystem } from "@/lib/log/queries";
 import type { ActionResult } from "@/lib/log/schemas";
 import {
   bodySchema,
+  invalid,
   readinessSchema,
   tendonSchema,
   testSchema,
@@ -29,18 +30,6 @@ import { dimensionOf, toCanonical } from "@/lib/units";
  * schema the client used, since a client-side check is a convenience and never a
  * guarantee.
  */
-
-function invalid(error: { issues: { path: PropertyKey[]; message: string }[] }) {
-  const errors: Record<string, string> = {};
-  for (const issue of error.issues) {
-    errors[issue.path.map(String).join(".")] = issue.message;
-  }
-  return {
-    ok: false,
-    message: Object.values(errors)[0] ?? "That did not validate.",
-    errors,
-  };
-}
 
 /**
  * A test sitting: one row per attempt, sharing a `testGroup`.

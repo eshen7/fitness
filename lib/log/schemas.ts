@@ -28,6 +28,24 @@ export type ActionResult = {
   errors?: Record<string, string>;
 };
 
+/**
+ * A failed parse as an `ActionResult`, keyed by dotted field path so a form can
+ * put each message under the field it belongs to.
+ */
+export function invalid(error: {
+  issues: { path: PropertyKey[]; message: string }[];
+}): ActionResult {
+  const errors: Record<string, string> = {};
+  for (const issue of error.issues) {
+    errors[issue.path.map(String).join(".")] = issue.message;
+  }
+  return {
+    ok: false,
+    message: Object.values(errors)[0] ?? "That did not validate.",
+    errors,
+  };
+}
+
 /** A number typed into a field. Blank becomes undefined rather than zero. */
 function optionalNumber(max: number, message: string) {
   return z

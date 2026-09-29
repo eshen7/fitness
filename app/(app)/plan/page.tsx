@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { Card, EmptyState, Tag } from "@/components/ui";
 import { planSnapshot } from "@/lib/ai/proposals";
+import { loadProfile } from "@/lib/ai/queries";
 import { formatUsd } from "@/lib/ai/pricing";
 import { formatDay } from "@/lib/days";
 import type { Directory } from "@/lib/engine/types";
@@ -25,10 +26,12 @@ export const metadata = { title: "Plan" };
  * another" next to it is how you end up paying twice for the same week.
  */
 export default async function PlanPage() {
-  const [snapshot, pendingFacts] = await Promise.all([
+  const [snapshot, pendingFacts, profile] = await Promise.all([
     planSnapshot(),
     pendingFactCount(),
+    loadProfile(),
   ]);
+  const gaps = profileGaps(profile);
   const { block, pending, nextWeek } = snapshot;
   const names = namesOf(snapshot.directory);
 
@@ -45,12 +48,20 @@ export default async function PlanPage() {
             {formatUsd(snapshot.spendUsd)} of {formatUsd(snapshot.spendCapUsd)} spent
           </span>
           {/*
-            Both here rather than in the nav, which stays at six items. Memory is what
-            the generator reads, so the screen it is generated from is where a wrong
-            fact gets noticed; the export is the same kind of thing one level up - it
-            is what you reach for when you want the data out from under the app.
+            All here rather than in the nav, which stays at six items. The profile and
+            memory are what the generator reads, so the screen it is generated from is
+            where a wrong fact gets noticed; the export is the same kind of thing one
+            level up - it is what you reach for when you want the data out from under
+            the app.
           */}
           <div className="flex items-center gap-4">
+            <Link
+              href="/profile"
+              className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-accent underline-offset-2 hover:underline"
+            >
+              Profile
+              <span aria-hidden className="ml-1">→</span>
+            </Link>
             <Link
               href="/plan/memory"
               className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-accent underline-offset-2 hover:underline"
@@ -61,14 +72,14 @@ export default async function PlanPage() {
                   {pendingFacts} waiting
                 </span>
               ) : null}
-              <span aria-hidden> →</span>
+              <span aria-hidden className="ml-1">→</span>
             </Link>
             <Link
               href="/export"
               className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-ink-faint underline-offset-2 hover:text-ink-muted hover:underline"
             >
               Export
-              <span aria-hidden> ↓</span>
+              <span aria-hidden className="ml-1">↓</span>
             </Link>
           </div>
         </div>
@@ -76,6 +87,22 @@ export default async function PlanPage() {
 
       <VerdictOutcomeProvider>
         <div className="space-y-5">
+          {gaps ? (
+            <Card>
+              <p className="text-sm text-ink-muted">
+                <span className="font-medium text-warn">Profile incomplete.</span>{" "}
+                {gaps}{" "}
+                <Link
+                  href="/profile"
+                  className="font-medium text-accent underline-offset-2 hover:underline"
+                >
+                  Set up your profile
+                  <span aria-hidden> →</span>
+                </Link>
+              </p>
+            </Card>
+          ) : null}
+
           {!snapshot.hasKey ? (
             <Card>
               <p className="text-sm text-ink-muted">
@@ -267,4 +294,23 @@ function verdictTone(verdict: string) {
   if (verdict === "rejected") return "bad" as const;
   if (verdict === "pending") return "warn" as const;
   return "neutral" as const;
+}
+
+/**
+ * What a blank profile costs the plan, or null when nothing is missing. The
+ * pre-filter reads no equipment literally, as bodyweight only, so a fresh
+ * install quietly plans push-ups for someone standing next to a rack.
+ */
+function profileGaps(profile: {
+  availableEquipment: readonly string[];
+  trainableWeekdays: readonly number[];
+}) {
+  const noEquipment = profile.availableEquipment.length === 0;
+  const noDays = profile.trainableWeekdays.length === 0;
+  if (noEquipment && noDays) {
+    return "No equipment and no training days are set, so every plan is bodyweight only and lands on days the planner picks.";
+  }
+  if (noEquipment) return "No equipment is set, so every plan is bodyweight only.";
+  if (noDays) return "No training days are set, so sessions land on days the planner picks.";
+  return null;
 }
