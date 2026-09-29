@@ -28,7 +28,7 @@ import {
 import { DIRECTORY, FULL_GYM, idOf, STOCK } from "./directory";
 
 /**
- * Deliberately invalid plans, at least one per rule.
+ * Deliberately invalid plans, at least one per rule and per invariant.
  *
  * Each is the baseline with one edit, so every finding it produces must come
  * from the rule it names, and each carries the exact messages that rule must
