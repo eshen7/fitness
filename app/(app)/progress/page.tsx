@@ -66,7 +66,7 @@ export default async function ProgressPage() {
           {insights === 0
             ? "What the numbers support"
             : `${insights} statement${insights === 1 ? "" : "s"} the numbers support`}
-          <span aria-hidden> →</span>
+          <span aria-hidden className="ml-1">→</span>
         </Link>
       </PageHeader>
       <div className="space-y-4">

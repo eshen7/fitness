@@ -206,13 +206,19 @@ function equipmentName(item: Equipment) {
   return equipmentLabels.of(item).toLowerCase();
 }
 
+/** The part of an exercise the equipment rule reads, which the profile screen also holds. */
+export type EquipmentNeeds = Pick<
+  EngineExercise,
+  "id" | "name" | "available" | "equipment" | "equipmentAnyOf"
+>;
+
 /**
  * Only what is actually reachable is eligible. `equipment` is needed all
  * together, `equipmentAnyOf` needs one on top, `none` is always satisfied, and
  * an exercise switched off in the library is out whatever the gym holds.
  */
 export function equipmentRule(
-  exercise: EngineExercise,
+  exercise: EquipmentNeeds,
   available: ReadonlySet<Equipment>,
 ): Exclusion | null {
   const exclude = (reason: string): Exclusion => ({

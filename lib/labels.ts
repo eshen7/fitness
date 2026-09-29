@@ -1,10 +1,12 @@
 import type { InsightFamily } from "@/lib/analytics/insight";
 import type {
+  ArmSwing,
   CouplingClass,
   EnergyDirection,
   Equipment,
   FoodUnit,
   ForceVelocity,
+  JumperType,
   Laterality,
   LoadType,
   MealSlot,
@@ -16,6 +18,7 @@ import type {
   MuscleGroup,
   Plane,
   SessionKind,
+  TakeoffLeg,
   TendonSite,
   UnitSystem,
 } from "@/lib/taxonomy";
@@ -192,6 +195,43 @@ export const unitSystemLabels = labels<UnitSystem>({
   imperial: "Pounds and inches",
   metric: "Kilograms and centimetres",
 });
+
+/**
+ * Speed versus power is set by the free leg during knee drive, not by run-up
+ * speed, and the ebook advises against forcing an experienced jumper to switch.
+ */
+export const jumperTypeLabels = labels<JumperType>({
+  speed: "Speed jumper",
+  power: "Power jumper",
+  unknown: "Not sure yet",
+});
+
+export const armSwingLabels = labels<ArmSwing>({
+  pendulum: "Pendulum",
+  circular: "Circular",
+  running: "Running action",
+  unknown: "Not sure yet",
+});
+
+export const takeoffLegLabels = labels<TakeoffLeg>({
+  left: "Left",
+  right: "Right",
+  unknown: "Not sure yet",
+});
+
+/**
+ * Weekdays in the order a training week is read, Monday first, keyed by the
+ * number `profile.trainable_weekdays` stores: 0 is Sunday, as `Date.getDay()`.
+ */
+export const WEEKDAYS = [
+  { value: 1, short: "Mon", long: "Monday" },
+  { value: 2, short: "Tue", long: "Tuesday" },
+  { value: 3, short: "Wed", long: "Wednesday" },
+  { value: 4, short: "Thu", long: "Thursday" },
+  { value: 5, short: "Fri", long: "Friday" },
+  { value: 6, short: "Sat", long: "Saturday" },
+  { value: 0, short: "Sun", long: "Sunday" },
+] as const;
 
 export const mealSlotLabels = labels<MealSlot>({
   breakfast: "Breakfast",
