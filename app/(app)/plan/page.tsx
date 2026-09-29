@@ -7,12 +7,16 @@ import { formatUsd } from "@/lib/ai/pricing";
 import { formatDay } from "@/lib/days";
 import type { Directory } from "@/lib/engine/types";
 import { mesocycleTypeLabels, motorAbilityLabels } from "@/lib/labels";
+import { getUnitSystem } from "@/lib/log/queries";
 import { pendingFactCount } from "@/lib/memory/queries";
+import { prescriptionMaxes } from "@/lib/prescription";
+import { currentOneRms } from "@/lib/strength/queries";
 import { today } from "@/lib/time";
 import { CloseBlock } from "./close-block";
 import { DeclareBlock } from "./declare-block";
 import { GenerateWeek } from "./generate-week";
 import { ProposalReview } from "./proposal-review";
+import type { PlanLoads } from "./week-editor";
 import { VerdictOutcome, VerdictOutcomeProvider } from "./verdict-outcome";
 
 export const metadata = { title: "Plan" };
@@ -26,14 +30,23 @@ export const metadata = { title: "Plan" };
  * another" next to it is how you end up paying twice for the same week.
  */
 export default async function PlanPage() {
-  const [snapshot, pendingFacts, profile] = await Promise.all([
+  const [snapshot, pendingFacts, profile, unitSystem, current] = await Promise.all([
     planSnapshot(),
     pendingFactCount(),
     loadProfile(),
+    getUnitSystem(),
+    currentOneRms(),
   ]);
   const gaps = profileGaps(profile);
   const { block, pending, nextWeek } = snapshot;
   const names = namesOf(snapshot.directory);
+  const loads: PlanLoads = {
+    unitSystem,
+    maxes: prescriptionMaxes(snapshot.directory.values(), current),
+    slugs: Object.fromEntries(
+      [...snapshot.directory].map(([id, exercise]) => [String(id), exercise.slug]),
+    ),
+  };
 
   return (
     <>
@@ -190,7 +203,7 @@ export default async function PlanPage() {
 
           {pending ? (
             <>
-              <ProposalReview proposal={pending} names={names} />
+              <ProposalReview proposal={pending} names={names} loads={loads} />
               {block && nextWeek ? (
                 <Card>
                   <h2 className="text-base font-semibold text-ink">

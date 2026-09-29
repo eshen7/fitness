@@ -1,5 +1,6 @@
 import type { PlannedSet } from "@/lib/engine/types";
 import type { LoggedSetInput } from "@/lib/log/schemas";
+import { loadFromPercent } from "@/lib/strength/one-rm";
 import type { UnitSystem } from "@/lib/taxonomy";
 import { round1, toCanonical, toDisplay } from "@/lib/units";
 
@@ -136,13 +137,13 @@ export function carriesOut(
  * Load and drop height come first from this session's last set carrying out the
  * same line, because a load adjusted after the first set is the athlete
  * calibrating and retyping it every set is how sets stop being logged; then from
- * the line; then from `lastOutingFor`. Only the same line counts: a back-off line
- * of the exercise has a load of its own, and opening it at the top set's would
- * log the back-off at the wrong weight. An unplanned exercise carries the
- * session's last set of it. A load given as a percentage of 1RM stays a
- * percentage: with no 1RM on record there is nothing honest to convert it with,
- * so the field falls back to what was actually lifted last time on a line of the
- * same shape, and stays blank when there is none.
+ * the line, a percentage of 1RM becoming a load from the lift's current max
+ * rounded to what can be loaded; then from `lastOutingFor`. Only the same line
+ * counts: a back-off line of the exercise has a load of its own, and opening it
+ * at the top set's would log the back-off at the wrong weight. An unplanned exercise carries the
+ * session's last set of it. With no max on record a percentage has nothing
+ * honest to convert it with, so the field falls back to what was actually lifted
+ * last time on a line of the same shape, and stays blank when there is none.
  *
  * RPE is never filled. It is how the set that just happened felt, and a
  * prefilled one would be a guess dressed up as a measurement.
@@ -152,6 +153,7 @@ export function prefill({
   sessionSets,
   outings,
   unitSystem,
+  oneRmKg = null,
 }: {
   line: PlanLine | null;
   /** This session's sets of the exercise, in order. */
@@ -159,6 +161,8 @@ export function prefill({
   /** The exercise's earlier outings, from `lastSetsByExercise`. */
   outings: readonly LoggerOuting[];
   unitSystem: UnitSystem;
+  /** The exercise's current max, from `currentOneRms`, or null with none on record. */
+  oneRmKg?: number | null;
 }): LoggerFields {
   const inSession = (
     line === null
@@ -169,7 +173,12 @@ export function prefill({
   const previous = inSession ?? lastOuting;
   const reps = line?.reps ?? previous?.reps;
   const hold = line?.holdSeconds ?? previous?.holdSeconds;
-  const loadKg = inSession?.loadKg ?? line?.loadKg ?? lastOuting?.loadKg;
+  const planned =
+    line?.loadKg ??
+    (line?.loadPctOf1rm != null && oneRmKg != null
+      ? loadFromPercent(line.loadPctOf1rm, oneRmKg, unitSystem).kg
+      : null);
+  const loadKg = inSession?.loadKg ?? planned ?? lastOuting?.loadKg;
   const boxCm = inSession?.boxHeightCm ?? line?.boxHeightCm ?? lastOuting?.boxHeightCm;
   return {
     reps: reps?.toString() ?? "",

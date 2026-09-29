@@ -214,11 +214,27 @@ describe("prefill", () => {
     expect(fields.load).toBe("24");
   });
 
-  it("never converts a percentage of 1RM into a load", () => {
+  it("converts a percentage of 1RM into a loadable weight from the max", () => {
+    const same = [{ ...offPlan, shape: deadlift }];
+    // 85% of 180 kg is 153 kg, 337.3 lb: the prefill is what goes on the bar.
+    expect(
+      prefill({ line: deadlift, sessionSets: [], outings: same, unitSystem: "imperial", oneRmKg: 180 }).load,
+    ).toBe("335");
+    expect(
+      prefill({ line: deadlift, sessionSets: [], outings: [], unitSystem: "metric", oneRmKg: 180 }).load,
+    ).toBe("152.5");
+    // A load retyped after the first set still wins over the plan.
+    const retyped = [{ prescribedSetId: deadlift.id, reps: 5, loadKg: 150, holdSeconds: null, boxHeightCm: null, rpe: 9 }];
+    expect(
+      prefill({ line: deadlift, sessionSets: retyped, outings: [], unitSystem: "metric", oneRmKg: 180 }).load,
+    ).toBe("150");
+  });
+
+  it("keeps a percentage of 1RM with no max on record from becoming a guess", () => {
     const same = [{ ...offPlan, shape: deadlift }];
     const fields = prefill({ line: deadlift, sessionSets: [], outings: same, unitSystem: "metric" });
     expect(fields.load).toBe("100");
-    const fresh = prefill({ line: deadlift, sessionSets: [], outings: [], unitSystem: "metric" });
+    const fresh = prefill({ line: deadlift, sessionSets: [], outings: [], unitSystem: "metric", oneRmKg: null });
     expect(fresh.load).toBe("");
   });
 

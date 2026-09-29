@@ -4,7 +4,12 @@ import { Input, Tag } from "@/components/ui";
 import type { MicrocyclePlan, PlannedSet } from "@/lib/engine/types";
 import { loadTypeLabels, sessionKindLabels } from "@/lib/labels";
 import { formatDay } from "@/lib/days";
-import { describePrescription, prescriptionDetail } from "@/lib/prescription";
+import {
+  describePrescription,
+  prescriptionDetail,
+  type PrescriptionMaxes,
+} from "@/lib/prescription";
+import type { UnitSystem } from "@/lib/taxonomy";
 
 /**
  * The proposed week, readable first and editable second.
@@ -35,6 +40,17 @@ const NUMERIC_FIELDS = [
   step: number;
   suffix: string;
 }[];
+
+/**
+ * What turns a percentage of 1RM into a load on the bar: the owner's units, each
+ * lift's current max from `prescriptionMaxes`, and each lift's slug so a lift with no max can
+ * link to the page where one is entered. Keyed by exercise id as a string.
+ */
+export type PlanLoads = {
+  unitSystem: UnitSystem;
+  maxes: PrescriptionMaxes;
+  slugs: Record<string, string>;
+};
 
 export type WeekEdit = {
   /** The session's index in the week shown, since two sessions can share a day. */
@@ -69,6 +85,7 @@ export function WeekEditor({
   week,
   proposed = week,
   names,
+  loads,
   editing,
   onChange,
   onMoveSession,
@@ -80,6 +97,7 @@ export function WeekEditor({
   /** The week as the model proposed it, before any edit. Defaults to `week`. */
   proposed?: MicrocyclePlan;
   names: Record<string, string>;
+  loads: PlanLoads;
   editing: boolean;
   onChange?: (edit: WeekEdit) => void;
   onMoveSession?: (session: number, to: string) => void;
@@ -170,7 +188,11 @@ export function WeekEditor({
                         </span>
                         {editing ? null : (
                           <span className="text-xs tabular-nums text-ink-muted">
-                            {describePrescription(item)}
+                            {describePrescription(
+                              item,
+                              loads.unitSystem,
+                              loads.maxes[String(item.exerciseId)],
+                            )}
                           </span>
                         )}
                       </div>

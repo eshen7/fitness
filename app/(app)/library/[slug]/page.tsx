@@ -6,8 +6,12 @@ import { getDb, schema } from "@/lib/db";
 import { updateExercise } from "@/lib/exercises/actions";
 import { getExerciseBySlug } from "@/lib/exercises/queries";
 import { equipmentLabels, muscleGroupLabels } from "@/lib/labels";
+import { getUnitSystem } from "@/lib/log/queries";
+import { estimatesOneRm } from "@/lib/strength/one-rm";
+import { currentOneRms } from "@/lib/strength/queries";
 import { AvailabilityToggle } from "../availability-toggle";
 import { ExerciseForm } from "../exercise-form";
+import { TestedMax } from "./tested-max";
 
 type Params = Promise<{ slug: string }>;
 
@@ -62,6 +66,10 @@ export default async function ExercisePage({ params }: { params: Params }) {
     .from(schema.prescribedSets)
     .where(eq(schema.prescribedSets.exerciseId, exercise.id))
     .limit(1);
+
+  const oneRm = estimatesOneRm(exercise)
+    ? await Promise.all([currentOneRms(), getUnitSystem()])
+    : null;
 
   return (
     <>
@@ -157,6 +165,14 @@ export default async function ExercisePage({ params }: { params: Params }) {
             ) : null}
           </dl>
         </Card>
+      ) : null}
+
+      {oneRm ? (
+        <TestedMax
+          exerciseId={exercise.id}
+          current={oneRm[0][String(exercise.id)] ?? null}
+          unitSystem={oneRm[1]}
+        />
       ) : null}
 
       <ExerciseForm

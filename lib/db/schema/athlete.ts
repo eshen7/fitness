@@ -64,7 +64,7 @@ export const measurements = pgTable(
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     kind: measurementKind().notNull(),
-    /** Set for `estimated_1rm` rows so the lift is identifiable. */
+    /** Set for `tested_1rm` rows so the lift is identifiable. */
     exerciseId: integer("exercise_id").references(() => exercises.id, {
       onDelete: "set null",
     }),

@@ -1,7 +1,8 @@
 import { formatSeconds } from "@/lib/engine/classify";
 import type { PlannedSet } from "@/lib/engine/types";
 import { couplingClassLabels } from "@/lib/labels";
-import type { UnitSystem } from "@/lib/taxonomy";
+import { estimatesOneRm, loadFromPercent } from "@/lib/strength/one-rm";
+import type { ForceVelocity, UnitSystem } from "@/lib/taxonomy";
 import { displayUnit, round1, toDisplay } from "@/lib/units";
 
 /**
@@ -10,14 +11,39 @@ import { displayUnit, round1, toDisplay } from "@/lib/units";
  */
 
 /**
- * The prescription in one line: `4 x 8 at 85% 1RM, 45 cm box`.
+ * Each lift's max as a prescription reads it, keyed by exercise id as a string:
+ * the max in kilograms, or null for a lift that can hold a max and has none yet.
+ * A lift `estimatesOneRm` rejects is absent, because no max can ever be entered
+ * for it and saying one is needed would point at a page with nowhere to enter it.
+ */
+export type PrescriptionMaxes = Readonly<Record<string, number | null>>;
+
+export function prescriptionMaxes(
+  exercises: Iterable<{ id: number; forceVelocity: ForceVelocity }>,
+  current: Readonly<Record<string, { kg: number }>>,
+): Record<string, number | null> {
+  const maxes: Record<string, number | null> = {};
+  for (const exercise of exercises) {
+    if (!estimatesOneRm(exercise)) continue;
+    maxes[String(exercise.id)] = current[String(exercise.id)]?.kg ?? null;
+  }
+  return maxes;
+}
+
+/**
+ * The prescription in one line: `4 x 8 at 145 kg (85% 1RM), 45 cm box`.
  *
- * Canonical kg and cm unless a unit system is given, which the set logger passes
- * so the target reads in the units its fields are typed in.
+ * Canonical kg and cm unless a unit system is given. A percentage of 1RM is
+ * turned into a load from the lift's current max, rounded to what can be put on
+ * the bar, because a percentage alone is a prescription nobody can follow. With
+ * `oneRmKg` null, a lift with no max on record, it stays a percentage and says a
+ * max is what is missing; with it undefined, a lift that cannot hold a max, it
+ * stays a bare percentage.
  */
 export function describePrescription(
   item: PlannedSet,
   unitSystem: UnitSystem = "metric",
+  oneRmKg?: number | null,
 ) {
   const measure = (value: number, dimension: "mass" | "length") => {
     const shown =
@@ -31,7 +57,13 @@ export function describePrescription(
         ? `${item.sets} x ${item.holdSeconds}s`
         : `${item.sets} sets`;
   const load = [
-    item.loadPctOf1rm != null ? `${item.loadPctOf1rm}% 1RM` : null,
+    item.loadPctOf1rm == null
+      ? null
+      : oneRmKg === undefined
+        ? `${item.loadPctOf1rm}% 1RM`
+        : oneRmKg === null
+          ? `${item.loadPctOf1rm}% 1RM (needs a max)`
+          : `${loadFromPercent(item.loadPctOf1rm, oneRmKg, unitSystem).shown} ${displayUnit("mass", unitSystem)} (${item.loadPctOf1rm}% 1RM)`,
     item.loadKg != null ? measure(item.loadKg, "mass") : null,
     item.boxHeightCm != null ? `${measure(item.boxHeightCm, "length")} box` : null,
     item.targetRpe != null ? `RPE ${item.targetRpe}` : null,
@@ -48,4 +80,19 @@ export function prescriptionDetail(item: PlannedSet) {
   ]
     .filter(Boolean)
     .join(" · ");
+}
+
+/**
+ * The lifts in a plan with a percentage of 1RM and no max to load it from, in
+ * plan order and each once, which is who the "needs a max" note names. A lift
+ * that cannot hold a max is not one of them.
+ */
+export function liftsNeedingMax(
+  items: readonly Pick<PlannedSet, "exerciseId" | "loadPctOf1rm">[],
+  maxes: PrescriptionMaxes,
+): number[] {
+  const ids = items
+    .filter((item) => item.loadPctOf1rm != null && maxes[String(item.exerciseId)] === null)
+    .map((item) => item.exerciseId);
+  return [...new Set(ids)];
 }
