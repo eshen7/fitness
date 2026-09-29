@@ -9,6 +9,7 @@ import {
   useSyncExternalStore,
   useTransition,
 } from "react";
+import { Volume } from "@/components/prescription";
 import { Button, Card, Field, Input, Select, Tag, Textarea } from "@/components/ui";
 import { deleteLoggedSet, finishSession } from "@/lib/log/actions";
 import {
@@ -35,6 +36,8 @@ import type { LoggedSetRow } from "@/lib/log/queries";
 import {
   describePrescription,
   prescriptionDetail,
+  prescriptionLoad,
+  prescriptionVolume,
   type PrescriptionMaxes,
 } from "@/lib/prescription";
 import type {
@@ -88,6 +91,12 @@ type Mode =
 
 type Current = { exerciseId: number; line: PlanLine | null };
 
+/**
+ * The set fields: scoreboard digits, centred in a column a third of the card
+ * wide, and 56px tall because they are hit between sets with chalked hands.
+ */
+const SET_FIELD = "numeral h-14 text-center text-2xl";
+
 export function SetLogger({
   sessionId,
   exercises,
@@ -133,6 +142,10 @@ export function SetLogger({
   const [sessionRpe, setSessionRpe] = useState("");
   const [sessionNotes, setSessionNotes] = useState("");
   const [busy, start] = useTransition();
+  /** The last set this form logged, confirmed under the button until the next. */
+  const [lastLogged, setLastLogged] = useState<{ key: string; text: string } | null>(
+    null,
+  );
 
   const massUnit = displayUnit("mass", unitSystem);
   const lengthUnit = displayUnit("length", unitSystem);
@@ -313,6 +326,10 @@ export function SetLogger({
 
     enqueue(item);
     setFormError(null);
+    setLastLogged({
+      key: item.clientId,
+      text: `${exercise.name}, set ${item.setIndex} logged`,
+    });
     setFields((current) => ({ ...current, rpe: "", quality: null }));
     // A picked line that this set finished hands back to the plan, which then
     // opens on whatever is next rather than inviting a set past the prescription.
@@ -386,7 +403,7 @@ export function SetLogger({
   return (
     <div className="space-y-4 pb-4">
       {notice ? (
-        <div className="flex items-start justify-between gap-3 rounded-field border border-warn/40 bg-warn/10 px-3 py-2.5">
+        <div className="flex items-start justify-between gap-3 border-l-2 border-warn bg-warn/[0.07] py-2 pr-2 pl-4">
           <p role="status" className="text-sm text-warn">
             {notice}
           </p>
@@ -396,7 +413,7 @@ export function SetLogger({
               setFormError(null);
               acknowledgeQueue();
             }}
-            className="-my-2 inline-flex min-h-11 shrink-0 items-center text-xs font-medium text-warn hover:underline"
+            className="press -my-2 inline-flex min-h-11 shrink-0 items-center px-2 text-sm font-medium text-warn hover:underline"
           >
             Dismiss
           </button>
@@ -406,53 +423,109 @@ export function SetLogger({
       {!finished ? (
         <Card>
           {current && exercise ? (
-            <>
+            <form
+              // Enter walks the fields in order and logs the set from the last
+              // one, so a keyboard never has to reach for the button and a
+              // stray Enter in the reps field never logs a half-filled set.
+              onSubmit={(event) => {
+                event.preventDefault();
+                logSet();
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" || !(event.target instanceof HTMLInputElement)) {
+                  return;
+                }
+                const inputs = [
+                  ...event.currentTarget.querySelectorAll<HTMLInputElement>("input[data-set-field]"),
+                ];
+                const at = inputs.indexOf(event.target);
+                if (at >= 0 && at < inputs.length - 1) {
+                  event.preventDefault();
+                  inputs[at + 1].focus();
+                  inputs[at + 1].select();
+                }
+              }}
+            >
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="font-display text-lg font-semibold text-ink">
+                <div className="min-w-0">
+                  <p
+                    className={`eyebrow tnum ${linkedTo !== null ? "text-accent" : ""}`}
+                  >
+                    {setLabel}
+                  </p>
+                  <h2 className="mt-1.5 font-display text-2xl leading-tight font-bold text-ink">
                     {exercise.name}
                   </h2>
-                  <p className="mt-0.5 text-xs text-ink-faint tabular-nums">
-                    {setLabel}
-                    {exercise.highImpact ? " · counts as a contact" : ""}
-                  </p>
+                  {exercise.highImpact ? (
+                    <p className="mt-0.5 text-xs text-ink-faint">Counts toward contacts</p>
+                  ) : null}
                 </div>
                 <Button
                   type="button"
                   variant="secondary"
                   onClick={() => setMode({ kind: "picker" })}
+                  className="-mt-0.5 shrink-0"
                 >
                   Change
                 </Button>
               </div>
 
+              {current.line && lineProgress ? (
+                // Where this set sits in the line: done, this one, still to come.
+                <div aria-hidden="true" className="mt-3 flex gap-1">
+                  {Array.from({ length: current.line.sets }, (_, i) => (
+                    <span
+                      key={i}
+                      className={`h-1 flex-1 rounded-full ${
+                        i < lineProgress.done
+                          ? "bg-good"
+                          : i === lineProgress.done && linkedTo !== null
+                            ? "bg-accent"
+                            : "bg-surface-raised"
+                      }`}
+                    />
+                  ))}
+                </div>
+              ) : null}
+
               {current.line ? (
-                <div className="mt-3 rounded-field border border-line bg-surface-sunken px-3 py-2">
-                  <p className="text-xs font-medium tracking-wide text-ink-faint uppercase">
-                    Target
-                  </p>
-                  <p className="mt-0.5 text-sm text-ink tabular-nums">
-                    {describePrescription(
+                <div className="mt-4 flex items-end justify-between gap-4 border-y border-line py-3">
+                  <div className="min-w-0">
+                    <p className="eyebrow">Target</p>
+                    {prescriptionLoad(
                       current.line,
                       unitSystem,
                       maxes[String(current.exerciseId)],
-                    )}
-                  </p>
-                  {prescriptionDetail(current.line) ? (
-                    <p className="mt-0.5 text-xs text-ink-faint">
-                      {prescriptionDetail(current.line)}
-                    </p>
-                  ) : null}
+                    ) ? (
+                      <p className="mt-1 text-sm text-ink-muted">
+                        {prescriptionLoad(
+                          current.line,
+                          unitSystem,
+                          maxes[String(current.exerciseId)],
+                        )}
+                      </p>
+                    ) : null}
+                    {prescriptionDetail(current.line) ? (
+                      <p className="mt-0.5 text-xs text-ink-faint">
+                        {prescriptionDetail(current.line)}
+                      </p>
+                    ) : null}
+                  </div>
+                  <Volume
+                    value={prescriptionVolume(current.line)}
+                    className="shrink-0 text-3xl leading-none text-ink"
+                  />
                 </div>
               ) : null}
 
               {cues.length ? (
-                <ul className="mt-3 space-y-1 text-xs text-ink-muted">
+                <ul className="mt-3 space-y-1 text-sm text-ink-muted">
                   {cues.map((cue) => (
-                    <li key={cue} className="flex gap-2">
-                      <span aria-hidden="true" className="text-ink-faint">
-                        ·
-                      </span>
+                    <li key={cue} className="flex gap-2.5">
+                      <span
+                        aria-hidden="true"
+                        className="mt-[0.6em] h-px w-2.5 shrink-0 bg-ink-faint"
+                      />
                       {cue}
                     </li>
                   ))}
@@ -473,13 +546,16 @@ export function SetLogger({
                     <Input
                       type="number"
                       inputMode="numeric"
+                      enterKeyHint="next"
+                      data-set-field=""
                       min="1"
                       max="500"
                       value={fields.reps}
                       onChange={(event) =>
                         setFields((f) => ({ ...f, reps: event.target.value }))
                       }
-                      className="tnum h-14 text-lg"
+                      onFocus={(event) => event.target.select()}
+                      className={SET_FIELD}
                     />
                   </Field>
                 ) : null}
@@ -488,13 +564,16 @@ export function SetLogger({
                     <Input
                       type="number"
                       inputMode="decimal"
+                      enterKeyHint="next"
+                      data-set-field=""
                       step="0.5"
                       min="0"
                       value={fields.hold}
                       onChange={(event) =>
                         setFields((f) => ({ ...f, hold: event.target.value }))
                       }
-                      className="tnum h-14 text-lg"
+                      onFocus={(event) => event.target.select()}
+                      className={SET_FIELD}
                     />
                   </Field>
                 ) : null}
@@ -502,13 +581,16 @@ export function SetLogger({
                   <Input
                     type="number"
                     inputMode="decimal"
+                    enterKeyHint="next"
+                    data-set-field=""
                     step="any"
                     min="0"
                     value={fields.load}
                     onChange={(event) =>
                       setFields((f) => ({ ...f, load: event.target.value }))
                     }
-                    className="tnum h-14 text-lg"
+                    onFocus={(event) => event.target.select()}
+                    className={SET_FIELD}
                   />
                 </Field>
                 {showBox ? (
@@ -516,13 +598,16 @@ export function SetLogger({
                     <Input
                       type="number"
                       inputMode="decimal"
+                      enterKeyHint="next"
+                      data-set-field=""
                       step="any"
                       min="0"
                       value={fields.box}
                       onChange={(event) =>
                         setFields((f) => ({ ...f, box: event.target.value }))
                       }
-                      className="tnum h-14 text-lg"
+                      onFocus={(event) => event.target.select()}
+                      className={SET_FIELD}
                     />
                   </Field>
                 ) : null}
@@ -530,6 +615,8 @@ export function SetLogger({
                   <Input
                     type="number"
                     inputMode="decimal"
+                    enterKeyHint="done"
+                    data-set-field=""
                     step="0.5"
                     min="1"
                     max="10"
@@ -537,7 +624,8 @@ export function SetLogger({
                     onChange={(event) =>
                       setFields((f) => ({ ...f, rpe: event.target.value }))
                     }
-                    className="tnum h-14 text-lg"
+                    onFocus={(event) => event.target.select()}
+                    className={SET_FIELD}
                   />
                 </Field>
               </div>
@@ -549,7 +637,7 @@ export function SetLogger({
                 </p>
               ) : null}
 
-              <div className="mt-3">
+              <div className="mt-4">
                 <div className="mb-1.5 flex items-baseline justify-between gap-3">
                   <span className="text-sm font-medium text-ink-muted">Quality</span>
                   <span className="text-xs text-ink-faint">1 fell apart · 5 clean</span>
@@ -572,7 +660,7 @@ export function SetLogger({
                           quality: f.quality === score ? null : score,
                         }))
                       }
-                      className={`tnum h-11 rounded-field border text-sm font-medium transition ${
+                      className={`press numeral h-12 rounded-field border text-lg ${
                         fields.quality === score
                           ? "border-accent bg-accent/15 text-accent"
                           : "border-line-strong bg-surface-sunken text-ink-muted hover:border-ink-faint"
@@ -584,45 +672,66 @@ export function SetLogger({
                 </div>
               </div>
 
-              <Button
-                type="button"
-                onClick={logSet}
-                className="mt-4 h-14 w-full text-base"
-              >
+              <Button type="submit" size="lg" className="mt-5 w-full">
                 Log set
               </Button>
-            </>
+              {/* Room reserved, so the confirmation never pushes the list down. */}
+              <p
+                role="status"
+                className="mt-2 flex min-h-5 items-center gap-1.5 text-sm text-good"
+              >
+                {lastLogged ? (
+                  <>
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                      className="size-4 shrink-0"
+                    >
+                      <path d="m5 12.5 4.5 4.5L19 7.5" />
+                    </svg>
+                    <span key={lastLogged.key} className="truncate">
+                      {lastLogged.text}
+                    </span>
+                  </>
+                ) : null}
+              </p>
+            </form>
           ) : (
             <>
               {plan.length ? (
                 <>
-                  <h2 className="text-sm font-semibold text-ink">Plan</h2>
+                  <h2 className="font-display text-xl font-bold text-ink">
+                    {upNext ? "Pick a line" : "Plan complete"}
+                  </h2>
                   {upNext ? null : (
-                    <p className="mt-1 text-xs text-ink-faint">
+                    <p className="mt-1 text-sm text-ink-muted">
                       Every planned set is logged. Anything more goes in as extra
                       work, outside the prescription.
                     </p>
                   )}
-                  <div className="mt-3 space-y-3">
+                  <div className="mt-4 space-y-4">
                     {planBlocks.map(({ label, rows }, index) => (
                       <div key={`${label}-${index}`}>
-                        <p className="text-xs font-medium tracking-wide text-ink-muted uppercase">
-                          {label}
-                        </p>
-                        <ul className="mt-1.5 space-y-1.5">
+                        <p className="eyebrow">{label}</p>
+                        <ul className="mt-1">
                           {rows.map(({ line, done }) => (
-                            <li key={line.id}>
+                            <li key={line.id} className="border-t border-line first:border-t-0">
                               <button
                                 type="button"
                                 onClick={() => pickLine(line)}
-                                className="flex min-h-11 w-full items-center justify-between gap-3 rounded-field border border-line-strong bg-surface-sunken px-3 py-2 text-left transition hover:border-ink-faint"
+                                className="press -mx-2 flex min-h-14 w-[calc(100%+1rem)] items-center justify-between gap-3 rounded-field px-2 py-2 text-left hover:bg-surface-raised/60"
                               >
                                 <span className="min-w-0">
-                                  <span className="block text-sm text-ink">
+                                  <span className="block text-ink">
                                     {exercises.find((row) => row.id === line.exerciseId)
                                       ?.name ?? `Exercise ${line.exerciseId}`}
                                   </span>
-                                  <span className="block text-xs text-ink-muted tabular-nums">
+                                  <span className="block text-sm text-ink-faint">
                                     {describePrescription(
                                       line,
                                       unitSystem,
@@ -630,8 +739,8 @@ export function SetLogger({
                                     )}
                                   </span>
                                 </span>
-                                <Tag tone={done >= line.sets ? "accent" : "neutral"}>
-                                  {done >= line.sets ? "done" : `${done} of ${line.sets}`}
+                                <Tag tone={done >= line.sets ? "good" : "neutral"}>
+                                  {done >= line.sets ? "Done" : `${done} of ${line.sets}`}
                                 </Tag>
                               </button>
                             </li>
@@ -640,46 +749,48 @@ export function SetLogger({
                       </div>
                     ))}
                   </div>
-                  <h2 className="mt-5 text-sm font-semibold text-ink">
-                    Something else
-                  </h2>
-                  <p className="mt-1 text-xs text-ink-faint">
-                    An exercise the plan does not name is logged as extra work.
+                  <h2 className="eyebrow mt-6">Something else</h2>
+                  <p className="mt-1 text-sm text-ink-faint">
+                    An exercise the plan does not name goes in as extra work.
                   </p>
                 </>
               ) : (
-                <h2 className="text-sm font-semibold text-ink">Exercise</h2>
+                <h2 className="font-display text-xl font-bold text-ink">
+                  Pick an exercise
+                </h2>
               )}
               <Input
+                type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Find an exercise"
                 autoComplete="off"
+                enterKeyHint="search"
                 className="mt-3"
                 aria-label="Find an exercise"
               />
-              <ul className="mt-2 space-y-1.5">
+              <ul className="mt-1">
                 {matches.map((row) => (
-                  <li key={row.id}>
+                  <li key={row.id} className="border-t border-line first:border-t-0">
                     <button
                       type="button"
                       onClick={() => pickExercise(row.id)}
-                      className="flex min-h-11 w-full items-center justify-between gap-3 rounded-field border border-line-strong bg-surface-sunken px-3 py-2 text-left text-sm text-ink transition hover:border-ink-faint"
+                      className="press -mx-2 flex min-h-12 w-[calc(100%+1rem)] items-center justify-between gap-3 rounded-field px-2 py-2 text-left text-ink hover:bg-surface-raised/60"
                     >
                       <span>{row.name}</span>
                       <span className="flex shrink-0 items-center gap-1.5">
                         {byExercise.has(row.id) ? (
-                          <Tag tone="accent">
-                            {byExercise.get(row.id)!.length}
+                          <Tag tone="good">
+                            {byExercise.get(row.id)!.length} logged
                           </Tag>
                         ) : null}
-                        {row.highImpact ? <Tag tone="warn">impact</Tag> : null}
+                        {row.highImpact ? <Tag tone="warn">Impact</Tag> : null}
                       </span>
                     </button>
                   </li>
                 ))}
                 {matches.length === 0 && query.trim() ? (
-                  <li className="px-1 py-2 text-sm text-ink-faint">
+                  <li className="py-3 text-sm text-ink-faint">
                     Nothing matches. The directory is a closed set: add it in the
                     library first so it carries its attributes.
                   </li>
@@ -691,10 +802,10 @@ export function SetLogger({
       ) : null}
 
       <Card>
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-sm font-semibold text-ink">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="eyebrow">
             Logged
-            <span className="tnum ml-2 text-xs font-normal text-ink-faint">
+            <span className="tnum ml-2 text-ink-muted">
               {entries.length} {entries.length === 1 ? "set" : "sets"}
               {contacts
                 ? ` · ${contacts} ${contacts === 1 ? "contact" : "contacts"}`
@@ -708,8 +819,8 @@ export function SetLogger({
 
         {entries.length === 0 ? (
           <p className="mt-3 text-sm text-ink-faint">
-            Nothing yet. Sets are saved on this device first, so they survive a dead
-            spot in the gym and send themselves when signal returns.
+            Nothing yet. Sets save to this phone first, so a dead spot in the gym
+            loses nothing: they send themselves when signal returns.
           </p>
         ) : (
           <div className="mt-3 space-y-4">
@@ -717,45 +828,47 @@ export function SetLogger({
               const row = exercises.find((e) => e.id === id);
               return (
                 <div key={id}>
-                  <p className="text-xs font-medium text-ink-muted">
-                    {row?.name ?? `Exercise ${id}`}
-                  </p>
-                  <ul className="mt-1.5 divide-y divide-line/60">
+                  <p className="font-medium text-ink">{row?.name ?? `Exercise ${id}`}</p>
+                  <ul className="mt-1">
                     {list.map((entry) => (
                       <li
                         key={entry.key}
-                        className="flex items-center justify-between gap-3 py-2"
+                        className={`flex min-h-11 items-center justify-between gap-3 border-t border-line first:border-t-0 ${
+                          entry.pending ? "opacity-70" : ""
+                        }`}
                       >
-                        <span className="tnum text-sm text-ink">
-                          <span className="mr-2 text-xs text-ink-faint">
+                        <span className="flex min-w-0 items-baseline gap-3">
+                          <span className="numeral w-4 shrink-0 text-right text-ink-faint">
                             {entry.setIndex}
                           </span>
-                          {entry.reps !== null ? `${entry.reps} reps` : null}
-                          {entry.holdSeconds !== null
-                            ? `${entry.holdSeconds}s hold`
-                            : null}
-                          {entry.loadKg !== null
-                            ? ` · ${round1(toDisplay(entry.loadKg, "mass", unitSystem))} ${massUnit}`
-                            : null}
-                          {entry.boxHeightCm !== null
-                            ? ` · from ${round1(toDisplay(entry.boxHeightCm, "length", unitSystem))} ${lengthUnit}`
-                            : null}
-                          {entry.rpe !== null ? ` · RPE ${entry.rpe}` : null}
-                          {entry.qualityRating !== null
-                            ? ` · Q${entry.qualityRating}`
-                            : null}
+                          <span className="tnum text-sm text-ink">
+                            {entry.reps !== null ? `${entry.reps} reps` : null}
+                            {entry.holdSeconds !== null
+                              ? `${entry.holdSeconds}s hold`
+                              : null}
+                            {entry.loadKg !== null
+                              ? ` · ${round1(toDisplay(entry.loadKg, "mass", unitSystem))} ${massUnit}`
+                              : null}
+                            {entry.boxHeightCm !== null
+                              ? ` · from ${round1(toDisplay(entry.boxHeightCm, "length", unitSystem))} ${lengthUnit}`
+                              : null}
+                            {entry.rpe !== null ? ` · RPE ${entry.rpe}` : null}
+                            {entry.qualityRating !== null
+                              ? ` · Q${entry.qualityRating}`
+                              : null}
+                          </span>
                         </span>
-                        <span className="flex shrink-0 items-center gap-2">
+                        <span className="flex shrink-0 items-center gap-1.5">
                           {plan.length && entry.prescribedSetId === null ? (
-                            <Tag tone="cool">extra</Tag>
+                            <Tag tone="cool">Extra</Tag>
                           ) : null}
-                          {entry.pending ? <Tag>unsent</Tag> : null}
+                          {entry.pending ? <Tag>Unsent</Tag> : null}
                           <button
                             type="button"
                             onClick={() => removeEntry(entry)}
                             disabled={busy}
                             aria-label={`Remove set ${entry.setIndex}`}
-                            className="-my-1 flex size-11 items-center justify-center rounded-field text-ink-faint transition hover:text-bad disabled:opacity-40"
+                            className="press -my-1 -mr-2.5 flex size-11 items-center justify-center rounded-field text-ink-faint hover:text-bad disabled:opacity-40"
                           >
                             <svg
                               viewBox="0 0 24 24"
@@ -782,10 +895,10 @@ export function SetLogger({
 
       {!finished ? (
         <Card className="space-y-4">
-          <h2 className="text-sm font-semibold text-ink">Finish</h2>
+          <h2 className="eyebrow">Finish</h2>
           <Field
             label="Session RPE"
-            hint="How hard the whole session was, 1 to 10. Prescribed minus actual is what the generator calibrates against."
+            hint="How hard the whole session was, 1 to 10. Prescribed against actual is what the next week is calibrated on."
           >
             <Select
               value={sessionRpe}
@@ -799,7 +912,7 @@ export function SetLogger({
               ))}
             </Select>
           </Field>
-          <Field label="Notes" hint="Read by the reflection job after the session.">
+          <Field label="Notes" hint="Anything worth remembering. Read after the session to shape the next one.">
             <Textarea
               rows={3}
               value={sessionNotes}
@@ -807,7 +920,7 @@ export function SetLogger({
             />
           </Field>
           {queued.length ? (
-            <p className="text-xs text-warn">
+            <p className="text-sm text-warn">
               {queued.length} {queued.length === 1 ? "set is" : "sets are"} still on
               this device.{" "}
               {queued.length === 1 ? "It sends itself" : "They send themselves"} when
@@ -817,6 +930,7 @@ export function SetLogger({
           ) : null}
           <Button
             type="button"
+            variant="secondary"
             onClick={finish}
             disabled={busy || queued.length > 0}
             className="w-full sm:w-auto"

@@ -22,7 +22,7 @@ export default function AppLayout({
             the top of the viewport while a long screen scrolls under it. */}
         <ConnectionBanner />
         {/* Capped measure: prose and set rows both get unreadable at 1000px. */}
-        <div className="mx-auto w-full max-w-3xl">{children}</div>
+        <div className="page mx-auto w-full max-w-3xl">{children}</div>
       </main>
       <Nav />
     </div>

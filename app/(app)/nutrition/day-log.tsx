@@ -35,7 +35,7 @@ export function DayLog({
       {meals.map((group) => (
         <Card key={group.meal}>
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <h3 className="text-base font-semibold text-ink">
+            <h3 className="font-display text-xl leading-tight font-bold text-ink">
               {mealSlotLabels.of(group.meal)}
             </h3>
             <p className="tnum text-xs text-ink-faint">
@@ -68,11 +68,11 @@ export function DayLog({
                   </div>
                 ) : null}
 
-                <ul className="mt-1.5 space-y-1.5">
+                <ul className="mt-1">
                   {sentence.items.map((item) => (
                     <li
                       key={item.id}
-                      className="rounded-field border border-line bg-surface-sunken px-3 py-2.5"
+                      className="border-t border-line py-2.5 first:border-t-0"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -108,9 +108,9 @@ export function DayLog({
                             ))}
                           </p>
                         </div>
-                        <p className="tnum shrink-0 text-sm font-medium text-ink">
+                        <p className="numeral shrink-0 text-lg leading-6 text-ink">
                           {item.macros.kcal}
-                          <span className="ml-1 text-xs font-normal text-ink-faint">
+                          <span className="ml-1 font-sans text-xs font-normal text-ink-faint">
                             kcal
                           </span>
                         </p>

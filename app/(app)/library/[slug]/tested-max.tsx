@@ -38,11 +38,11 @@ export function TestedMax({
   }
 
   return (
-    <Card className="mb-4">
-      <h2 className="text-sm font-medium text-ink-muted">One-rep max</h2>
+    <Card className="mb-5">
+      <h2 className="eyebrow">One-rep max</h2>
       {current ? (
-        <p className="mt-1 text-sm text-ink-faint">
-          <span className="tnum text-xl font-semibold text-ink">
+        <p className="mt-1.5 text-sm text-ink-faint">
+          <span className="numeral text-2xl text-ink">
             {formatMeasurement(current.kg, "tested_1rm", unitSystem)}
           </span>{" "}
           {current.source === "tested" ? "tested" : "estimated from a heavy set"},{" "}

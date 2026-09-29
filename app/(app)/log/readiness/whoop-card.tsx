@@ -22,7 +22,7 @@ export async function WhoopCard({
   if (!whoopConfigured()) {
     return (
       <Card className="mb-4">
-        <h2 className="text-sm font-semibold text-ink">WHOOP</h2>
+        <h2 className="font-display text-xl leading-tight font-bold text-ink">WHOOP</h2>
         <p className="mt-1.5 text-xs text-ink-faint">
           Not configured. Set <code className="text-ink-muted">WHOOP_CLIENT_ID</code>{" "}
           and <code className="text-ink-muted">WHOOP_CLIENT_SECRET</code>, with the
@@ -40,12 +40,12 @@ export async function WhoopCard({
   return (
     <Card className="mb-4">
       <div className="flex items-start justify-between gap-2">
-        <h2 className="text-sm font-semibold text-ink">WHOOP</h2>
+        <h2 className="font-display text-xl leading-tight font-bold text-ink">WHOOP</h2>
         {connection ? (
           stale ? (
             <Tag tone="bad">reconnect</Tag>
           ) : (
-            <Tag tone="accent">connected</Tag>
+            <Tag tone="good">connected</Tag>
           )
         ) : (
           <Tag tone="cool">not connected</Tag>

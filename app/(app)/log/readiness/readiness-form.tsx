@@ -63,7 +63,7 @@ export function ReadinessForm({ prefill }: { prefill: ReadinessPrefill }) {
     <form onSubmit={submit} className="space-y-4 pb-4">
       <Card className="space-y-1">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-ink">Soreness</h2>
+          <h2 className="font-display text-xl leading-tight font-bold text-ink">Soreness</h2>
           <button
             type="button"
             onClick={() => {
@@ -72,7 +72,7 @@ export function ReadinessForm({ prefill }: { prefill: ReadinessPrefill }) {
               );
               setOpenGroup(null);
             }}
-            className="-my-2 inline-flex min-h-11 items-center text-xs font-medium text-accent hover:underline"
+            className="press -my-2 inline-flex min-h-11 items-center text-sm font-medium text-accent underline-offset-4 hover:underline"
           >
             None anywhere
           </button>
@@ -86,7 +86,7 @@ export function ReadinessForm({ prefill }: { prefill: ReadinessPrefill }) {
                 type="button"
                 aria-expanded={open}
                 onClick={() => setOpenGroup(open ? null : group)}
-                className={`flex h-11 w-full items-center justify-between gap-3 rounded-field px-3 text-left text-sm transition ${
+                className={`flex h-11 w-full items-center justify-between gap-3 rounded-field px-3 text-left text-sm press ${
                   open ? "bg-surface-sunken" : "hover:bg-surface-sunken/60"
                 }`}
               >

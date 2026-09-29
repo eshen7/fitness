@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { PlannedSet } from "@/lib/engine/types";
-import { describePrescription, liftsNeedingMax, prescriptionMaxes } from "./prescription";
+import {
+  describePrescription,
+  liftsNeedingMax,
+  prescriptionLoad,
+  prescriptionMaxes,
+  prescriptionVolume,
+} from "./prescription";
 
 const base: PlannedSet = {
   exerciseId: 1,
@@ -72,5 +78,23 @@ describe("prescriptionMaxes and liftsNeedingMax", () => {
       liftsNeedingMax([line(3), line(2), line(1), line(2), { exerciseId: 2, loadPctOf1rm: null }], maxes),
     ).toEqual([2]);
     expect(liftsNeedingMax([line(3)], maxes)).toEqual([]);
+  });
+});
+
+describe("prescriptionVolume and prescriptionLoad", () => {
+  it("are the two halves of the one-line reading", () => {
+    const item = { ...base, loadKg: 100, boxHeightCm: 45 };
+    expect(prescriptionVolume(item)).toBe("3 x 6");
+    expect(prescriptionLoad(item)).toBe("100 kg, 45 cm box, RPE 7");
+  });
+
+  it("reads a hold in seconds and a bare set count as sets", () => {
+    expect(prescriptionVolume({ ...base, reps: null, holdSeconds: 45 })).toBe("3 x 45s");
+    expect(prescriptionVolume({ ...base, reps: null })).toBe("3 sets");
+  });
+
+  it("has no load half for volume alone", () => {
+    expect(prescriptionLoad({ ...base, targetRpe: null })).toBeNull();
+    expect(describePrescription({ ...base, targetRpe: null })).toBe("3 x 6");
   });
 });

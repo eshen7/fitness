@@ -1,42 +1,54 @@
 @import "tailwindcss";
 
 /*
-  Gentle dark, WHOOP-adjacent: soft near-black surfaces, one restrained mint
-  accent, low-saturation status colours, no pure white and no pure black.
-  Carried over from the approved plan artifact so the app and the plan look like
-  the same product.
+  The training card: warm graphite surfaces, chalk-white ink, and one
+  high-visibility volt accent spent only on the thing you act on next. The look
+  borrows from a track meet rather than from a dashboard kit - a condensed
+  scoreboard face for the numbers and titles, a plain grotesque for everything
+  read, flat panels instead of outlined boxes, and labels set like the printing
+  on a bib. No pure white and no pure black.
 */
 @theme {
-  --color-surface: oklch(21.5% 0.008 255);
-  --color-surface-raised: oklch(26% 0.01 255);
-  --color-surface-sunken: oklch(16.5% 0.008 255);
-  --color-ink: oklch(92% 0.006 255);
-  --color-ink-muted: oklch(72% 0.008 255);
+  /*
+    Neutrals carry a trace of warmth (hue 75) rather than the blue-slate tint
+    every generated dark theme ships with. Lightness steps are wide enough that a
+    panel separates from the page on its fill alone, which is what lets panels
+    drop the outline.
+  */
+  --color-surface: oklch(20.5% 0.005 75);
+  --color-surface-raised: oklch(25% 0.006 75);
+  --color-surface-sunken: oklch(16.5% 0.004 75);
+  --color-ink: oklch(94% 0.008 85);
+  --color-ink-muted: oklch(76% 0.008 80);
   /*
     `ink-faint` carries most of the app's small print - units, hints, chart axes -
-    so it is held to 4.5:1 rather than to the 3:1 that large text would allow. At
-    the 56% it started from it measured 3.34:1 on `surface-raised`, which reads
-    fine on a desk and disappears on a phone held at arm's length under gym
-    lighting. 64% is 4.62:1 on the worst of the three surfaces.
+    so it is held to 4.5:1 rather than to the 3:1 that large text would allow: a
+    phone at arm's length under gym lighting is the reading condition. 65% is
+    4.95:1 on `surface-raised`, the worst of the three surfaces.
   */
-  --color-ink-faint: oklch(64% 0.008 255);
+  --color-ink-faint: oklch(65% 0.008 80);
 
   /*
     Two line weights, because the contrast a border needs depends on what it is
     doing. `line` divides and groups: it may stay a hairline, since losing it
     costs nothing but a seam. `line-strong` is the boundary of something you
     operate - a field, a toggle, a secondary button - which WCAG 1.4.11 holds to
-    3:1 because not seeing it means not knowing the control is there. 54% is
-    3.07:1 on `surface-raised`, the worst case; the old single 34% token was
-    1.32:1 and effectively invisible on every surface.
+    3:1 because not seeing it means not knowing the control is there. 55% is
+    3.30:1 on `surface-raised`, the worst case.
   */
-  --color-line: oklch(40% 0.008 255);
-  --color-line-strong: oklch(54% 0.008 255);
+  --color-line: oklch(32.5% 0.006 75);
+  --color-line-strong: oklch(55% 0.007 75);
 
-  --color-accent: oklch(80% 0.128 168);
-  --color-accent-ink: oklch(22% 0.045 168);
-  --color-cool: oklch(74% 0.075 232);
-  --color-good: oklch(80% 0.125 162);
+  /*
+    Volt: the colour of track spikes and lane markers. It is loud on purpose and
+    rationed for that reason - the primary action, the current set, the active
+    tab and focus. Anything merely "on" or "done" uses `good` instead, so the
+    accent keeps meaning "this is where you act".
+  */
+  --color-accent: oklch(89% 0.165 118);
+  --color-accent-ink: oklch(20% 0.04 118);
+  --color-cool: oklch(76% 0.075 232);
+  --color-good: oklch(79% 0.13 155);
   --color-warn: oklch(84% 0.1 82);
   --color-bad: oklch(72% 0.13 22);
 
@@ -46,10 +58,10 @@
     belongs to the thing you tap. These four are stepped into the dark palette's
     lightness band rather than matching the interface hues, which sit too light to
     stay separable as a set, and the order is the colourblind-safety mechanism.
-    Validated as a set against `--color-surface` on the adjacent pairlist: worst
-    adjacent CVD dE 17.1, normal-vision dE 19.2, all four over 3:1 contrast. Both
-    a legend and direct labels ship with every chart, so identity never rests on
-    hue alone.
+    Validated as a set on the adjacent pairlist: worst adjacent CVD dE 17.1,
+    normal-vision dE 19.2, all four over 3:1 contrast on every surface. Both a
+    legend and direct labels ship with every chart, so identity never rests on hue
+    alone.
   */
   --color-series-1: oklch(62% 0.115 168);
   --color-series-2: oklch(55% 0.145 255);
@@ -63,15 +75,52 @@
     colour of a label, and a wall of bars painted in it outshouts every data line
     on the page.
   */
-  --color-series-neutral: oklch(52% 0.006 255);
+  --color-series-neutral: oklch(53% 0.006 75);
 
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+  /*
+    Barlow for reading and Barlow Condensed for display. One superfamily, so the
+    two faces share proportions and never look pasted together; the condensed cut
+    is a scoreboard face, which is what a set count, a jump height and a page title
+    all want to look like. Both have true tabular figures.
+  */
+  --font-sans: var(--font-barlow), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", sans-serif;
-  --font-display: var(--font-inter-tight), var(--font-inter), ui-sans-serif,
+  --font-display: var(--font-barlow-condensed), var(--font-barlow), ui-sans-serif,
     system-ui, sans-serif;
 
-  --radius-field: 0.625rem;
-  --radius-box: 1rem;
+  /*
+    The type scale, stepped rather than left at the framework defaults. Barlow has
+    a smaller x-height than the usual UI grotesque, so the small sizes sit a pixel
+    up: 13px is the floor for anything read, 15px the body of a panel.
+  */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.375rem;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.25rem;
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.5rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 2rem;
+  --text-2xl--line-height: 2.125rem;
+  --text-3xl: 2.75rem;
+  --text-3xl--line-height: 2.75rem;
+
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
+
+  /* One curve for every state change: quick out of the gate, soft landing. */
+  --ease-out-quick: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+
+  @keyframes shimmer {
+    50% {
+      opacity: 0.45;
+    }
+  }
 }
 
 /*
@@ -86,25 +135,33 @@
   html {
     color-scheme: dark;
     background-color: var(--color-surface-sunken);
-    /* Keep the safe-area inset available to sticky gym-mode controls. */
     -webkit-tap-highlight-color: transparent;
+    /* The scrollbar appearing on a long screen must not shift the layout sideways. */
+    scrollbar-gutter: stable;
   }
 
   body {
     background-color: var(--color-surface-sunken);
     color: var(--color-ink);
     font-family: var(--font-sans);
-    font-feature-settings: "cv11", "ss01";
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
     -webkit-font-smoothing: antialiased;
     overscroll-behavior-y: none;
+    /* No 300ms wait for a double-tap zoom that is disabled anyway. */
+    touch-action: manipulation;
   }
 
   h1,
   h2,
   h3,
   h4 {
+    text-wrap: balance;
+  }
+
+  h1 {
     font-family: var(--font-display);
-    letter-spacing: -0.018em;
+    letter-spacing: -0.005em;
   }
 
   /*
@@ -124,7 +181,8 @@
   }
 
   :where(p, li, td) {
-    line-height: 1.6;
+    line-height: 1.55;
+    text-wrap: pretty;
   }
 
   :where(.grid, .flex) > * {
@@ -141,9 +199,22 @@
     height: auto;
   }
 
+  :where(a, button, summary, [role="button"]) {
+    cursor: pointer;
+  }
+
+  :where(button:disabled) {
+    cursor: default;
+  }
+
   *:focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklch, var(--color-accent) 35%, transparent);
+    color: var(--color-ink);
   }
 }
 
@@ -152,5 +223,87 @@
   .tnum {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+  }
+
+  /*
+    A scoreboard figure: the display face with tabular digits. For the numbers a
+    screen exists to show - a prescription, a jump height, a day's calories - and
+    never for a sentence, since it carries `tnum`'s nowrap.
+  */
+  .numeral {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    letter-spacing: 0.005em;
+    white-space: nowrap;
+  }
+
+  /*
+    The small label above a group, set like the printing on a race bib: condensed,
+    capitals, tracked out. Replaces the thin tracked-out 12px capitals that every
+    template uses for "section label", which at this size go grey and fuzzy.
+  */
+  .eyebrow {
+    font-family: var(--font-display);
+    font-size: 0.8125rem;
+    line-height: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-ink-faint);
+  }
+
+  /*
+    Tap feedback that lands on the frame the finger does. Colour changes alone
+    arrive a frame late on a busy screen and read as lag; a 2% press does not.
+    Motion-safe, because a press that moves is still motion.
+  */
+  .press {
+    transition-property: color, background-color, border-color, opacity, filter,
+      transform;
+    transition-duration: 150ms;
+    transition-timing-function: var(--ease-out-quick);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .press:active:not(:disabled) {
+      transform: scale(0.97);
+      transition-duration: 60ms;
+    }
+  }
+
+  /* A placeholder block for a screen still on its way from the server. */
+  .skeleton {
+    border-radius: var(--radius-field);
+    background-color: var(--color-surface-raised);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .skeleton {
+      animation: var(--animate-shimmer);
+    }
+  }
+}
+
+/*
+  A new screen settles in rather than cutting. Every top-level block of a page
+  fades up four pixels as it is inserted - on first paint, when a loading
+  skeleton is swapped for the real content, and when a block appears after an
+  action - through `@starting-style`, so no page has to opt in and none can
+  forget to. Short, because it plays on every navigation and anything longer
+  starts to feel like waiting; off entirely under reduced motion.
+*/
+@layer components {
+  @media (prefers-reduced-motion: no-preference) {
+    .page > * {
+      transition:
+        opacity 200ms var(--ease-out-quick),
+        translate 200ms var(--ease-out-quick);
+
+      @starting-style {
+        opacity: 0;
+        translate: 0 4px;
+      }
+    }
   }
 }

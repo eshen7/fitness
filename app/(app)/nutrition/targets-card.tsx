@@ -1,4 +1,4 @@
-import { Card, Tag } from "@/components/ui";
+import { Card, Notice, Tag } from "@/components/ui";
 import { formatDay } from "@/lib/days";
 import { energyDirectionLabels, mesocycleTypeLabels } from "@/lib/labels";
 import {
@@ -41,7 +41,7 @@ export function TargetsCard({
   return (
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <h2 className="text-base font-semibold text-ink">Daily targets</h2>
+        <h2 className="font-display text-xl leading-tight font-bold text-ink">Daily targets</h2>
         <div className="flex flex-wrap items-center gap-1.5">
           <Tag tone={blockType ? "accent" : "neutral"}>
             {blockType ? mesocycleTypeLabels.of(blockType) : "No block open"}
@@ -56,7 +56,7 @@ export function TargetsCard({
 
       {target ? (
         <>
-          <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Stat label="Calories" value={`${target.kcal}`} unit="kcal" />
             <Stat label="Protein" value={`${target.proteinG}`} unit="g" />
             <Stat label="Carbs" value={`${target.carbsG}`} unit="g" />
@@ -88,14 +88,16 @@ export function TargetsCard({
       )}
 
       {proposal === null ? (
-        <p className="mt-4 rounded-field border border-line bg-surface-sunken px-3 py-2.5 text-sm text-ink-muted">
-          Every target is per kilogram of bodyweight, so these follow a weigh-in. Log
-          a morning weight and they can be set.
-        </p>
+        <Notice className="mt-4">
+          <p>
+            Every target is per kilogram of bodyweight, so these follow a weigh-in. Log
+            a morning weight and they can be set.
+          </p>
+        </Notice>
       ) : (
         <div className="mt-4 border-t border-line pt-4">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <p className="text-xs font-medium tracking-wide text-ink-faint uppercase">
+            <p className="eyebrow">
               What the rules say now
             </p>
             <p className="tnum text-xs text-ink-muted">
@@ -157,11 +159,11 @@ function Stat({
   unit: string;
 }) {
   return (
-    <div className="rounded-field border border-line bg-surface-sunken px-3 py-2">
-      <dt className="text-xs text-ink-faint">{label}</dt>
-      <dd className="tnum mt-0.5 text-lg leading-none font-semibold text-ink">
+    <div className="rounded-field bg-surface-sunken px-3 py-2.5">
+      <dt className="eyebrow">{label}</dt>
+      <dd className="numeral mt-1.5 text-2xl leading-none text-ink">
         {value}
-        <span className="ml-1 text-xs font-normal text-ink-faint">{unit}</span>
+        <span className="ml-1 font-sans text-xs font-normal text-ink-faint">{unit}</span>
       </dd>
     </div>
   );

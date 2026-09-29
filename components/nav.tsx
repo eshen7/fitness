@@ -103,13 +103,17 @@ export function Nav() {
   return (
     <nav
       aria-label="Sections"
-      className="sticky bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur md:sticky md:top-0 md:h-dvh md:w-52 md:shrink-0 md:border-t-0 md:border-r md:bg-surface"
+      className="sticky bottom-0 z-20 border-t border-line bg-surface-sunken/92 backdrop-blur-md md:sticky md:top-0 md:h-dvh md:w-56 md:shrink-0 md:border-t-0 md:border-r md:bg-surface-sunken md:backdrop-blur-none"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="hidden px-4 pt-6 pb-2 md:block">
-        <span className="font-display text-lg font-semibold text-ink">Training</span>
+      {/* The wordmark: a lane line and the word, nothing more. */}
+      <div className="hidden items-center gap-2.5 px-5 pt-7 pb-6 md:flex">
+        <span aria-hidden="true" className="h-4 w-1 -skew-x-12 rounded-[1px] bg-accent" />
+        <span className="font-display text-xl leading-none font-bold tracking-[0.06em] text-ink uppercase">
+          Training
+        </span>
       </div>
-      <ul className="flex md:flex-col md:gap-1 md:px-2">
+      <ul className="flex md:flex-col md:gap-0.5 md:px-3">
         {ITEMS.map((item) => {
           const active =
             pathname === item.href || pathname.startsWith(item.href + "/");
@@ -119,21 +123,23 @@ export function Nav() {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 // 56px minimum: gym-usable target with cold or taped hands.
-                className={`relative flex h-14 flex-col items-center justify-center gap-1 rounded-field transition-colors md:h-11 md:flex-row md:justify-start md:gap-3 md:px-3 ${
+                className={`press relative flex h-14 flex-col items-center justify-center gap-1 rounded-field md:h-11 md:flex-row md:justify-start md:gap-3 md:px-3 ${
                   active
-                    ? "text-accent md:bg-surface-raised"
-                    : "text-ink-faint hover:text-ink-muted"
+                    ? "text-ink md:bg-surface"
+                    : "text-ink-faint hover:text-ink-muted md:hover:bg-surface/60"
                 }`}
               >
-                {/* Mobile-only: colour alone is a weak active signal on a dark bar. */}
+                {/* Colour alone is a weak active signal on a dark bar, so the
+                    current section also carries a volt mark: a top rule on the
+                    phone, a left one on the sidebar. */}
                 <span
                   aria-hidden="true"
-                  className={`absolute top-0 h-0.5 w-7 rounded-full bg-accent transition-opacity md:hidden ${
+                  className={`absolute top-0 h-0.5 w-8 rounded-full bg-accent transition-opacity duration-150 md:top-1/2 md:left-0 md:h-5 md:w-0.5 md:-translate-y-1/2 ${
                     active ? "opacity-100" : "opacity-0"
                   }`}
                 />
-                {item.icon("size-5 shrink-0")}
-                <span className="text-[11px] leading-none font-medium md:text-sm">
+                {item.icon(`size-5.5 shrink-0 md:size-5 ${active ? "text-accent" : ""}`)}
+                <span className="font-display text-[0.8125rem] leading-none font-semibold tracking-[0.05em] uppercase md:font-sans md:text-sm md:font-medium md:tracking-normal md:normal-case">
                   {item.label}
                 </span>
               </Link>

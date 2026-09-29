@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
 import { loadDirectory, loadProfile } from "@/lib/ai/queries";
 import { getUnitSystem } from "@/lib/log/queries";
 import { ProfileForm } from "./profile-form";
@@ -22,19 +22,11 @@ export default async function ProfilePage() {
 
   return (
     <>
-      {/* The memory screen's header: reached from Plan, so the way back is above the title. */}
-      <header className="mb-6">
-        <Link
-          href="/plan"
-          className="-my-2 inline-flex min-h-11 items-center text-sm text-ink-faint hover:text-ink-muted"
-        >
-          ← Plan
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-ink">Profile</h1>
-        <p className="mt-1 text-sm text-ink-faint">
-          What the planner builds around: your gym, your week, and you.
-        </p>
-      </header>
+      <PageHeader
+        title="Profile"
+        back={{ href: "/plan", label: "Plan" }}
+        subtitle="What the planner builds around: your gym, your week, and you."
+      />
 
       <ProfileForm
         profile={profile}

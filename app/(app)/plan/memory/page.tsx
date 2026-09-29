@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
 import { Card, EmptyState, Tag } from "@/components/ui";
 import { storedInsights } from "@/lib/analytics/persist";
 import { dayOf, formatDay } from "@/lib/time";
@@ -32,29 +32,19 @@ export default async function MemoryPage() {
 
   return (
     <>
-      {/*
-        Its own header rather than `PageHeader`, matching the library detail page:
-        `PageHeader` puts its children beside the title and wraps them underneath the
-        subtitle at phone widths, where a back link left-aligned under a paragraph
-        reads as one more line of prose. Above the title it reads as the way out.
-      */}
-      <header className="mb-6">
-        <Link href="/plan" className="-my-2 inline-flex min-h-11 items-center text-sm text-ink-faint hover:text-ink-muted">
-          ← Plan
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-ink">Memory</h1>
-        <p className="mt-1 text-sm text-ink-faint">
-          What the app has learned, and what the numbers support saying.
-        </p>
-      </header>
+      <PageHeader
+        title="Memory"
+        back={{ href: "/plan", label: "Plan" }}
+        subtitle="What the app has learned about you, and what your numbers actually support saying."
+      />
 
       <div className="space-y-6">
         {feed.pending.length > 0 ? (
           <section>
-            <h2 className="mb-1 text-base font-semibold text-ink">
+            <h2 className="mb-1 font-display text-xl leading-tight font-bold text-ink">
               Waiting on you
             </h2>
-            <p className="mb-2.5 text-sm text-ink-faint">
+            <p className="mb-3 max-w-prose text-sm text-ink-muted">
               Two kinds of fact are never acted on unasked: anything that changes how a
               tendon is handled, and anything that would stop an exercise being
               prescribed at all. Each of these is written down and doing nothing until
@@ -71,7 +61,7 @@ export default async function MemoryPage() {
         ) : null}
 
         <section>
-          <h2 className="mb-2.5 text-base font-semibold text-ink">
+          <h2 className="mb-2.5 font-display text-xl leading-tight font-bold text-ink">
             What it remembers
           </h2>
           {pausedTypes.length > 0 ? (
@@ -99,8 +89,8 @@ export default async function MemoryPage() {
         </section>
 
         <section>
-          <h2 className="mb-1 text-base font-semibold text-ink">Tell it something</h2>
-          <p className="mb-2.5 text-sm text-ink-faint">
+          <h2 className="mb-1 font-display text-xl leading-tight font-bold text-ink">Tell it something</h2>
+          <p className="mb-3 max-w-prose text-sm text-ink-muted">
             Anything you say here outranks anything it works out for itself, and an
             inference that contradicts it is dropped rather than stored.
           </p>
@@ -111,7 +101,7 @@ export default async function MemoryPage() {
 
         <section>
           <RecomputeInsights>
-            <h2 className="text-base font-semibold text-ink">
+            <h2 className="font-display text-xl leading-tight font-bold text-ink">
               What the numbers support
             </h2>
           </RecomputeInsights>
@@ -120,10 +110,10 @@ export default async function MemoryPage() {
 
         {feed.past.length > 0 ? (
           <section>
-            <h2 className="mb-1 text-base font-semibold text-ink">
+            <h2 className="mb-1 font-display text-xl leading-tight font-bold text-ink">
               Corrected and deleted
             </h2>
-            <p className="mb-2.5 text-sm text-ink-faint">
+            <p className="mb-3 max-w-prose text-sm text-ink-muted">
               Kept on purpose. A store that only ever showed its current facts would
               look infallible.
             </p>
@@ -131,7 +121,7 @@ export default async function MemoryPage() {
               {feed.past.map((fact) => (
                 <li
                   key={fact.id}
-                  className="rounded-field border border-line bg-surface/40 px-3 py-2"
+                  className="border-l-2 border-line py-0.5 pl-4"
                 >
                   <p className="text-sm text-ink-faint line-through decoration-ink-faint/40">
                     {fact.body}

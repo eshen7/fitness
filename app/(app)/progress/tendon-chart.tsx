@@ -94,7 +94,7 @@ export function TendonChart({ weeks }: { weeks: TendonWeek[] }) {
         </p>
       ) : (
         <>
-          <p className="mb-1.5 text-[11px] font-medium text-ink-muted">
+          <p className="eyebrow mb-2">
             Worst pain in the week, 0 to 10
           </p>
           <Plot
@@ -154,7 +154,7 @@ export function TendonChart({ weeks }: { weeks: TendonWeek[] }) {
             />
           </Plot>
 
-          <p className="mt-4 mb-1.5 text-[11px] font-medium text-ink-muted">
+          <p className="eyebrow mt-4 mb-2">
             High-impact contacts in the week
           </p>
           <Plot

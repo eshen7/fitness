@@ -19,24 +19,28 @@ export default async function LogTestPage() {
   return (
     <>
       <PageHeader
+        back={{ href: "/log", label: "Log" }}
         title="Test"
-        subtitle="Jumps, entered as every attempt in the sitting."
+        subtitle="Same warm-up, same surface, same time of day. A test only compares with one taken the same way."
       />
 
       <TestForm unitSystem={unitSystem} />
 
-      <h2 className="mt-8 mb-3 text-sm font-semibold text-ink">Recent sittings</h2>
+      <h2 className="eyebrow mt-9 mb-2">Recent sittings</h2>
       {tests.length === 0 ? (
-        <EmptyState title="No tests logged yet.">
+        <EmptyState title="No tests logged yet">
           A standing vertical is the reference every other jump number is read
-          against, and depth jump calibration starts from it, so it is the one worth
-          logging first.
+          against, and depth jump calibration starts from it, so it is the one
+          worth logging first.
         </EmptyState>
       ) : (
-        <ul className="space-y-2">
-          {tests.map((test) => (
-            <li key={test.testGroup}>
-              <Card className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
+        <Card className="py-1 sm:py-1">
+          <ul>
+            {tests.map((test) => (
+              <li
+                key={test.testGroup}
+                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line py-3 first:border-t-0"
+              >
                 <div>
                   <p className="text-sm font-medium text-ink">
                     {measurementKindLabels.of(test.kind)}
@@ -54,11 +58,13 @@ export default async function LogTestPage() {
                     </span>
                   </p>
                   {test.notes ? (
-                    <p className="mt-1.5 text-xs text-ink-muted">{test.notes}</p>
+                    <p className="mt-1.5 text-xs text-ink-muted">
+                      {test.notes}
+                    </p>
                   ) : null}
                 </div>
                 <p className="tnum text-right">
-                  <span className="font-display text-xl font-semibold text-ink">
+                  <span className="numeral text-2xl text-ink">
                     {show(test.best)}
                   </span>
                   <span className="ml-1 text-xs text-ink-faint">{unit}</span>
@@ -66,10 +72,10 @@ export default async function LogTestPage() {
                     mean {show(test.mean)}
                   </span>
                 </p>
-              </Card>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
     </>
   );

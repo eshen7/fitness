@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
-import { Card } from "@/components/ui";
+import { buttonClass, Card } from "@/components/ui";
 import { exportTables, REDACTIONS } from "@/lib/export/archive";
 import { exportCounts } from "@/lib/export/queries";
 import { today } from "@/lib/time";
@@ -28,20 +27,14 @@ export default async function ExportPage() {
     <>
       <PageHeader
         title="Export"
-        subtitle="Everything in the database, as a file you keep."
-      >
-        {/* Not in the nav, which stays at six items, so the way back has to be here. */}
-        <Link
-          href="/plan"
-          className="-my-2 inline-flex min-h-11 items-center text-sm text-ink-faint hover:text-ink-muted"
-        >
-          ← Plan
-        </Link>
-      </PageHeader>
+        // Not in the nav, which stays at six items, so the way back has to be here.
+        back={{ href: "/plan", label: "Plan" }}
+        subtitle="Every row the app holds, as a file you keep. It reads back without the app."
+      />
 
-      <div className="space-y-4">
+      <div className="space-y-5">
         <Card>
-          <h2 className="text-sm font-semibold text-ink">Full archive</h2>
+          <h2 className="font-display text-xl leading-tight font-bold text-ink">Full archive</h2>
           <p className="mt-2 text-sm text-ink-muted">
             One JSON file, one key per table, {tables.length} tables and{" "}
             <span className="tnum">{total.toLocaleString()}</span> rows. Keys are
@@ -54,7 +47,7 @@ export default async function ExportPage() {
           <a
             href="/api/export"
             download
-            className="mt-4 inline-flex h-14 items-center justify-center gap-2 rounded-field bg-accent px-5 text-base font-semibold text-accent-ink transition hover:brightness-105"
+            className={buttonClass("primary", "mt-4", "lg")}
           >
             Download JSON
             <span aria-hidden="true">↓</span>
@@ -65,12 +58,12 @@ export default async function ExportPage() {
         </Card>
 
         <Card>
-          <h2 className="text-sm font-semibold text-ink">One table as CSV</h2>
+          <h2 className="font-display text-xl leading-tight font-bold text-ink">One table as CSV</h2>
           <p className="mt-2 text-sm text-ink-muted">
             For a spreadsheet, where the nesting in the archive is in the way.
             Same columns, same names.
           </p>
-          <ul className="mt-4 divide-y divide-line/60">
+          <ul className="mt-3 divide-y divide-line">
             {tables.map((entry) => {
               const rows = counts[entry.name] ?? 0;
               return (
@@ -78,16 +71,16 @@ export default async function ExportPage() {
                   <a
                     href={`/api/export?table=${entry.name}`}
                     download
-                    className="flex min-h-14 items-center justify-between gap-3 rounded-field px-1 text-sm transition hover:text-accent"
+                    className="press group flex min-h-14 items-center justify-between gap-3 text-sm"
                   >
-                    <span className="min-w-0 truncate font-medium text-ink">
+                    <span className="min-w-0 truncate font-medium text-ink underline-offset-4 group-hover:underline">
                       {entry.name}
                     </span>
                     <span className="flex shrink-0 items-center gap-3">
                       <span className="tnum text-xs text-ink-faint">
                         {rows.toLocaleString()} {rows === 1 ? "row" : "rows"}
                       </span>
-                      <span aria-hidden="true" className="text-ink-faint">
+                      <span aria-hidden="true" className="text-ink-faint group-hover:text-ink">
                         ↓
                       </span>
                     </span>
@@ -99,7 +92,7 @@ export default async function ExportPage() {
         </Card>
 
         <Card>
-          <h2 className="text-sm font-semibold text-ink">What is held back</h2>
+          <h2 className="font-display text-xl leading-tight font-bold text-ink">What is held back</h2>
           <ul className="mt-2 space-y-1.5 text-sm text-ink-muted">
             {omitted.map((entry) => (
               <li key={`${entry.table}.${entry.column}`}>

@@ -1,7 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Card, Tag } from "@/components/ui";
+import { Card, QUIET_LINK, Tag } from "@/components/ui";
 import { getDb, schema } from "@/lib/db";
 import { updateExercise } from "@/lib/exercises/actions";
 import { getExerciseBySlug } from "@/lib/exercises/queries";
@@ -73,18 +73,22 @@ export default async function ExercisePage({ params }: { params: Params }) {
 
   return (
     <>
-      <header className="mb-6">
+      <header className="mb-7">
         <Link
           href="/library"
-          className="-my-2 inline-flex min-h-11 items-center text-sm text-ink-faint hover:text-ink-muted"
+          className={QUIET_LINK}
         >
-          ← Library
+          <span aria-hidden="true">←</span> Library
         </Link>
-        <div className="mt-2 flex items-start justify-between gap-4">
+        <div className="mt-3 flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-2xl font-semibold text-ink">{exercise.name}</h1>
-            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-faint">
-              <span>{muscleGroupLabels.of(exercise.primaryMuscleGroup)}</span>
+            <p className="eyebrow mb-1.5">
+              {muscleGroupLabels.of(exercise.primaryMuscleGroup)}
+            </p>
+            <h1 className="text-[2.25rem] leading-[0.95] font-bold text-ink uppercase sm:text-3xl">
+              {exercise.name}
+            </h1>
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 empty:hidden">
               {!exercise.isStock ? <Tag tone="cool">Custom</Tag> : null}
               {exercise.highImpact ? <Tag tone="warn">Impact</Tag> : null}
               {exercise.protocolPhase !== null ? (
@@ -93,7 +97,7 @@ export default async function ExercisePage({ params }: { params: Params }) {
               {exercise.forceVelocity === "shock" ? <Tag tone="bad">Shock</Tag> : null}
               {!exercise.available ? <Tag tone="bad">Unavailable</Tag> : null}
               {usage ? <Tag>Prescribed before</Tag> : null}
-            </p>
+            </div>
           </div>
           <AvailabilityToggle
             slug={exercise.slug}
@@ -108,12 +112,12 @@ export default async function ExercisePage({ params }: { params: Params }) {
       exercise.equipmentAnyOf.length > 0 ||
       easier ||
       harder ? (
-        <Card className="mb-4">
+        <Card className="mb-5">
           <dl className="grid gap-4 text-sm sm:grid-cols-2">
             {exercise.equipment.length > 0 ? (
               <div>
-                <dt className="text-xs text-ink-faint">Equipment</dt>
-                <dd className="mt-1 flex flex-wrap gap-1.5">
+                <dt className="eyebrow">Equipment</dt>
+                <dd className="mt-2 flex flex-wrap gap-1.5">
                   {exercise.equipment.map((item) => (
                     <Tag key={item}>{equipmentLabels.of(item)}</Tag>
                   ))}
@@ -123,10 +127,10 @@ export default async function ExercisePage({ params }: { params: Params }) {
 
             {exercise.equipmentAnyOf.length > 0 ? (
               <div>
-                <dt className="text-xs text-ink-faint">
+                <dt className="eyebrow">
                   {exercise.equipment.length > 0 ? "Plus one of" : "Any one of"}
                 </dt>
-                <dd className="mt-1 flex flex-wrap gap-1.5">
+                <dd className="mt-2 flex flex-wrap gap-1.5">
                   {exercise.equipmentAnyOf.map((item) => (
                     <Tag key={item}>{equipmentLabels.of(item)}</Tag>
                   ))}
@@ -136,14 +140,14 @@ export default async function ExercisePage({ params }: { params: Params }) {
 
             {easier || harder ? (
               <div>
-                <dt className="text-xs text-ink-faint">Progression chain</dt>
-                <dd className="mt-1 space-y-1">
+                <dt className="eyebrow">Progression chain</dt>
+                <dd className="mt-2 space-y-1">
                   {easier ? (
                     <p>
                       <span className="text-ink-faint">Regresses to </span>
                       <Link
                         href={`/library/${easier.slug}`}
-                        className="text-accent underline-offset-2 hover:underline"
+                        className="font-medium text-ink underline decoration-ink-faint underline-offset-3 hover:decoration-ink"
                       >
                         {easier.name}
                       </Link>
@@ -154,7 +158,7 @@ export default async function ExercisePage({ params }: { params: Params }) {
                       <span className="text-ink-faint">Progresses to </span>
                       <Link
                         href={`/library/${harder.slug}`}
-                        className="text-accent underline-offset-2 hover:underline"
+                        className="font-medium text-ink underline decoration-ink-faint underline-offset-3 hover:decoration-ink"
                       >
                         {harder.name}
                       </Link>

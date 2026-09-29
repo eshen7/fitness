@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { Button } from "@/components/ui";
 import { unlock, type UnlockState } from "./actions";
 
 export function UnlockForm({ next }: { next?: string }) {
@@ -34,16 +35,12 @@ export function UnlockForm({ next }: { next?: string }) {
         autoFocus
         aria-invalid={state.error ? true : undefined}
         aria-describedby={state.error ? "passcode-error" : undefined}
-        className="h-14 rounded-field border border-line-strong bg-surface px-4 text-lg tracking-widest text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+        className="h-14 rounded-field border border-line-strong bg-surface-sunken px-4 text-lg tracking-widest text-ink transition-[border-color,box-shadow] duration-150 placeholder:tracking-normal placeholder:text-ink-faint focus:border-accent focus:shadow-[0_0_0_3px_color-mix(in_oklch,var(--color-accent)_18%,transparent)] focus:outline-none"
         placeholder="Passcode"
       />
-      <button
-        type="submit"
-        disabled={pending}
-        className="h-14 rounded-field bg-accent text-base font-semibold text-accent-ink transition-opacity disabled:opacity-50"
-      >
-        {pending ? "Checking" : "Unlock"}
-      </button>
+      <Button type="submit" size="lg" disabled={pending}>
+        {pending ? "Checking…" : "Unlock"}
+      </Button>
       {state.error ? (
         <p id="passcode-error" role="alert" className="text-sm text-bad">
           {state.error}

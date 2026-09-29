@@ -118,7 +118,7 @@ export function WeekEditor({
             parts={[
               `Week ${week.ordinal}`,
               `from ${formatDay(week.startDate)}`,
-              <span key="load" className="tabular-nums">
+              <span key="load" className="tnum">
                 relative load {week.relativeLoad.toFixed(2)}
               </span>,
             ]}
@@ -133,12 +133,12 @@ export function WeekEditor({
       {week.sessions.map((session, sessionIndex) => (
         <div
           key={sessionKeys?.[sessionIndex] ?? sessionIndex}
-          className="rounded-box border border-line bg-surface-sunken p-3"
+          className="rounded-box bg-surface-sunken p-3 sm:p-4"
         >
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h4 className="text-sm font-semibold text-ink">
+                <h4 className="font-display text-lg leading-tight font-bold text-ink">
                   {session.title ?? sessionKindLabels.of(session.kind)}
                 </h4>
                 <Tag>{sessionKindLabels.of(session.kind)}</Tag>
@@ -163,7 +163,7 @@ export function WeekEditor({
                     type="button"
                     onClick={() => onDropSession?.(sessionIndex)}
                     aria-label={`Drop ${session.title ?? sessionKindLabels.of(session.kind)} on ${formatDay(session.day)}`}
-                    className="h-11 shrink-0 rounded-field border border-bad/40 px-3 text-xs font-semibold whitespace-nowrap text-bad transition hover:bg-bad/10"
+                    className="h-11 shrink-0 rounded-field border border-bad/40 press px-3 text-xs font-semibold whitespace-nowrap text-bad hover:bg-bad/10"
                   >
                     Drop session
                   </button>
@@ -178,23 +178,23 @@ export function WeekEditor({
             {session.blocks.map((block, blockIndex) => (
               <div key={`${block.label}-${blockIndex}`}>
                 <div className="flex items-center gap-2">
-                  <p className="text-xs font-medium tracking-wide text-ink-muted uppercase">
+                  <p className="eyebrow">
                     {block.label}
                   </p>
                   {block.complexPair ? <Tag tone="cool">complex pair</Tag> : null}
                 </div>
-                <ul className="mt-1.5 space-y-1.5">
+                <ul className="mt-1">
                   {block.items.map((item) => (
                     <li
                       key={item.exerciseId}
-                      className="rounded-field border border-line/70 bg-surface px-3 py-2"
+                      className="border-t border-line py-2.5 first:border-t-0"
                     >
                       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                         <span className="text-sm text-ink">
                           {names[String(item.exerciseId)] ?? `Exercise ${item.exerciseId}`}
                         </span>
                         {editing ? null : (
-                          <span className="text-xs tabular-nums text-ink-muted">
+                          <span className="tnum text-sm text-ink-muted">
                             {describePrescription(
                               item,
                               loads.unitSystem,
@@ -212,7 +212,7 @@ export function WeekEditor({
                               editable.get(item.exerciseId)?.has(field),
                           ).map(({ field, label, step }) => (
                             <label key={field} className="block w-20">
-                              <span className="mb-0.5 block text-[0.6875rem] text-ink-faint">
+                              <span className="mb-0.5 block text-xs text-ink-faint">
                                 {label}
                               </span>
                               <Input
@@ -232,7 +232,7 @@ export function WeekEditor({
                                         : Number(event.target.value),
                                   })
                                 }
-                                className="h-11 text-xs tabular-nums"
+                                className="tnum h-11 text-sm"
                               />
                             </label>
                           ))}
@@ -240,7 +240,7 @@ export function WeekEditor({
                             type="button"
                             onClick={() => onDropItem?.(sessionIndex, item.exerciseId)}
                             aria-label={`Drop ${names[String(item.exerciseId)] ?? `exercise ${item.exerciseId}`} from ${session.title ?? sessionKindLabels.of(session.kind)}`}
-                            className="h-11 rounded-field border border-bad/40 px-3 text-xs font-semibold text-bad transition hover:bg-bad/10"
+                            className="h-11 rounded-field border border-bad/40 press px-3 text-xs font-semibold text-bad hover:bg-bad/10"
                           >
                             Drop
                           </button>

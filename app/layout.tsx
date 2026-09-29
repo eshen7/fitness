@@ -1,17 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Inter_Tight } from "next/font/google";
+import { Barlow, Barlow_Condensed } from "next/font/google";
 import { ServiceWorker } from "@/components/service-worker";
 import "./globals.css";
 
-const inter = Inter({
+const barlow = Barlow({
   subsets: ["latin"],
-  variable: "--font-inter",
+  weight: ["400", "500", "600"],
+  variable: "--font-barlow",
   display: "swap",
 });
 
-const interTight = Inter_Tight({
+const barlowCondensed = Barlow_Condensed({
   subsets: ["latin"],
-  variable: "--font-inter-tight",
+  weight: ["500", "600", "700"],
+  variable: "--font-barlow-condensed",
   display: "swap",
 });
 
@@ -32,7 +34,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#161a1c",
+  themeColor: "#0f0e0c",
   width: "device-width",
   initialScale: 1,
   // Gym use: the layout is already mobile-first, and pinch-zoom on a sweaty
@@ -45,8 +47,12 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.variable} ${interTight.variable} antialiased`}>
+    // The font variables go on `<html>`, not `<body>`: the theme's `--font-sans`
+    // and `--font-display` are declared on `:root` and resolve there, so a
+    // variable set any lower is undefined where they read it and every screen
+    // silently falls back to the system face.
+    <html lang="en" className={`${barlow.variable} ${barlowCondensed.variable}`}>
+      <body className="antialiased">
         {children}
         <ServiceWorker />
       </body>

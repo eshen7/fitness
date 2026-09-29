@@ -32,7 +32,7 @@ export function VerdictOutcome() {
   return (
     <p
       role="status"
-      className="rounded-field border border-line bg-surface px-3 py-2 text-sm text-ink-muted"
+      className="border-l-2 border-line-strong py-0.5 pl-4 text-sm text-ink-muted"
     >
       {message}
     </p>

@@ -26,20 +26,21 @@ export default async function LogTendonPage() {
   return (
     <>
       <PageHeader
+        back={{ href: "/log", label: "Log" }}
         title="Tendon"
-        subtitle="Function and pain, per site. Never structure."
+        subtitle="Pain during load and what the tendon can do, site by site. Pain is a signal about load, not a verdict on the tendon."
       />
 
       {known.length ? (
-        <Card className="mb-4">
-          <h2 className="text-sm font-semibold text-ink">Last recorded</h2>
-          <ul className="mt-3 space-y-2.5">
+        <Card className="mb-5">
+          <h2 className="eyebrow">Last recorded</h2>
+          <ul className="mt-2">
             {known.map((site: TendonSite) => {
               const row = latest.get(site)!;
               return (
                 <li
                   key={site}
-                  className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1"
+                  className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-line py-2 first:border-t-0"
                 >
                   <span className="flex items-center gap-2 text-sm text-ink-muted">
                     {tendonSiteLabels.of(site)}

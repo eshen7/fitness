@@ -115,14 +115,14 @@ export function ProposalReview({
     <Card className="space-y-5">
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-base font-semibold text-ink">
+          <h2 className="font-display text-xl leading-tight font-bold text-ink">
             {proposal.scope === "mesocycle"
               ? `Proposed block${proposal.ask ? ` ${proposal.ask.ordinal}` : ""}`
               : `Proposed week${shown ? ` ${shown.ordinal}` : ""}`}
           </h2>
           {proposal.isFallback ? <Tag tone="bad">Fallback</Tag> : null}
           {proposal.passed ? (
-            <Tag tone="accent">Gate passed</Tag>
+            <Tag tone="good">Gate passed</Tag>
           ) : proposal.violations.length ? (
             <Tag tone="bad">{proposal.violations.length} unresolved</Tag>
           ) : (
@@ -146,7 +146,7 @@ export function ProposalReview({
       </header>
 
       {proposal.isFallback ? (
-        <p className="rounded-field border border-bad/40 bg-bad/5 px-3 py-2 text-sm text-ink-muted">
+        <p className="border-l-2 border-bad py-0.5 pl-4 text-sm text-ink-muted">
           The repair loop never converged, so this is the last session of each kind
           at reduced load rather than a new plan. Accepting it keeps training
           moving. Regenerating is worth it once whatever the gate report names has
@@ -236,7 +236,7 @@ export function ProposalReview({
             {proposal.violations.map((violation, index) => (
               <li
                 key={`${violation.rule}-${index}`}
-                className="rounded-field border border-bad/40 bg-bad/5 px-3 py-2 text-sm text-ink-muted"
+                className="border-l-2 border-bad py-0.5 pl-4 text-sm text-ink-muted"
               >
                 <span className="font-mono text-xs text-bad">{violation.rule}</span>{" "}
                 {violation.message}
@@ -292,7 +292,7 @@ export function ProposalReview({
                 <span className="text-ink-faint">{formatDay(change.day)}</span>
                 {" · "}
                 <span className="text-ink-faint">{change.field}</span>{" "}
-                <span className="tabular-nums">
+                <span className="tnum">
                   {String(change.from ?? "unset")} → {String(change.to ?? "unset")}
                 </span>
                 <span className="block text-xs text-ink-faint">{change.message}</span>
@@ -314,7 +314,7 @@ export function ProposalReview({
               return (
                 <li
                   key={index}
-                  className="rounded-field border border-warn/40 bg-warn/5 px-3 py-2 text-sm text-ink-muted"
+                  className="border-l-2 border-warn py-0.5 pl-4 text-sm text-ink-muted"
                 >
                   {rule ? (
                     <span className="font-mono text-xs text-warn">{rule} </span>
@@ -330,13 +330,13 @@ export function ProposalReview({
       <SuggestedExercises proposal={proposal.proposal} />
 
       {/* The receipts. */}
-      <details className="rounded-field border border-line bg-surface-sunken px-3 py-2">
+      <details className="rounded-field bg-surface-sunken px-3 py-2">
         <summary className="cursor-pointer text-sm font-medium text-ink-muted">
           What the model saw
         </summary>
         <div className="mt-3 space-y-3">
           <div>
-            <p className="text-xs font-medium tracking-wide text-ink-faint uppercase">
+            <p className="eyebrow">
               Stable prefix, cached
             </p>
             <pre className="mt-1 max-h-80 overflow-auto rounded-field border border-line bg-surface p-3 text-xs whitespace-pre-wrap text-ink-muted">
@@ -344,7 +344,7 @@ export function ProposalReview({
             </pre>
           </div>
           <div>
-            <p className="text-xs font-medium tracking-wide text-ink-faint uppercase">
+            <p className="eyebrow">
               Volatile suffix
             </p>
             <pre className="mt-1 max-h-80 overflow-auto rounded-field border border-line bg-surface p-3 text-xs whitespace-pre-wrap text-ink-muted">
@@ -352,7 +352,7 @@ export function ProposalReview({
             </pre>
           </div>
           <div>
-            <p className="text-xs font-medium tracking-wide text-ink-faint uppercase">
+            <p className="eyebrow">
               Raw proposal, before the normalizer
             </p>
             <pre className="mt-1 max-h-80 overflow-auto rounded-field border border-line bg-surface p-3 text-xs text-ink-muted">
@@ -425,7 +425,7 @@ export function ProposalReview({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="text-xs font-medium tracking-wide text-ink-faint uppercase">
+    <h3 className="eyebrow">
       {children}
     </h3>
   );
@@ -461,18 +461,18 @@ function DeclarationView({
         <p className="text-xs text-ink-faint">
           The stable complex, run through every week of the block.
         </p>
-        <ul className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
+        <ul className="mt-1.5 grid sm:grid-cols-2 sm:gap-x-6">
           {declaration.complex.map((item) => (
             <li
               key={item.exerciseId}
-              className="flex items-center justify-between gap-2 rounded-field border border-line bg-surface-sunken px-3 py-2"
+              className="flex min-h-10 items-center justify-between gap-2 border-b border-line py-1.5"
             >
               <span className="min-w-0 truncate text-sm text-ink">
                 {names[String(item.exerciseId)] ?? `Exercise ${item.exerciseId}`}
               </span>
               <span className="flex shrink-0 items-center gap-1.5">
                 {item.isMain ? <Tag tone="accent">main</Tag> : null}
-                <span className="text-xs text-ink-faint tabular-nums">
+                <span className="tnum text-sm text-ink-faint">
                   {item.targetWeeklyFrequency ?? 2}x/wk
                 </span>
               </span>
@@ -501,7 +501,7 @@ function SuggestedExercises({ proposal }: { proposal: unknown }) {
         {suggestions.map((suggestion, index) => (
           <li
             key={index}
-            className="rounded-field border border-line bg-surface-sunken px-3 py-2"
+            className="border-l-2 border-line-strong py-0.5 pl-4"
           >
             <p className="text-sm font-medium text-ink">{suggestion.name}</p>
             <p className="mt-0.5 text-sm text-ink-muted">{suggestion.rationale}</p>

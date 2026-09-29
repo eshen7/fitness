@@ -49,7 +49,7 @@ export function StartSession() {
             </option>
           ))}
         </Select>
-        <Button type="button" onClick={open} disabled={pending}>
+        <Button type="button" onClick={open} disabled={pending} className="shrink-0">
           {pending ? "Opening…" : "Start"}
         </Button>
       </div>

@@ -27,7 +27,7 @@ export const SERIES = [
 ] as const;
 
 /**
- * The width of the y-axis gutter. Wide enough for four digits at 10px and for
+ * The width of the y-axis gutter. Wide enough for four condensed digits at 12px and for
  * the widest unit label, which is `(× bw)`: a narrower gutter wraps that onto two
  * lines and pushes the first x tick off its own baseline.
  */
@@ -72,7 +72,7 @@ export function Plot({
           {yTicks.map((tick) => (
             <span
               key={tick.pct}
-              className="tnum absolute right-1.5 -translate-y-1/2 text-[10px] leading-none text-ink-faint"
+              className="tnum absolute right-1.5 -translate-y-1/2 font-display text-[0.75rem] leading-none text-ink-faint"
               style={{ top: `${tick.pct}%` }}
             >
               {tick.label}
@@ -100,7 +100,7 @@ export function Plot({
             unit beside a date.
           */}
           {unit ? (
-            <span className="block pt-1.5 pr-1.5 text-right text-[10px] leading-none whitespace-nowrap text-ink-faint">
+            <span className="block pt-1.5 pr-1.5 text-right font-display text-[0.75rem] leading-none whitespace-nowrap text-ink-faint">
               ({unit})
             </span>
           ) : null}
@@ -109,7 +109,7 @@ export function Plot({
           {xTicks.map((tick) => (
             <span
               key={tick.label + tick.pct}
-              className="absolute top-1.5 text-[10px] leading-none whitespace-nowrap text-ink-faint"
+              className="absolute top-1.5 font-display text-[0.75rem] leading-none whitespace-nowrap text-ink-faint"
               style={edgeAlign(tick.pct)}
             >
               {tick.label}
@@ -118,7 +118,7 @@ export function Plot({
         </div>
       </div>
       {xLabel ? (
-        <p className="mt-0.5 text-right text-[10px] leading-none text-ink-faint">
+        <p className="mt-0.5 text-right font-display text-[0.75rem] leading-none text-ink-faint">
           {xLabel}
         </p>
       ) : null}
@@ -168,7 +168,7 @@ export function Bands({ bands }: { bands: Band[] }) {
             the same block on a laptop has room to spare. Where the words do not
             fit, the shading key under the chart says what each wash means.
           */}
-          <span className="absolute top-1 left-1.5 text-[10px] leading-none whitespace-nowrap text-ink-faint">
+          <span className="absolute top-1 left-1.5 font-display text-[0.75rem] leading-none whitespace-nowrap text-ink-faint">
             {band.longLabel ? (
               <>
                 <span className="@[6.5rem]:hidden">{band.label}</span>
@@ -203,7 +203,7 @@ export function BandKey({
       {items.map((item) => (
         <li
           key={item.label}
-          className="flex items-center gap-1.5 text-[11px] text-ink-muted"
+          className="flex items-center gap-1.5 text-xs text-ink-muted"
         >
           <span
             aria-hidden="true"
@@ -277,7 +277,7 @@ export function Band({
       }}
     >
       {label ? (
-        <span className="absolute top-0.5 right-1.5 text-[10px] leading-none text-ink-faint opacity-100">
+        <span className="absolute top-0.5 right-1.5 font-display text-[0.75rem] leading-none text-ink-faint opacity-100">
           {label}
         </span>
       ) : null}
@@ -357,7 +357,7 @@ export function PointLabel({
         surface colour rather than a filled chip: it stays legible where it crosses
         a stroke without boxing off the part of the plot underneath it.
       */
-      className={`tnum absolute text-[10px] leading-none font-medium whitespace-nowrap text-ink-muted [text-shadow:0_0_3px_var(--color-surface),0_0_3px_var(--color-surface),0_0_3px_var(--color-surface)] ${offset}`}
+      className={`tnum absolute font-display text-[0.75rem] leading-none font-medium whitespace-nowrap text-ink-muted [text-shadow:0_0_3px_var(--color-surface),0_0_3px_var(--color-surface),0_0_3px_var(--color-surface)] ${offset}`}
       style={{ left: `${leftPct}%`, top: `${topPct}%` }}
     >
       {children}
@@ -400,7 +400,7 @@ export function Annotation({
         className="absolute inset-y-0 left-0 w-0 border-l border-dashed border-ink-faint/60"
       />
       <span
-        className={`tnum absolute bottom-0 mb-1 w-max text-[10px] leading-none font-medium whitespace-nowrap ${place}`}
+        className={`tnum absolute bottom-0 mb-1 w-max font-display text-[0.75rem] leading-none font-medium whitespace-nowrap ${place}`}
       >
         {children}
       </span>
@@ -493,13 +493,13 @@ export function Slices({
               aria-hidden="true"
               className={`pointer-events-none absolute bottom-full z-10 mb-1 w-max rounded-field border border-line bg-surface-raised px-2 py-1.5 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus:opacity-100 ${place}`}
             >
-              <p className="text-[10px] leading-none font-medium text-ink">
+              <p className="font-display text-[0.75rem] leading-none font-medium text-ink">
                 {slice.title}
               </p>
               {slice.rows.map((row) => (
                 <p
                   key={row.label}
-                  className="mt-1 flex items-center gap-1.5 text-[10px] leading-none whitespace-nowrap text-ink-muted"
+                  className="mt-1 flex items-center gap-1.5 font-display text-[0.75rem] leading-none whitespace-nowrap text-ink-muted"
                 >
                   {row.color ? (
                     <span
@@ -537,7 +537,7 @@ export function Legend({
       {items.map((item) => (
         <li
           key={item.label}
-          className="flex items-center gap-1.5 text-[11px] text-ink-muted"
+          className="flex items-center gap-1.5 text-xs text-ink-muted"
         >
           {item.kind === "swatch" ? (
             <span
@@ -588,12 +588,12 @@ export function TableView({
         of line with the chart's left edge; the negative margin keeps the height
         off the layout.
       */}
-      <summary className="-my-2 inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center gap-1 text-[11px] text-ink-faint hover:text-ink-muted">
+      <summary className="-my-2 inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center gap-1 text-xs text-ink-faint hover:text-ink-muted">
         <span className="transition-transform group-open:rotate-90">›</span>
         Table
       </summary>
       <div className="mt-2 max-h-64 overflow-auto rounded-field border border-line">
-        <table className="w-full text-left text-[11px]">
+        <table className="w-full text-left text-xs">
           <caption className="sr-only">{caption}</caption>
           <thead className="sticky top-0 bg-surface-raised text-ink-muted">
             <tr>
@@ -634,7 +634,7 @@ export function ChartCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-box border border-line bg-surface p-4 sm:p-5">
+    <section className="rounded-box bg-surface p-4 shadow-[inset_0_1px_0_oklch(100%_0_0/0.045)] sm:p-5">
       {/*
         Wrapping, and the aside kept whole. `Tag` is `whitespace-nowrap`, so as a
         shrinkable flex item it does not wrap or ellipsise when the row is tight - it
@@ -643,10 +643,10 @@ export function ChartCard({
         break to its own line instead, and `ml-auto` keeps it right-aligned there.
       */}
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
-        <h2 className="min-w-0 text-sm font-semibold text-ink">{title}</h2>
+        <h2 className="min-w-0 font-display text-xl leading-tight font-bold text-ink">{title}</h2>
         {aside ? <div className="ml-auto shrink-0">{aside}</div> : null}
       </div>
-      {note ? <p className="mt-1.5 mb-4 text-xs text-ink-faint">{note}</p> : null}
+      {note ? <p className="mt-1.5 mb-5 max-w-prose text-sm text-ink-muted">{note}</p> : null}
       {children}
     </section>
   );
