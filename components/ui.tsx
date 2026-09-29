@@ -310,7 +310,7 @@ export function EmptyState({
  * Each separator travels with the fact after it, so a wrapped line starts with
  * one instead of the line above ending on one: a separator left hanging at the
  * edge of a card reads as a missing value. The breakable space is the one before
- * the separator; the one after it is non-breaking.
+ * the separator; the nowrap span keeps the separator with its fact.
  */
 export function DetailLine({ parts }: { parts: readonly ReactNode[] }) {
   return (

@@ -143,9 +143,11 @@ export function SetLogger({
   const [sessionNotes, setSessionNotes] = useState("");
   const [busy, start] = useTransition();
   /** The last set this form logged, confirmed under the button until the next. */
-  const [lastLogged, setLastLogged] = useState<{ key: string; text: string } | null>(
-    null,
-  );
+  const [lastLogged, setLastLogged] = useState<{
+    key: string;
+    exerciseId: number;
+    text: string;
+  } | null>(null);
 
   const massUnit = displayUnit("mass", unitSystem);
   const lengthUnit = displayUnit("length", unitSystem);
@@ -290,6 +292,7 @@ export function SetLogger({
 
   /** A planned line, done or not: a finished one takes extra sets, unlinked. */
   function pickLine(line: PlanLine) {
+    forgetLastLoggedUnless(line.exerciseId);
     setMode({ kind: "pick", exerciseId: line.exerciseId, lineId: line.id });
     setQuery("");
   }
@@ -303,8 +306,13 @@ export function SetLogger({
     const open = progress.find(
       ({ line, done }) => line.exerciseId === id && done < line.sets,
     );
+    forgetLastLoggedUnless(id);
     setMode({ kind: "pick", exerciseId: id, lineId: open?.line.id ?? null });
     setQuery("");
+  }
+
+  function forgetLastLoggedUnless(exerciseId: number) {
+    if (lastLogged && lastLogged.exerciseId !== exerciseId) setLastLogged(null);
   }
 
   function logSet() {
@@ -328,6 +336,7 @@ export function SetLogger({
     setFormError(null);
     setLastLogged({
       key: item.clientId,
+      exerciseId: exercise.id,
       text: `${exercise.name}, set ${item.setIndex} logged`,
     });
     setFields((current) => ({ ...current, rpe: "", quality: null }));
@@ -345,6 +354,7 @@ export function SetLogger({
   }
 
   function removeEntry(entry: Entry) {
+    if (entry.clientId && entry.clientId === lastLogged?.key) setLastLogged(null);
     if (entry.id === null) {
       if (entry.clientId) dequeue([entry.clientId]);
       return;
