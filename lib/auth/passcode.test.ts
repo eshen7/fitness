@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { hashPasscode, verifyPasscode } from "./passcode";
 
-describe("passcode", () => {
+// Production scrypt cost on purpose, about 128 MB and a few hundred ms per hash,
+// so a test doing four of them on a busy machine outlives the 5 s default.
+describe("passcode", { timeout: 60_000 }, () => {
   it("accepts the right passcode and rejects a wrong one", async () => {
     const encoded = await hashPasscode("penultimate-step");
     expect(await verifyPasscode("penultimate-step", encoded)).toBe(true);

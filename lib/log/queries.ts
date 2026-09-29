@@ -10,6 +10,7 @@ import {
   isNull,
 } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import type { PlanLine } from "@/lib/log/plan";
 import type { BodyKind, TendonSite, TestKind, UnitSystem } from "@/lib/taxonomy";
 import { TENDON_SITES, TEST_KINDS } from "@/lib/taxonomy";
 import { dayMinus, dayOf, today } from "@/lib/time";
@@ -252,6 +253,8 @@ export type LoggedSetRow = {
   id: number;
   /** Null for a set written before the queue existed, or straight from the server. */
   clientId: string | null;
+  /** The prescription this set carried out, null for off-plan work. */
+  prescribedSetId: number | null;
   exerciseId: number;
   exerciseName: string;
   exerciseSlug: string;
@@ -272,6 +275,7 @@ export async function loggedSetsForSession(sessionId: number) {
     .select({
       id: loggedSets.id,
       clientId: loggedSets.clientId,
+      prescribedSetId: loggedSets.prescribedSetId,
       exerciseId: loggedSets.exerciseId,
       exerciseName: exercises.name,
       exerciseSlug: exercises.slug,
@@ -299,6 +303,48 @@ export async function loggedSetsForSession(sessionId: number) {
       rpe: row.rpe === null ? null : Number(row.rpe),
     }),
   );
+}
+
+/**
+ * The session's plan, one row per prescription line, in the order it is done.
+ *
+ * Block position then position within the block, which is the order the
+ * normalizer wrote: highest intensity and most coordination-demanding work first.
+ * Empty for an ad-hoc session. Every field is as the plan stores it; a load given
+ * as a percentage of 1RM stays one.
+ */
+export async function plannedSetsForSession(sessionId: number): Promise<PlanLine[]> {
+  const { prescribedSets, sessionBlocks } = schema;
+  const rows = await getDb()
+    .select({
+      id: prescribedSets.id,
+      blockLabel: sessionBlocks.label,
+      exerciseId: prescribedSets.exerciseId,
+      sets: prescribedSets.sets,
+      reps: prescribedSets.reps,
+      holdSeconds: prescribedSets.holdSeconds,
+      loadKg: prescribedSets.loadKg,
+      loadPctOf1rm: prescribedSets.loadPctOf1rm,
+      boxHeightCm: prescribedSets.boxHeightCm,
+      targetRpe: prescribedSets.targetRpe,
+      restSeconds: prescribedSets.restSeconds,
+      couplingClass: prescribedSets.couplingClass,
+      tempo: prescribedSets.tempo,
+      cueOverride: prescribedSets.cueOverride,
+    })
+    .from(prescribedSets)
+    .innerJoin(sessionBlocks, eq(sessionBlocks.id, prescribedSets.blockId))
+    .where(eq(sessionBlocks.sessionId, sessionId))
+    .orderBy(asc(sessionBlocks.position), asc(prescribedSets.position));
+
+  return rows.map((row) => ({
+    ...row,
+    holdSeconds: row.holdSeconds === null ? null : Number(row.holdSeconds),
+    loadKg: row.loadKg === null ? null : Number(row.loadKg),
+    boxHeightCm: row.boxHeightCm === null ? null : Number(row.boxHeightCm),
+    targetRpe: row.targetRpe === null ? null : Number(row.targetRpe),
+    shockMethod: null,
+  }));
 }
 
 export type LastSet = {
