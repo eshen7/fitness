@@ -1,3 +1,9 @@
+import {
+  MAINTENANCE_KCAL_PER_KG,
+  MIN_INTAKE_WEEKS,
+  MIN_LOGGED_DAYS_PER_WEEK,
+  type MeasuredMaintenance,
+} from "@/lib/analytics/nutrition";
 import type { EnergyDirection, MesocycleType, TendonSite } from "@/lib/taxonomy";
 import { KCAL_PER_G } from "./macros";
 
@@ -56,16 +62,7 @@ export function unhealthySites(tendon: readonly TendonState[]): TendonState[] {
 // The numbers
 // -----------------------------------------------------------------------------
 
-/**
- * Maintenance calories per kilogram, for when nothing better is known.
- *
- * A placeholder on purpose. True maintenance is measurable from intake against
- * trend bodyweight change, and that arrives with the analytics; until it does this
- * is a textbook multiplier for an athlete training most days, and the rationale
- * line says which of the two produced the number so a target from before the
- * measurement is not mistaken for one after it.
- */
-export const MAINTENANCE_KCAL_PER_KG = 33;
+export { MAINTENANCE_KCAL_PER_KG };
 
 /** Surplus and deficit as a share of maintenance. */
 export const SURPLUS_FRACTION = 0.1;
@@ -112,8 +109,8 @@ export type TargetInputs = {
   /** Null when no block is open, which is treated as conservatively as realization. */
   blockType: MesocycleType | null;
   tendon: readonly TendonState[];
-  /** Measured maintenance, once the analytics can estimate it. */
-  maintenanceKcal?: number | null;
+  /** Measured maintenance, once the history can support one. */
+  maintenance?: MeasuredMaintenance | null;
   goal: TargetGoal;
 };
 
@@ -127,6 +124,10 @@ export type TargetProposal = {
   targetWeeklyChangePct: number;
   direction: EnergyDirection;
   maintenanceKcal: number;
+  /** The weeks of logged intake maintenance was measured from, or null for the default. */
+  maintenanceWeeks: number | null;
+  /** True when the history measured a maintenance that was not reliable enough to use. */
+  maintenanceUnreliable: boolean;
   /** Set only when a cut was asked for and not allowed. */
   cutRefusedBecause: string | null;
   rationale: string;
@@ -144,15 +145,16 @@ export type TargetProposal = {
  */
 export function proposeTargets(input: TargetInputs): TargetProposal {
   const { bodyweightKg, blockType, goal } = input;
+  const measured = input.maintenance?.reliable ? input.maintenance : null;
+  const maintenanceUnreliable = input.maintenance?.reliable === false;
   const maintenanceKcal =
-    input.maintenanceKcal ?? Math.round(bodyweightKg * MAINTENANCE_KCAL_PER_KG);
+    measured?.kcal ?? Math.round(bodyweightKg * MAINTENANCE_KCAL_PER_KG);
 
   // Only asked when a cut is on the table. The rules say nothing against a surplus
   // during realization or on a painful tendon - eating more is not what hurts a
   // tendon - so a refusal computed for every goal would report one that never applied.
   const refusal = goal === "cut" ? cutRefusal(input) : null;
-  const direction: EnergyDirection =
-    goal === "cut" ? (refusal ? "hold" : "deficit") : goal === "gain" ? "surplus" : "hold";
+  const direction: EnergyDirection = refusal ? "hold" : directionOf(goal);
 
   const kcal = Math.round(
     direction === "surplus"
@@ -185,12 +187,15 @@ export function proposeTargets(input: TargetInputs): TargetProposal {
           : 0,
     direction,
     maintenanceKcal,
+    maintenanceWeeks: measured?.weeks ?? null,
+    maintenanceUnreliable,
     cutRefusedBecause: refusal,
     rationale: rationaleFor({
       direction,
       blockType,
       maintenanceKcal,
-      measured: input.maintenanceKcal != null,
+      maintenanceWeeks: measured?.weeks ?? null,
+      maintenanceUnreliable,
       refusal,
     }),
   };
@@ -225,17 +230,60 @@ function siteWords(site: TendonSite) {
   return site.replace(/_/g, " ");
 }
 
+/**
+ * Which maintenance a proposal rests on, as one sentence.
+ *
+ * Shown beside the proposal and written into the stored rationale, so the owner can
+ * tell a target built on their own history from one built on a textbook multiplier.
+ * "At least" because the weeks are necessary rather than sufficient: the estimate
+ * also needs intake to rise with weight gain, and says nothing until it does.
+ */
+export function maintenanceBasis(
+  proposal: Pick<TargetProposal, "maintenanceKcal" | "maintenanceWeeks" | "maintenanceUnreliable">,
+): string {
+  if (proposal.maintenanceWeeks !== null)
+    return `Maintenance ${proposal.maintenanceKcal} kcal, measured from ${proposal.maintenanceWeeks} weeks of logged intake against the bodyweight trend.`;
+  return proposal.maintenanceUnreliable
+    ? `Maintenance ${proposal.maintenanceKcal} kcal, the ${MAINTENANCE_KCAL_PER_KG} kcal/kg default, since the logged intake does not yet measure it reliably enough to use.`
+    : `Maintenance ${proposal.maintenanceKcal} kcal, the ${MAINTENANCE_KCAL_PER_KG} kcal/kg default until at least ${inWords(MIN_INTAKE_WEEKS)} weeks of logged intake, ${inWords(MIN_LOGGED_DAYS_PER_WEEK)} days in each, can measure it.`;
+}
+
+/** A count of weeks or days as the card's prose writes one. */
+function inWords(count: number): string {
+  return ["zero", "one", "two", "three", "four", "five", "six", "seven"][count] ?? `${count}`;
+}
+
+/**
+ * The multipliers a target applies that nothing has measured, as one line.
+ *
+ * Every number on the card other than maintenance is a per-kilogram default or a
+ * fixed share of maintenance, and printed as a round figure in a stat box it reads
+ * as more than that. Only the ones the direction actually uses are named.
+ */
+export function defaultsNote(direction: EnergyDirection): string {
+  const share =
+    direction === "surplus"
+      ? `The ${Math.round(SURPLUS_FRACTION * 100)}% surplus, protein`
+      : direction === "deficit"
+        ? `The ${Math.round(DEFICIT_FRACTION * 100)}% deficit, protein`
+        : "Protein";
+  return `${share} at ${PROTEIN_G_PER_KG[direction]} g/kg, fat at ${FAT_G_PER_KG[direction]} g/kg and fluid at ${FLUID_ML_PER_KG} ml/kg are defaults, not measured.`;
+}
+
+/** The energy direction a goal is written as, once any refusal has been applied. */
+export function directionOf(goal: TargetGoal): EnergyDirection {
+  return goal === "gain" ? "surplus" : goal === "cut" ? "deficit" : "hold";
+}
+
 function rationaleFor(input: {
   direction: EnergyDirection;
   blockType: MesocycleType | null;
   maintenanceKcal: number;
-  measured: boolean;
+  maintenanceWeeks: number | null;
+  maintenanceUnreliable: boolean;
   refusal: string | null;
 }) {
-  const basis = input.measured
-    ? `Maintenance ${input.maintenanceKcal} kcal, measured from intake against the bodyweight trend.`
-    : `Maintenance estimated at ${input.maintenanceKcal} kcal from trend bodyweight, since intake has not been measured against it yet.`;
-
+  const basis = maintenanceBasis(input);
   const block =
     input.blockType === null
       ? "No block is open."

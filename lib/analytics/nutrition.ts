@@ -96,10 +96,10 @@ export function bodyweightTrend(inputs: AnalyticsInputs): Insight[] {
 // -----------------------------------------------------------------------------
 
 /** Complete weeks of paired intake and weight before maintenance is estimable. */
-const MIN_INTAKE_WEEKS = 5;
+export const MIN_INTAKE_WEEKS = 5;
 
 /** Days a week needs logged intake on before it counts as a logged week. */
-const MIN_LOGGED_DAYS_PER_WEEK = 4;
+export const MIN_LOGGED_DAYS_PER_WEEK = 4;
 
 /**
  * The energy in a kilogram of bodyweight change, used only as a sanity bound.
@@ -218,6 +218,55 @@ export function maintenanceCalories(inputs: AnalyticsInputs): Insight[] {
       },
     }),
   ];
+}
+
+/**
+ * Maintenance as the targets consume it: the figure, the weeks it rests on, and
+ * whether it is sound enough to set a target from.
+ */
+export type MeasuredMaintenance = { kcal: number; weeks: number; reliable: boolean };
+
+/**
+ * Maintenance calories per kilogram, for when nothing better is known.
+ *
+ * A placeholder on purpose. True maintenance is measured from logged intake against
+ * trend bodyweight change by `measuredMaintenance` below, and this textbook
+ * multiplier for an athlete training most days only stands in until the history can
+ * support that. Defined here rather than beside the targets that apply it because
+ * the measurement is also checked against it.
+ */
+export const MAINTENANCE_KCAL_PER_KG = 33;
+
+/** How far a measured maintenance may sit from the per-kilogram default and still be used. */
+const MAX_DEFAULT_DEVIATION = 0.25;
+
+/**
+ * The maintenance figure the daily targets should rest on, or null while the history
+ * cannot support one and the per-kilogram default has to stand in.
+ *
+ * The insight above, read without the suite's gate. The gate asks whether the
+ * figure is distinguishable from what the athlete already eats, which is the right
+ * question before telling them something new and the wrong one here: a measured
+ * maintenance that equals current intake is useless as an insight and exactly what
+ * a hold should be set to. What does carry over is every sufficiency rule the
+ * estimate already applies: the weeks, the logged days in each, a line that rises.
+ *
+ * A figure the history does produce is still only `reliable` when the fit is
+ * plausible and the figure lands within a quarter of the per-kilogram default at the
+ * current trend weight. In a sustained bulk every observed week is a gaining week,
+ * so maintenance is extrapolated off the line rather than observed, and the smoothed
+ * trend steepens that line; the result can sit many hundreds of kilocalories below
+ * the truth while looking just as measured.
+ */
+export function measuredMaintenance(inputs: AnalyticsInputs): MeasuredMaintenance | null {
+  const [insight] = maintenanceCalories(inputs);
+  if (!insight) return null;
+  const trendKg = smoothedBodyweight(inputs.bodyweight).at(-1)?.kg ?? 0;
+  const fallback = trendKg * MAINTENANCE_KCAL_PER_KG;
+  const reliable =
+    insight.detail?.plausible === true &&
+    Math.abs(insight.value - fallback) <= fallback * MAX_DEFAULT_DEVIATION;
+  return { kcal: Math.round(insight.value), weeks: insight.n, reliable };
 }
 
 function round(value: number): number {

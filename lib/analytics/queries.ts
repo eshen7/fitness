@@ -13,15 +13,16 @@ import type {
   TendonSite,
 } from "@/lib/taxonomy";
 import { dayMinus, dayOf, today } from "@/lib/time";
-import type {
-  AnalyticsExercise,
-  AnalyticsInputs,
-  LoggedSetRow,
-  PrescribedSetRow,
-  ProposalRow,
-  ReadinessRow,
-  SessionRow,
-  TendonRow,
+import {
+  emptyInputs,
+  type AnalyticsExercise,
+  type AnalyticsInputs,
+  type LoggedSetRow,
+  type PrescribedSetRow,
+  type ProposalRow,
+  type ReadinessRow,
+  type SessionRow,
+  type TendonRow,
 } from "./inputs";
 
 /**
@@ -54,21 +55,12 @@ export async function loadAnalyticsInputs(
   options: { asOf?: string; windowDays?: number; db?: Db } = {},
 ): Promise<AnalyticsInputs> {
   const db = options.db ?? getDb();
-  const asOf = options.asOf ?? today();
-  const windowDays = options.windowDays ?? ANALYTICS_WINDOW_DAYS;
-  const fromDay = dayMinus(windowDays, asOf);
-  // Instants are read a day wide on either side and then cut by the owner's day,
-  // because a UTC midnight is not the owner's midnight at either end.
-  const fromInstant = new Date(`${dayMinus(1, fromDay)}T00:00:00Z`);
-  const toInstant = new Date(`${dayMinus(-2, asOf)}T00:00:00Z`);
-  const inWindow = (day: string) => day >= fromDay && day <= asOf;
+  const window = windowOf(options);
+  const { asOf, fromDay, fromInstant, toInstant, inWindow } = window;
 
   const {
     exercises,
-    foodLogEntries,
-    foods,
     loggedSets,
-    measurements,
     planProposals,
     prescribedSets,
     profile,
@@ -85,8 +77,8 @@ export async function loadAnalyticsInputs(
     loggedRows,
     tendonRows,
     readinessRows,
-    weightRows,
-    intakeRows,
+    bodyweight,
+    intake,
     proposalRows,
     profileRow,
     tests,
@@ -188,26 +180,8 @@ export async function loadAnalyticsInputs(
       .from(readinessCheckins)
       .where(and(gte(readinessCheckins.day, fromDay), lte(readinessCheckins.day, asOf)))
       .orderBy(asc(readinessCheckins.day)),
-    db
-      .select({ value: measurements.value, measuredAt: measurements.measuredAt })
-      .from(measurements)
-      .where(
-        and(
-          eq(measurements.kind, "bodyweight"),
-          gte(measurements.measuredAt, fromInstant),
-          lt(measurements.measuredAt, toInstant),
-        ),
-      )
-      .orderBy(asc(measurements.measuredAt)),
-    db
-      .select({
-        day: foodLogEntries.day,
-        quantity: foodLogEntries.quantity,
-        kcalPerUnit: foods.kcalPerUnit,
-      })
-      .from(foodLogEntries)
-      .innerJoin(foods, eq(foods.id, foodLogEntries.foodId))
-      .where(and(gte(foodLogEntries.day, fromDay), lte(foodLogEntries.day, asOf))),
+    bodyweightIn(window, db),
+    intakeIn(window, db),
     db
       .select({
         id: planProposals.id,
@@ -247,12 +221,6 @@ export async function loadAnalyticsInputs(
       },
     ]),
   );
-
-  const intakeByDay = new Map<string, number>();
-  for (const row of intakeRows) {
-    const kcal = Number(row.quantity) * Number(row.kcalPerUnit);
-    intakeByDay.set(row.day, (intakeByDay.get(row.day) ?? 0) + kcal);
-  }
 
   return {
     asOf,
@@ -298,12 +266,8 @@ export async function loadAnalyticsInputs(
       }),
     ),
     tests: tests.filter((sitting) => inWindow(sitting.day)),
-    bodyweight: weightRows
-      .map((row) => ({ day: dayOf(row.measuredAt), kg: Number(row.value) }))
-      .filter((reading) => inWindow(reading.day)),
-    intake: [...intakeByDay.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([day, kcal]) => ({ day, kcal })),
+    bodyweight,
+    intake,
     tendon: tendonRows
       .map(
         (row): TendonRow => ({
@@ -349,6 +313,90 @@ export async function loadAnalyticsInputs(
         }),
       ),
   };
+}
+
+/**
+ * Only the two series maintenance is measured from, for the food targets.
+ *
+ * Read over the suite's own window and through the same queries, so the maintenance
+ * a target rests on is the one the insight reports rather than a near relative of
+ * it computed over different rows. The targets need it on every load of the food
+ * screen and have no use for the other ten tables, which is why it is not simply
+ * `loadAnalyticsInputs`.
+ */
+export async function loadEnergyBalanceInputs(
+  options: { asOf?: string; windowDays?: number; db?: Db } = {},
+): Promise<AnalyticsInputs> {
+  const db = options.db ?? getDb();
+  const window = windowOf(options);
+  const [bodyweight, intake] = await Promise.all([
+    bodyweightIn(window, db),
+    intakeIn(window, db),
+  ]);
+  return { ...emptyInputs(window.asOf), bodyweight, intake };
+}
+
+type Window = {
+  asOf: string;
+  fromDay: string;
+  fromInstant: Date;
+  toInstant: Date;
+  inWindow: (day: string) => boolean;
+};
+
+function windowOf(options: { asOf?: string; windowDays?: number }): Window {
+  const asOf = options.asOf ?? today();
+  const fromDay = dayMinus(options.windowDays ?? ANALYTICS_WINDOW_DAYS, asOf);
+  return {
+    asOf,
+    fromDay,
+    // Instants are read a day wide on either side and then cut by the owner's day,
+    // because a UTC midnight is not the owner's midnight at either end.
+    fromInstant: new Date(`${dayMinus(1, fromDay)}T00:00:00Z`),
+    toInstant: new Date(`${dayMinus(-2, asOf)}T00:00:00Z`),
+    inWindow: (day) => day >= fromDay && day <= asOf,
+  };
+}
+
+async function bodyweightIn(window: Window, db: Db): Promise<AnalyticsInputs["bodyweight"]> {
+  const { measurements } = schema;
+  const rows = await db
+    .select({ value: measurements.value, measuredAt: measurements.measuredAt })
+    .from(measurements)
+    .where(
+      and(
+        eq(measurements.kind, "bodyweight"),
+        gte(measurements.measuredAt, window.fromInstant),
+        lt(measurements.measuredAt, window.toInstant),
+      ),
+    )
+    .orderBy(asc(measurements.measuredAt));
+  return rows
+    .map((row) => ({ day: dayOf(row.measuredAt), kg: Number(row.value) }))
+    .filter((reading) => window.inWindow(reading.day));
+}
+
+/** Logged calories per day, summed from the food log. */
+async function intakeIn(window: Window, db: Db): Promise<AnalyticsInputs["intake"]> {
+  const { foodLogEntries, foods } = schema;
+  const rows = await db
+    .select({
+      day: foodLogEntries.day,
+      quantity: foodLogEntries.quantity,
+      kcalPerUnit: foods.kcalPerUnit,
+    })
+    .from(foodLogEntries)
+    .innerJoin(foods, eq(foods.id, foodLogEntries.foodId))
+    .where(and(gte(foodLogEntries.day, window.fromDay), lte(foodLogEntries.day, window.asOf)));
+
+  const byDay = new Map<string, number>();
+  for (const row of rows) {
+    const kcal = Number(row.quantity) * Number(row.kcalPerUnit);
+    byDay.set(row.day, (byDay.get(row.day) ?? 0) + kcal);
+  }
+  return [...byDay.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([day, kcal]) => ({ day, kcal }));
 }
 
 /**

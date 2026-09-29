@@ -1,10 +1,14 @@
 import { Card, Tag } from "@/components/ui";
 import { formatDay } from "@/lib/days";
 import { energyDirectionLabels, mesocycleTypeLabels } from "@/lib/labels";
-import type {
-  DailyTarget,
-  TargetGoal,
-  TargetProposal,
+import {
+  defaultsNote,
+  directionOf,
+  goalOf,
+  maintenanceBasis,
+  type DailyTarget,
+  type TargetGoal,
+  type TargetProposal,
 } from "@/lib/nutrition/targets";
 import type { MesocycleType } from "@/lib/taxonomy";
 import { SetTargets } from "./set-targets";
@@ -65,6 +69,9 @@ export function TargetsCard({
           {target.rationale ? (
             <p className="mt-2 text-sm text-ink-muted">{target.rationale}</p>
           ) : null}
+          <p className="mt-2 text-xs text-ink-faint">
+            {defaultsNote(directionOf(goalOf(target)))}
+          </p>
         </>
       ) : (
         <p className="mt-2 text-sm text-ink-muted">
@@ -91,6 +98,21 @@ export function TargetsCard({
               {` · P ${proposal.proteinG} · C ${proposal.carbsG} · F ${proposal.fatG}`}
             </p>
           </div>
+          {/*
+            Which maintenance the rules rest on now, unless the target in force already
+            says so word for word. A target set before the history could measure one
+            says "default", and this line is what shows that it no longer is.
+          */}
+          {target?.rationale?.includes(maintenanceBasis(proposal)) ? null : (
+            <p className="mt-2 text-sm text-ink-muted">{maintenanceBasis(proposal)}</p>
+          )}
+          {/*
+            Once, beside whichever numbers the card leads with: under the target in
+            force when there is one, here when this proposal is all there is.
+          */}
+          {target === null ? (
+            <p className="mt-2 text-xs text-ink-faint">{defaultsNote(proposal.direction)}</p>
+          ) : null}
 
           {stale ? (
             <p className="mt-2 text-sm text-warn">
