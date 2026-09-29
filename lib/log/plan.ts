@@ -95,10 +95,13 @@ export function carriesOut(
  * The fields a new set opens with.
  *
  * What the plan fixes, the plan fills: reps and hold time come from the line.
- * Load and drop height come first from this session's last set of the exercise,
- * because a load adjusted after the first set is the athlete calibrating and
- * retyping it every set is how sets stop being logged; then from the line; then
- * from the exercise's last outing. A load given as a percentage of 1RM stays a
+ * Load and drop height come first from this session's last set carrying out the
+ * same line, because a load adjusted after the first set is the athlete
+ * calibrating and retyping it every set is how sets stop being logged; then from
+ * the line; then from the exercise's last outing. Only the same line counts: a
+ * back-off line of the exercise has a load of its own, and opening it at the top
+ * set's would log the back-off at the wrong weight. With no line to carry out, an
+ * unplanned exercise or an extra set, the session's last set of the exercise does. A load given as a percentage of 1RM stays a
  * percentage: with no 1RM on record there is nothing honest to convert it with,
  * so the field falls back to what was actually lifted last time.
  *
@@ -107,15 +110,24 @@ export function carriesOut(
  */
 export function prefill({
   line,
-  inSession,
+  linkedTo,
+  sessionSets,
   lastOuting,
   unitSystem,
 }: {
   line: PlanLine | null;
-  inSession: LoggerLastSet | undefined;
+  /** From `carriesOut`: the line this set counts toward, if any. */
+  linkedTo: number | null;
+  /** This session's sets of the exercise, in order. */
+  sessionSets: readonly (LoggerLastSet & PlanEntry)[];
   lastOuting: LoggerLastSet | undefined;
   unitSystem: UnitSystem;
 }): LoggerFields {
+  const inSession = (
+    linkedTo === null
+      ? sessionSets
+      : sessionSets.filter((set) => set.prescribedSetId === linkedTo)
+  ).at(-1);
   const previous = inSession ?? lastOuting;
   const reps = line?.reps ?? previous?.reps;
   const hold = line?.holdSeconds ?? previous?.holdSeconds;

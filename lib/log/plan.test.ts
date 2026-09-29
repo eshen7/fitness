@@ -140,35 +140,61 @@ describe("prefill", () => {
   const lastOuting = { reps: 10, loadKg: 100, holdSeconds: null, boxHeightCm: 30, rpe: 9 };
 
   it("fills reps and the plan's box height, in display units", () => {
-    const fields = prefill({ line: depthJump, inSession: undefined, lastOuting, unitSystem: "metric" });
+    const fields = prefill({ line: depthJump, linkedTo: null, sessionSets: [], lastOuting, unitSystem: "metric" });
     expect(fields).toMatchObject({ reps: "6", box: "45", rpe: "" });
   });
 
   it("keeps the load the athlete settled on earlier in the session", () => {
-    const inSession = { reps: 7, loadKg: 26, holdSeconds: null, boxHeightCm: null, rpe: 8 };
-    const fields = prefill({ line: splitSquat, inSession, lastOuting, unitSystem: "metric" });
+    const sessionSets = [
+      { prescribedSetId: splitSquat.id, reps: 7, loadKg: 26, holdSeconds: null, boxHeightCm: null, rpe: 8 },
+    ];
+    const fields = prefill({ line: splitSquat, linkedTo: splitSquat.id, sessionSets, lastOuting, unitSystem: "metric" });
     expect(fields).toMatchObject({ reps: "8", load: "26" });
   });
 
+  it("opens a back-off line at its own load, not the top sets'", () => {
+    const top = line(5, { exerciseId: 40, sets: 3, reps: 3, loadKg: 140 });
+    const backOff = line(6, { exerciseId: 40, sets: 2, reps: 8, loadKg: 100 });
+    const heavy = { prescribedSetId: top.id, reps: 3, loadKg: 140, holdSeconds: null, boxHeightCm: null, rpe: 8 };
+    const sessionSets = [heavy, heavy, heavy];
+    const progress = planProgress([top, backOff], sessionSets);
+    const next = nextLine(progress);
+    expect(next).toBe(backOff);
+    const linkedTo = carriesOut(progress, next!.id);
+    expect(prefill({ line: next, linkedTo, sessionSets, lastOuting, unitSystem: "metric" })).toMatchObject({
+      reps: "8",
+      load: "100",
+    });
+    const adjusted = [...sessionSets, { ...heavy, prescribedSetId: backOff.id, reps: 8, loadKg: 95 }];
+    expect(prefill({ line: backOff, linkedTo, sessionSets: adjusted, lastOuting, unitSystem: "metric" }).load).toBe("95");
+  });
+
+  it("carries the session's last set into an extra one past the line", () => {
+    const sessionSets = [
+      { prescribedSetId: splitSquat.id, reps: 8, loadKg: 26, holdSeconds: null, boxHeightCm: null, rpe: 8 },
+    ];
+    expect(prefill({ line: splitSquat, linkedTo: null, sessionSets, lastOuting, unitSystem: "metric" }).load).toBe("26");
+  });
+
   it("uses the planned load in kilograms before the first set", () => {
-    const fields = prefill({ line: splitSquat, inSession: undefined, lastOuting, unitSystem: "metric" });
+    const fields = prefill({ line: splitSquat, linkedTo: null, sessionSets: [], lastOuting, unitSystem: "metric" });
     expect(fields.load).toBe("24");
   });
 
   it("never converts a percentage of 1RM into a load", () => {
-    const fields = prefill({ line: deadlift, inSession: undefined, lastOuting, unitSystem: "metric" });
+    const fields = prefill({ line: deadlift, linkedTo: null, sessionSets: [], lastOuting, unitSystem: "metric" });
     expect(fields.load).toBe("100");
-    const fresh = prefill({ line: deadlift, inSession: undefined, lastOuting: undefined, unitSystem: "metric" });
+    const fresh = prefill({ line: deadlift, linkedTo: null, sessionSets: [], lastOuting: undefined, unitSystem: "metric" });
     expect(fresh.load).toBe("");
   });
 
   it("falls back to the last outing for an unplanned exercise", () => {
-    const fields = prefill({ line: null, inSession: undefined, lastOuting, unitSystem: "metric" });
+    const fields = prefill({ line: null, linkedTo: null, sessionSets: [], lastOuting, unitSystem: "metric" });
     expect(fields).toMatchObject({ reps: "10", load: "100", box: "30", rpe: "" });
   });
 
   it("fills a planned hold for an isometric line", () => {
     const hold = line(4, { reps: null, holdSeconds: 45 });
-    expect(prefill({ line: hold, inSession: undefined, lastOuting: undefined, unitSystem: "metric" })).toMatchObject({ hold: "45", reps: "" });
+    expect(prefill({ line: hold, linkedTo: null, sessionSets: [], lastOuting: undefined, unitSystem: "metric" })).toMatchObject({ hold: "45", reps: "" });
   });
 });

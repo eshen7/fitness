@@ -242,12 +242,12 @@ export function SetLogger({
   // shows for a frame with the old one's numbers in it.
   const formKey = current ? `${current.exerciseId}:${current.line?.id ?? "-"}` : null;
   if (current && form.key !== formKey) {
-    const inSession = byExercise.get(current.exerciseId)?.at(-1);
     setForm({
       key: formKey,
       fields: prefill({
         line: current.line,
-        inSession,
+        linkedTo,
+        sessionSets: byExercise.get(current.exerciseId) ?? [],
         lastOuting: lastSets[current.exerciseId],
         unitSystem,
       }),
@@ -425,7 +425,7 @@ export function SetLogger({
                     Target
                   </p>
                   <p className="mt-0.5 text-sm text-ink tabular-nums">
-                    {describePrescription(current.line)}
+                    {describePrescription(current.line, unitSystem)}
                   </p>
                   {prescriptionDetail(current.line) ? (
                     <p className="mt-0.5 text-xs text-ink-faint">
@@ -601,7 +601,7 @@ export function SetLogger({
                                       ?.name ?? `Exercise ${line.exerciseId}`}
                                   </span>
                                   <span className="block text-xs text-ink-muted tabular-nums">
-                                    {describePrescription(line)}
+                                    {describePrescription(line, unitSystem)}
                                   </span>
                                 </span>
                                 <Tag tone={done >= line.sets ? "accent" : "neutral"}>
