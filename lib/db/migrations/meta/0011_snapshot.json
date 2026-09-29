@@ -1,5 +1,5 @@
 {
-  "id": "ded1b77d-e4e0-4932-8a10-701081e6d987",
+  "id": "c1c7be70-011f-4f70-86f3-8409067240e4",
   "prevId": "a34b479b-cb67-4077-b858-a7a45be80726",
   "version": "7",
   "dialect": "postgresql",
@@ -706,6 +706,12 @@
         },
         "guide_dismissed_at": {
           "name": "guide_dismissed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "profile_saved_at": {
+          "name": "profile_saved_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

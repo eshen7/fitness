@@ -1,1 +1,0 @@
-ALTER TABLE "profile" ADD COLUMN "guide_dismissed_at" timestamp with time zone;

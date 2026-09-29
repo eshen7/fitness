@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import { offerGuide, setupProgress, type SetupFacts } from "./steps";
 
 const fresh: SetupFacts = {
-  hasEquipment: false,
-  hasTrainingDays: false,
+  hasSavedProfile: false,
   hasBodyweight: false,
   hasStandingVertical: false,
   hasFoodTargets: false,
@@ -20,11 +19,12 @@ describe("setupProgress", () => {
     expect(setupProgress(fresh)).toEqual({ done: 0, total: 6, next: "profile" });
   });
 
-  it("wants both equipment and training days before the profile counts", () => {
-    expect(setupProgress({ ...fresh, hasEquipment: true }).next).toBe("profile");
-    expect(
-      setupProgress({ ...fresh, hasEquipment: true, hasTrainingDays: true }),
-    ).toEqual({ done: 1, total: 6, next: "bodyweight" });
+  it("counts the profile once it has been saved", () => {
+    expect(setupProgress({ ...fresh, hasSavedProfile: true })).toEqual({
+      done: 1,
+      total: 6,
+      next: "bodyweight",
+    });
   });
 
   it("points at the earliest gap even when later steps are done", () => {

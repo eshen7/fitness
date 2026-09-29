@@ -1,16 +1,15 @@
 /**
  * The one-time setup, as a checklist the database can answer.
  *
- * Each step is done when the row it produces exists, not when a box was ticked,
- * so the guide cannot claim a profile is set up while the planner still sees an
- * empty one. The order is the order they depend on each other: the planner
+ * Each step is done when the row it produces exists, not when a box was ticked.
+ * The profile is the exception that proves it: its row exists from the seed on,
+ * so it counts once the owner has saved it, whatever the lists then hold. The order is the order they depend on each other: the planner
  * reads the profile, the food targets read the bodyweight, and a week can only
  * be generated inside a block.
  */
 
 export type SetupFacts = {
-  hasEquipment: boolean;
-  hasTrainingDays: boolean;
+  hasSavedProfile: boolean;
   hasBodyweight: boolean;
   hasStandingVertical: boolean;
   hasFoodTargets: boolean;
@@ -31,7 +30,7 @@ export type SetupStep = (typeof SETUP_STEPS)[number];
 export function stepDone(step: SetupStep, facts: SetupFacts): boolean {
   switch (step) {
     case "profile":
-      return facts.hasEquipment && facts.hasTrainingDays;
+      return facts.hasSavedProfile;
     case "bodyweight":
       return facts.hasBodyweight;
     case "vertical":

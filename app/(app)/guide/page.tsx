@@ -11,8 +11,9 @@ const SETUP_WHY: Record<SetupStep, ReactNode> = {
   profile: (
     <>
       Tick every piece of equipment you can use and the weekdays you train. The
-      planner only picks exercises your equipment allows, and an empty list means
-      bodyweight only.
+      planner only picks exercises your equipment allows, so leaving equipment
+      empty means bodyweight only, and leaving the days empty lets the planner
+      choose them. Saving the profile completes this step.
     </>
   ),
   bodyweight: (
@@ -203,8 +204,9 @@ export default async function GuidePage() {
             <Step title="Edit, regenerate or reject">
               <Strong>Edit</Strong> changes a week before you accept it: move a
               session, drop one, or drop an exercise. <Strong>Regenerate</Strong> asks
-              again and replaces the proposal. <Strong>Reject</Strong> throws it away,
-              with a reason if you want one.
+              again and replaces the proposal. <Strong>Reject</Strong> throws it away and
+              needs a short reason, which becomes the strongest steer for the next
+              generation.
             </Step>
             <Step title="A fallback week is a stopgap">
               If the AI cannot produce a week that passes, you get a fallback: your

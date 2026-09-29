@@ -26,8 +26,7 @@ export async function loadGuideState(db: Db = getDb()): Promise<GuideState> {
     await Promise.all([
       db
         .select({
-          equipment: schema.profile.availableEquipment,
-          days: schema.profile.trainableWeekdays,
+          savedAt: schema.profile.profileSavedAt,
           dismissedAt: schema.profile.guideDismissedAt,
         })
         .from(schema.profile)
@@ -42,8 +41,7 @@ export async function loadGuideState(db: Db = getDb()): Promise<GuideState> {
 
   return {
     facts: {
-      hasEquipment: (profile?.equipment.length ?? 0) > 0,
-      hasTrainingDays: (profile?.days.length ?? 0) > 0,
+      hasSavedProfile: (profile?.savedAt ?? null) !== null,
       hasBodyweight,
       hasStandingVertical,
       hasFoodTargets,
