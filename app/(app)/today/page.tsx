@@ -10,6 +10,7 @@ import {
   describePrescription,
   liftsNeedingMax,
   prescriptionDetail,
+  prescriptionMaxes,
 } from "@/lib/prescription";
 import { currentOneRms } from "@/lib/strength/queries";
 import { today } from "@/lib/time";
@@ -25,13 +26,14 @@ export const metadata = { title: "Today" };
  */
 export default async function TodayPage() {
   const day = today();
-  const [days, block, directory, unitSystem, maxes] = await Promise.all([
+  const [days, block, directory, unitSystem, current] = await Promise.all([
     loadPlannedDay(day),
     loadOpenBlock(),
     loadDirectory(),
     getUnitSystem(),
     currentOneRms(),
   ]);
+  const maxes = prescriptionMaxes(directory.exercises, current);
 
   return (
     <>
@@ -121,7 +123,7 @@ export default async function TodayPage() {
                             {describePrescription(
                               prescription,
                               unitSystem,
-                              maxes[String(prescription.exerciseId)]?.kg,
+                              maxes[String(prescription.exerciseId)],
                             )}
                           </span>
                         </div>

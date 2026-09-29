@@ -10,6 +10,7 @@ import {
   plannedSetsForSession,
   sessionById,
 } from "@/lib/log/queries";
+import { prescriptionMaxes } from "@/lib/prescription";
 import { currentOneRms } from "@/lib/strength/queries";
 import type { SessionKind } from "@/lib/taxonomy";
 import { formatDay, formatTime } from "@/lib/time";
@@ -35,7 +36,7 @@ export default async function SessionPage({ params }: { params: Params }) {
   const session = await sessionById(id);
   if (!session) notFound();
 
-  const [rows, plan, sets, lastSets, unitSystem, maxes] = await Promise.all([
+  const [rows, plan, sets, lastSets, unitSystem, current] = await Promise.all([
     listExercises(),
     plannedSetsForSession(id),
     loggedSetsForSession(id),
@@ -89,9 +90,7 @@ export default async function SessionPage({ params }: { params: Params }) {
         plan={plan}
         serverSets={sets}
         lastSets={lastSets}
-        maxes={Object.fromEntries(
-          Object.entries(maxes).map(([exerciseId, max]) => [exerciseId, max.kg]),
-        )}
+        maxes={prescriptionMaxes(rows, current)}
         unitSystem={unitSystem}
         finished={finished}
       />

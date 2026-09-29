@@ -32,7 +32,11 @@ import {
   subscribeQueue,
 } from "@/lib/log/queue";
 import type { LoggedSetRow } from "@/lib/log/queries";
-import { describePrescription, prescriptionDetail } from "@/lib/prescription";
+import {
+  describePrescription,
+  prescriptionDetail,
+  type PrescriptionMaxes,
+} from "@/lib/prescription";
 import type {
   Equipment,
   MovementPattern,
@@ -101,7 +105,7 @@ export function SetLogger({
   serverSets: LoggedSetRow[];
   lastSets: Record<number, LoggerOuting[]>;
   /** Each lift's current max in kilograms, keyed by exercise id, for "% 1RM" lines. */
-  maxes: Record<string, number>;
+  maxes: PrescriptionMaxes;
   unitSystem: UnitSystem;
   finished: boolean;
 }) {

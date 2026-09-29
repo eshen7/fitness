@@ -9,6 +9,7 @@ import type { Directory } from "@/lib/engine/types";
 import { mesocycleTypeLabels, motorAbilityLabels } from "@/lib/labels";
 import { getUnitSystem } from "@/lib/log/queries";
 import { pendingFactCount } from "@/lib/memory/queries";
+import { prescriptionMaxes } from "@/lib/prescription";
 import { currentOneRms } from "@/lib/strength/queries";
 import { today } from "@/lib/time";
 import { CloseBlock } from "./close-block";
@@ -29,7 +30,7 @@ export const metadata = { title: "Plan" };
  * another" next to it is how you end up paying twice for the same week.
  */
 export default async function PlanPage() {
-  const [snapshot, pendingFacts, profile, unitSystem, maxes] = await Promise.all([
+  const [snapshot, pendingFacts, profile, unitSystem, current] = await Promise.all([
     planSnapshot(),
     pendingFactCount(),
     loadProfile(),
@@ -41,7 +42,7 @@ export default async function PlanPage() {
   const names = namesOf(snapshot.directory);
   const loads: PlanLoads = {
     unitSystem,
-    maxes: Object.fromEntries(Object.entries(maxes).map(([id, max]) => [id, max.kg])),
+    maxes: prescriptionMaxes(snapshot.directory.values(), current),
     slugs: Object.fromEntries(
       [...snapshot.directory].map(([id, exercise]) => [String(id), exercise.slug]),
     ),

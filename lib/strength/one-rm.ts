@@ -98,7 +98,7 @@ export function currentOneRm(
   let tested: OneRmReading | null = null;
   for (const reading of readings) {
     if (reading.source !== "tested") continue;
-    if (!tested || reading.day > tested.day) tested = reading;
+    if (!tested || reading.day >= tested.day) tested = reading;
   }
 
   const since = addDays(today, -ESTIMATE_WINDOW_DAYS);
@@ -172,7 +172,9 @@ export function dailyBestEstimates(
 /**
  * One lift's readings, one per day, in day order. A tested max owns the day it
  * was tested on: the warm-ups and openers before an attempt are in the log as
- * sets, and none of them is a better answer than the attempt.
+ * sets, and none of them is a better answer than the attempt. Of two tested maxes
+ * on one day the later in `readings` wins, because the second is the owner
+ * correcting the first; of two estimates the higher does.
  */
 export function oneRmHistory(readings: readonly OneRmReading[]): OneRmReading[] {
   const byDay = new Map<string, OneRmReading>();
@@ -180,8 +182,8 @@ export function oneRmHistory(readings: readonly OneRmReading[]): OneRmReading[] 
     const held = byDay.get(reading.day);
     const wins =
       !held ||
-      (reading.source === "tested" && held.source === "estimated") ||
-      (reading.source === held.source && reading.kg > held.kg);
+      reading.source === "tested" ||
+      (held.source === "estimated" && reading.kg > held.kg);
     if (wins) byDay.set(reading.day, reading);
   }
   return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));

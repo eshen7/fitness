@@ -55,9 +55,31 @@ describe("oneRmHistory", () => {
       ]),
     ).toEqual([estimated("2026-09-10", 140), tested("2026-09-20", 145)]);
   });
+
+  it("lets a tested max corrected on the same day replace the mistyped one", () => {
+    const history = oneRmHistory([
+      estimated("2026-09-20", 150),
+      tested("2026-09-20", 400),
+      tested("2026-09-20", 140),
+    ]);
+    expect(history).toEqual([tested("2026-09-20", 140)]);
+    expect(currentOneRm(history, TODAY)).toEqual(tested("2026-09-20", 140));
+  });
+
+  it("keeps the higher of two estimates on one day", () => {
+    expect(
+      oneRmHistory([estimated("2026-09-20", 150), estimated("2026-09-20", 140)]),
+    ).toEqual([estimated("2026-09-20", 150)]);
+  });
 });
 
 describe("currentOneRm", () => {
+  it("takes the later of two tested maxes on one day", () => {
+    expect(
+      currentOneRm([tested("2026-09-20", 400), tested("2026-09-20", 140)], TODAY),
+    ).toEqual(tested("2026-09-20", 140));
+  });
+
   it("is null with nothing on record", () => {
     expect(currentOneRm([], TODAY)).toBeNull();
   });

@@ -4,7 +4,11 @@ import { Input, Tag } from "@/components/ui";
 import type { MicrocyclePlan, PlannedSet } from "@/lib/engine/types";
 import { loadTypeLabels, sessionKindLabels } from "@/lib/labels";
 import { formatDay } from "@/lib/days";
-import { describePrescription, prescriptionDetail } from "@/lib/prescription";
+import {
+  describePrescription,
+  prescriptionDetail,
+  type PrescriptionMaxes,
+} from "@/lib/prescription";
 import type { UnitSystem } from "@/lib/taxonomy";
 
 /**
@@ -39,12 +43,12 @@ const NUMERIC_FIELDS = [
 
 /**
  * What turns a percentage of 1RM into a load on the bar: the owner's units, each
- * lift's current max in kilograms, and each lift's slug so a lift with no max can
+ * lift's current max from `prescriptionMaxes`, and each lift's slug so a lift with no max can
  * link to the page where one is entered. Keyed by exercise id as a string.
  */
 export type PlanLoads = {
   unitSystem: UnitSystem;
-  maxes: Record<string, number>;
+  maxes: PrescriptionMaxes;
   slugs: Record<string, string>;
 };
 
