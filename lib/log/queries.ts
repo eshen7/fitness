@@ -8,6 +8,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  ne,
 } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import type { PlanLine } from "@/lib/log/plan";
@@ -357,14 +358,17 @@ export type LastSet = {
 };
 
 /**
- * The last set logged for every exercise, which is what the logger prefills from.
+ * The last set logged for every exercise in any other session, which is what the
+ * logger prefills from. The session being logged is left out: its own sets are
+ * already on the device, and counting them here would pass one line's load off as
+ * the last outing of another.
  *
  * Repeating last week's numbers is the common case, and typing them again on a
  * phone between sets is the single thing most likely to stop a set being logged at
  * all. One query for the whole directory rather than one per selection, so the
  * prefill is already on the device when the connection is not.
  */
-export async function lastSetsByExercise() {
+export async function lastSetsByExercise(excludeSessionId: number) {
   const { loggedSets } = schema;
   const rows = await getDb()
     .selectDistinctOn([loggedSets.exerciseId], {
@@ -377,6 +381,7 @@ export async function lastSetsByExercise() {
       performedAt: loggedSets.performedAt,
     })
     .from(loggedSets)
+    .where(ne(loggedSets.sessionId, excludeSessionId))
     .orderBy(loggedSets.exerciseId, desc(loggedSets.performedAt));
 
   const byExercise: Record<number, LastSet> = {};

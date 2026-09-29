@@ -169,6 +169,20 @@ describe("prefill", () => {
     expect(prefill({ line: backOff, linkedTo, sessionSets: adjusted, lastOuting, unitSystem: "metric" }).load).toBe("95");
   });
 
+  it("opens a percentage back-off line at the last outing, not today's top sets", () => {
+    const top = line(5, { exerciseId: 40, sets: 3, reps: 3, loadPctOf1rm: 85 });
+    const backOff = line(6, { exerciseId: 40, sets: 2, reps: 8, loadPctOf1rm: 70 });
+    const heavy = { prescribedSetId: top.id, reps: 3, loadKg: 140, holdSeconds: null, boxHeightCm: null, rpe: 8 };
+    const sessionSets = [heavy, heavy, heavy];
+    const progress = planProgress([top, backOff], sessionSets);
+    const linkedTo = carriesOut(progress, nextLine(progress)!.id);
+    expect(linkedTo).toBe(backOff.id);
+    expect(prefill({ line: backOff, linkedTo, sessionSets, lastOuting, unitSystem: "metric" })).toMatchObject({
+      reps: "8",
+      load: "100",
+    });
+  });
+
   it("carries the session's last set into an extra one past the line", () => {
     const sessionSets = [
       { prescribedSetId: splitSquat.id, reps: 8, loadKg: 26, holdSeconds: null, boxHeightCm: null, rpe: 8 },

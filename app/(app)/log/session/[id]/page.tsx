@@ -38,7 +38,7 @@ export default async function SessionPage({ params }: { params: Params }) {
     listExercises(),
     plannedSetsForSession(id),
     loggedSetsForSession(id),
-    lastSetsByExercise(),
+    lastSetsByExercise(id),
     getUnitSystem(),
   ]);
 

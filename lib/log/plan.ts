@@ -101,9 +101,11 @@ export function carriesOut(
  * the line; then from the exercise's last outing. Only the same line counts: a
  * back-off line of the exercise has a load of its own, and opening it at the top
  * set's would log the back-off at the wrong weight. With no line to carry out, an
- * unplanned exercise or an extra set, the session's last set of the exercise does. A load given as a percentage of 1RM stays a
- * percentage: with no 1RM on record there is nothing honest to convert it with,
- * so the field falls back to what was actually lifted last time.
+ * unplanned exercise or an extra set, the session's last set of the exercise does.
+ * The last outing is a previous session, never this one. A load given as a
+ * percentage of 1RM stays a percentage: with no 1RM on record there is nothing
+ * honest to convert it with, so the field falls back to what was actually lifted
+ * last time.
  *
  * RPE is never filled. It is how the set that just happened felt, and a
  * prefilled one would be a guess dressed up as a measurement.
