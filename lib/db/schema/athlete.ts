@@ -51,6 +51,19 @@ export const profile = pgTable("profile", {
   availableEquipment: text("available_equipment").array().notNull().default([]),
   /** Days of week normally trainable, 0 Sunday to 6 Saturday. */
   trainableWeekdays: smallint("trainable_weekdays").array().notNull().default([]),
+  /**
+   * When the getting-started prompt on Today was dismissed. On the row rather than
+   * in a cookie so that dismissing it on the phone dismisses it on the laptop too.
+   * The generator never reads it.
+   */
+  guideDismissedAt: timestamp("guide_dismissed_at", { withTimezone: true }),
+  /**
+   * When the owner last saved the profile screen, null until they first do. The
+   * setup guide reads this rather than whether the lists are filled, because an
+   * empty equipment list (bodyweight only) and no weekdays (the planner picks) are
+   * both answers the owner can mean. The seed never sets it.
+   */
+  profileSavedAt: timestamp("profile_saved_at", { withTimezone: true }),
   ...stamps,
 });
 

@@ -19,14 +19,15 @@ export async function saveProfile(input: unknown): Promise<ActionResult> {
 
   const db = getDb();
   const stored = await loadProfile(db);
-  const row = profileRow(parsed.data, stored);
+  const now = new Date();
+  const row = { ...profileRow(parsed.data, stored), profileSavedAt: now };
 
   await db
     .insert(schema.profile)
     .values({ id: 1, ...row })
     .onConflictDoUpdate({
       target: schema.profile.id,
-      set: { ...row, updatedAt: new Date() },
+      set: { ...row, updatedAt: now },
     });
 
   // The unit system is read by nearly every screen, and the equipment and the

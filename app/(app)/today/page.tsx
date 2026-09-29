@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { NeedsMaxNote } from "@/components/needs-max-note";
-import { Card, EmptyState, Tag } from "@/components/ui";
+import { Card, DetailLine, EmptyState, Tag } from "@/components/ui";
 import { loadDirectory, loadOpenBlock, loadPlannedDay } from "@/lib/ai/queries";
 import { formatDay } from "@/lib/days";
+import { loadGuideState } from "@/lib/guide/queries";
+import { offerGuide, setupProgress } from "@/lib/guide/steps";
 import { loadTypeLabels, mesocycleTypeLabels, sessionKindLabels } from "@/lib/labels";
 import { getUnitSystem } from "@/lib/log/queries";
+import { quietDay, type QuietDay } from "@/lib/plan/today";
 import {
   describePrescription,
   liftsNeedingMax,
@@ -14,6 +17,7 @@ import {
 } from "@/lib/prescription";
 import { currentOneRms } from "@/lib/strength/queries";
 import { today } from "@/lib/time";
+import { GuidePrompt } from "./guide-prompt";
 
 export const metadata = { title: "Today" };
 
@@ -26,29 +30,47 @@ export const metadata = { title: "Today" };
  */
 export default async function TodayPage() {
   const day = today();
-  const [days, block, directory, unitSystem, current] = await Promise.all([
+  const [days, block, directory, unitSystem, current, guide] = await Promise.all([
     loadPlannedDay(day),
     loadOpenBlock(),
     loadDirectory(),
     getUnitSystem(),
     currentOneRms(),
+    loadGuideState(),
   ]);
   const maxes = prescriptionMaxes(directory.exercises, current);
+  const guided = offerGuide(guide.facts, guide.dismissedAt);
 
   return (
     <>
       <PageHeader
         title="Today"
         subtitle={`${formatDay(day)}. The generated session, with the reasoning behind it.`}
-      />
+      >
+        {/* Always here, so the guide outlives the prompt that offers it. */}
+        <Link
+          href="/guide"
+          className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-accent underline-offset-2 hover:underline"
+        >
+          Guide
+          <span aria-hidden className="ml-1">→</span>
+        </Link>
+      </PageHeader>
 
       <div className="space-y-5">
+        {guided ? <GuidePrompt progress={setupProgress(guide.facts)} /> : null}
+
         {days.length === 0 ? (
-          <EmptyState title="Nothing planned for today">
-            {block
-              ? "This block is open but today is not in a generated week. Generate the next week on Plan."
-              : "No block is open. Declare one on Plan and the weeks follow from it."}
-          </EmptyState>
+          <NothingToday
+            guided={guided}
+            quiet={quietDay(
+              day,
+              block && {
+                plannedMicrocycles: block.declaration.plannedMicrocycles,
+                weeks: block.priorWeeks,
+              },
+            )}
+          />
         ) : null}
 
         {days.map(({ sessionId, session, week, block: meta, completedAt, skippedAt }) => (
@@ -65,18 +87,17 @@ export default async function TodayPage() {
                 {completedAt ? <Tag tone="accent">done</Tag> : null}
                 {skippedAt ? <Tag tone="bad">skipped</Tag> : null}
               </div>
-              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-faint">
-                <span>
-                  Block {meta.ordinal}, {mesocycleTypeLabels.of(meta.type)}
-                </span>
-                <span aria-hidden="true">·</span>
-                <span>Week {week.ordinal}</span>
-                <span aria-hidden="true">·</span>
-                <span>{loadTypeLabels.of(week.loadType)}</span>
-                <span aria-hidden="true">·</span>
-                <span className="tabular-nums">
-                  relative load {week.relativeLoad.toFixed(2)}
-                </span>
+              <p className="text-xs text-ink-faint">
+                <DetailLine
+                  parts={[
+                    `Block ${meta.ordinal}, ${mesocycleTypeLabels.of(meta.type)}`,
+                    `Week ${week.ordinal}`,
+                    loadTypeLabels.of(week.loadType),
+                    <span key="load" className="tabular-nums">
+                      relative load {week.relativeLoad.toFixed(2)}
+                    </span>,
+                  ]}
+                />
               </p>
             </header>
 
@@ -159,5 +180,84 @@ export default async function TodayPage() {
         ))}
       </div>
     </>
+  );
+}
+
+/**
+ * What a day with no session means, and the one thing to do about it.
+ *
+ * A rest day inside a written week is the plan working, so it gets the next
+ * session rather than an instruction to generate the week it is already in.
+ * While the setup prompt is showing it names the next step, so a fresh install
+ * is not sent to declare a block before the planner knows what gym it is for.
+ */
+function NothingToday({ quiet, guided }: { quiet: QuietDay; guided: boolean }) {
+  switch (quiet.kind) {
+    case "no-block":
+      return (
+        <EmptyState
+          title="No block open"
+          action={guided ? null : <PlanLink>Declare a block on Plan</PlanLink>}
+        >
+          A block is the next few weeks: one or two targets and a fixed set of
+          exercises. Once it is open, each week is generated inside it and shows up
+          here.
+        </EmptyState>
+      );
+    case "no-week":
+      return (
+        <EmptyState
+          title="Nothing planned for today"
+          action={<PlanLink>Generate week {quiet.nextOrdinal} on Plan</PlanLink>}
+        >
+          Week {quiet.nextOrdinal} of this block has not been generated yet.
+        </EmptyState>
+      );
+    case "block-done":
+      return (
+        <EmptyState
+          title="Block finished"
+          action={<PlanLink>End it and declare the next on Plan</PlanLink>}
+        >
+          Every planned week of this block is behind you.
+        </EmptyState>
+      );
+    case "rest":
+      if (quiet.next) {
+        return (
+          <EmptyState title="Rest day">
+            Next up: {quiet.next.title ?? sessionKindLabels.of(quiet.next.kind)} on{" "}
+            {/* One unit, so a narrow screen never strands the month on its own line. */}
+            <span className="whitespace-nowrap">{formatDay(quiet.next.day)}.</span>
+          </EmptyState>
+        );
+      }
+      return quiet.nextOrdinal === null ? (
+        <EmptyState
+          title="Rest day"
+          action={<PlanLink>End it and declare the next on Plan</PlanLink>}
+        >
+          That was the last session of this block.
+        </EmptyState>
+      ) : (
+        <EmptyState
+          title="Rest day"
+          action={<PlanLink>Generate week {quiet.nextOrdinal} on Plan</PlanLink>}
+        >
+          That was the last session of this week. The next one is not generated yet.
+        </EmptyState>
+      );
+  }
+}
+
+function PlanLink({ children }: { children: React.ReactNode }) {
+  return (
+    <Link
+      href="/plan"
+      className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-accent underline-offset-2 hover:underline"
+    >
+      {children}
+      <span aria-hidden className="ml-1">→</span>
+    </Link>
   );
 }

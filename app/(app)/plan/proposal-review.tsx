@@ -149,7 +149,8 @@ export function ProposalReview({
         <p className="rounded-field border border-bad/40 bg-bad/5 px-3 py-2 text-sm text-ink-muted">
           The repair loop never converged, so this is the last session of each kind
           at reduced load rather than a new plan. Accepting it keeps training
-          moving; regenerating is usually the better answer.
+          moving. Regenerating is worth it once whatever the gate report names has
+          changed; before that it usually meets the same wall.
         </p>
       ) : null}
 
@@ -253,13 +254,13 @@ export function ProposalReview({
           <SectionTitle>Repair loop</SectionTitle>
           <ol className="mt-1.5 space-y-1">
             {proposal.attempts.map((attempt) => (
-              <li key={attempt.attempt} className="text-sm text-ink-muted">
+              <li key={attempt.attempt} className="text-sm [overflow-wrap:anywhere] text-ink-muted">
                 <span className="text-ink-faint">Attempt {attempt.attempt}:</span>{" "}
                 {attempt.error
                   ? attempt.error
                   : attempt.passed
                     ? "passed"
-                    : `${attempt.violations.length} violation${attempt.violations.length === 1 ? "" : "s"} - ${[...new Set(attempt.violations.map((violation) => violation.rule))].join(", ")}`}
+                    : `${attempt.violations.length} violation${attempt.violations.length === 1 ? "" : "s"} - ${ruleCounts(attempt.violations)}`}
               </li>
             ))}
           </ol>
@@ -401,7 +402,12 @@ export function ProposalReview({
           </div>
         ) : null}
 
-        {canRegenerate === false && !shown ? (
+        {proposal.scope === "mesocycle" && !canAccept(proposal, shown) ? (
+          <p className="text-sm text-ink-faint">
+            No attempt passed the rules, so there is nothing to accept. Reject it,
+            fix what the messages above name, and declare the block again.
+          </p>
+        ) : canRegenerate === false && !shown ? (
           <p className="text-sm text-ink-faint">
             There is nothing to accept here. Regenerate, or fix the prompt first.
           </p>
@@ -557,6 +563,15 @@ function readSuggestions(proposal: unknown): Suggestion[] {
       },
     ];
   });
+}
+
+/** Each broken rule once, with how often: five `closed-set`s read as one problem. */
+function ruleCounts(violations: readonly { rule: string }[]): string {
+  const counts = new Map<string, number>();
+  for (const { rule } of violations) counts.set(rule, (counts.get(rule) ?? 0) + 1);
+  return [...counts]
+    .map(([rule, count]) => (count === 1 ? rule : `${rule} x${count}`))
+    .join(", ");
 }
 
 function parseWeek(value: unknown): MicrocyclePlan | null {

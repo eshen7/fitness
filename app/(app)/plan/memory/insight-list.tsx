@@ -20,9 +20,9 @@ import { dayOf, formatDay } from "@/lib/time";
 export function InsightList({ insights }: { insights: StoredInsight[] }) {
   if (insights.length === 0) {
     return (
-      <EmptyState title="Nothing computed yet">
-        The suite is recomputed nightly, and every statement in it needs a few weeks of
-        logged training before it can say anything.
+      <EmptyState title="Nothing to say yet">
+        Every statement here needs a few weeks of logged training before there is
+        anything to compute. The suite runs nightly, and Recompute runs it now.
       </EmptyState>
     );
   }

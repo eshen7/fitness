@@ -502,9 +502,8 @@ export function SetLogger({
                   <Input
                     type="number"
                     inputMode="decimal"
-                    step="0.5"
+                    step="any"
                     min="0"
-                    placeholder={bodyweightOnly ? "bodyweight" : undefined}
                     value={fields.load}
                     onChange={(event) =>
                       setFields((f) => ({ ...f, load: event.target.value }))
@@ -517,7 +516,7 @@ export function SetLogger({
                     <Input
                       type="number"
                       inputMode="decimal"
-                      step="0.5"
+                      step="any"
                       min="0"
                       value={fields.box}
                       onChange={(event) =>
@@ -542,14 +541,26 @@ export function SetLogger({
                   />
                 </Field>
               </div>
+              {/* A hint line rather than a placeholder: the load column is a
+                  third of the card at 390px, too narrow for the word. */}
+              {bodyweightOnly ? (
+                <p className="mt-1.5 text-xs text-ink-faint">
+                  Load is added weight. Leave it empty for bodyweight.
+                </p>
+              ) : null}
 
               <div className="mt-3">
-                <span className="mb-1.5 block text-sm font-medium text-ink-muted">
-                  Quality
-                </span>
+                <div className="mb-1.5 flex items-baseline justify-between gap-3">
+                  <span className="text-sm font-medium text-ink-muted">Quality</span>
+                  <span className="text-xs text-ink-faint">1 fell apart · 5 clean</span>
+                </div>
                 {/* Only well-executed reps count toward adaptation, so a set that
                     fell apart is worth marking as one at the time. */}
-                <div className="grid grid-cols-5 gap-1.5">
+                <div
+                  role="group"
+                  aria-label="Quality, 1 fell apart, 5 clean"
+                  className="grid grid-cols-5 gap-1.5"
+                >
                   {[1, 2, 3, 4, 5].map((score) => (
                     <button
                       key={score}

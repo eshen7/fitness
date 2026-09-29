@@ -2,11 +2,18 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "@/lib/db";
 import { getDb, schema } from "@/lib/db";
 import { addDays } from "@/lib/days";
-import type { Change, Directory, Violation } from "@/lib/engine/types";
+import { prefilter } from "@/lib/engine/prefilter";
+import type { Change, Directory, Exclusion, Violation } from "@/lib/engine/types";
 import { hasApiKey, type AiUsage } from "./client";
 import type { Attempt, GenerationAsk } from "./generate";
 import { costOf, SPEND_CAP_USD } from "./pricing";
-import { loadDirectory, loadOpenBlock, type BlockState } from "./queries";
+import {
+  loadDirectory,
+  loadOpenBlock,
+  loadProfile,
+  loadTendonReadings,
+  type BlockState,
+} from "./queries";
 
 /**
  * Reading proposals back out.
@@ -241,6 +248,13 @@ export type PlanSnapshot = {
   history: StoredProposal[];
   /** Where the next week would start, so the button can say the date. */
   nextWeek: { ordinal: number; startDate: string } | null;
+  /**
+   * The open block's complex exercises the prefilter removes today, with why.
+   * A complex is declared once, and a tendon that has since gone into protocol
+   * or equipment taken off the profile leaves each week to be built around the
+   * gap; the owner should see that before the gate or the fallback says it.
+   */
+  sidelined: Exclusion[];
   spendUsd: number;
   spendCapUsd: number;
   hasKey: boolean;
@@ -248,11 +262,13 @@ export type PlanSnapshot = {
 
 /** Everything `/plan` renders, in one round of queries. */
 export async function planSnapshot(db: Db = getDb()): Promise<PlanSnapshot> {
-  const [block, directory, spendUsd, history] = await Promise.all([
+  const [block, directory, spendUsd, history, profile, tendon] = await Promise.all([
     loadOpenBlock(db),
     loadDirectory(db),
     totalSpendUsd(db),
     loadProposalHistory(12, db),
+    loadProfile(db),
+    loadTendonReadings(28, db),
   ]);
 
   // With a block open the question is which week comes next; without one it is
@@ -270,12 +286,25 @@ export async function planSnapshot(db: Db = getDb()): Promise<PlanSnapshot> {
     };
   }
 
+  // The same inputs `loadContext` hands the generator, so this is the candidate
+  // set the next week will actually be drawn from.
+  const complex = new Set(block?.declaration.complex.map((item) => item.exerciseId));
+  const sidelined = complex.size
+    ? prefilter({
+        exercises: directory.exercises,
+        tendon,
+        availableEquipment: profile.availableEquipment,
+        asOf: new Date(),
+      }).excluded.filter((exclusion) => complex.has(exclusion.exerciseId))
+    : [];
+
   return {
     block,
     directory: directory.directory,
     pending,
     history,
     nextWeek,
+    sidelined,
     spendUsd,
     spendCapUsd: SPEND_CAP_USD,
     hasKey: hasApiKey(),

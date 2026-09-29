@@ -18,6 +18,15 @@ describe("dayTicks", () => {
     expect(ticks.at(-1)).toBe("2026-09-15");
   });
 
+  it("labels a window shorter than the tick count once per day", () => {
+    const one = dayNumber("2026-09-29");
+    expect(dayTicks({ min: one, max: one })).toStrictEqual(["2026-09-29"]);
+    expect(dayTicks({ min: one, max: one + 1 })).toStrictEqual([
+      "2026-09-29",
+      "2026-09-30",
+    ]);
+  });
+
   it("uses fewer labels on a shorter window", () => {
     const short = dayTicks({ min: 0, max: 20 });
     const long = dayTicks({ min: 0, max: 200 });

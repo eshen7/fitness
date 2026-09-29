@@ -13,6 +13,8 @@ export type ReadinessPrefill = {
   soreness: Partial<Record<MuscleGroup, number>>;
   motivation: number | null;
   priorSessionRpe: string;
+  /** True when the RPE came from the last finished session, not a saved check-in. */
+  priorSessionRpeFilled: boolean;
   notes: string;
 };
 
@@ -139,7 +141,11 @@ export function ReadinessForm({ prefill }: { prefill: ReadinessPrefill }) {
 
         <Field
           label="Prior session RPE"
-          hint="1 to 10, how hard the last session actually felt. Prescribed minus actual is the correction factor the generator calibrates against."
+          hint={`1 to 10, how hard the last session actually felt.${
+            prefill.priorSessionRpeFilled && priorSessionRpe === prefill.priorSessionRpe
+              ? " Filled in from what you gave when you finished it."
+              : ""
+          } Prescribed minus actual is the correction factor the generator calibrates against.`}
           error={result?.errors?.priorSessionRpe}
         >
           <Input

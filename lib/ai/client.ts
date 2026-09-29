@@ -5,7 +5,7 @@ import type {
   ResponseFunctionToolCall,
   ResponseInputItem,
 } from "openai/resources/responses/responses";
-import type * as z from "zod";
+import * as z from "zod";
 import { EMBEDDING_DIMENSIONS } from "@/lib/db/schema/memory";
 
 /**
@@ -166,6 +166,53 @@ export class AiOutputError extends Error {
 }
 
 /**
+ * An answer that arrived but did not parse as the schema, as the attempt it is.
+ *
+ * `responses.parse` validates `output_parsed` by throwing, so a plan with one enum
+ * value out of range surfaces as a `ZodError` and a cut-off JSON body as a
+ * `SyntaxError`. Both are the model's answer being wrong, which the repair loop can
+ * retry; left unclassified they read as an outage and end the whole generation.
+ * Anything else is not the answer's fault and returns null.
+ */
+export function unparseable(
+  error: unknown,
+  label: string,
+  usage: AiUsage = EMPTY_USAGE,
+): AiOutputError | null {
+  if (error instanceof z.ZodError) {
+    return new AiOutputError(
+      "unparseable",
+      `${label}: the answer did not match the schema (${schemaIssues(error)}).`,
+      usage,
+    );
+  }
+  if (error instanceof SyntaxError) {
+    return new AiOutputError("unparseable", `${label}: the answer was not valid JSON.`, usage);
+  }
+  return null;
+}
+
+/**
+ * A schema failure in a line a person can read: the first few issues by path.
+ *
+ * A `ZodError`'s own message is the issue list as pretty-printed JSON, which is
+ * useful in a log and several screens wide in a status line.
+ */
+export function schemaIssues(error: z.ZodError, shown = 3): string {
+  const issues = error.issues.slice(0, shown).map((issue) => {
+    const path = issue.path.map(String).join(".");
+    // Zod joins the allowed values with a bare `|`, one unbreakable run of text.
+    const message =
+      issue.code === "invalid_value"
+        ? `expected one of ${issue.values.map(String).join(", ")}`
+        : issue.message;
+    return path ? `${path}: ${message}` : message;
+  });
+  const more = error.issues.length - shown;
+  return more > 0 ? `${issues.join("; ")}; and ${more} more` : issues.join("; ");
+}
+
+/**
  * A failure that is not the model's - a dropped connection, a 5xx - carrying
  * what had already been billed when it happened.
  *
@@ -236,6 +283,17 @@ function functionCallsOf(response: Response): ResponseFunctionToolCall[] {
   );
 }
 
+function outputTextOf(response: Response): string {
+  const parts: string[] = [];
+  for (const item of response.output) {
+    if (item.type !== "message") continue;
+    for (const part of item.content) {
+      if (part.type === "output_text") parts.push(part.text);
+    }
+  }
+  return parts.join("");
+}
+
 function refusalOf(response: Response): string | null {
   for (const item of response.output) {
     if (item.type !== "message") continue;
@@ -249,9 +307,11 @@ function refusalOf(response: Response): string | null {
 /**
  * The live client.
  *
- * `responses.parse` gives the strict JSON schema and the validated
- * `output_parsed` in one call; the tool loop around it is ours to run, because
- * parsing a response deliberately does not execute tool callbacks.
+ * `zodTextFormat` gives the strict JSON schema; the answer is validated here
+ * rather than by `responses.parse`, because that helper validates by throwing
+ * from inside the call, before its usage can be read. A plan one enum value off
+ * the schema was billed like any other, and the meter has to see it. The tool
+ * loop is ours to run either way, since parsing does not execute tool callbacks.
  */
 export const openaiClient: AiClient = {
   async propose<T>(call: AiCall<T>): Promise<AiResult<T>> {
@@ -272,7 +332,7 @@ export const openaiClient: AiClient = {
 
     try {
       for (let turn = 0; turn <= MAX_TOOL_TURNS; turn += 1) {
-        const response = await client.responses.parse({
+        const response = await client.responses.create({
           model: GENERATION_MODEL,
           input: inputOf(call, history),
           tools,
@@ -303,7 +363,8 @@ export const openaiClient: AiClient = {
 
         const calls = functionCallsOf(response);
         if (calls.length === 0) {
-          if (response.output_parsed === null || response.output_parsed === undefined) {
+          const text = outputTextOf(response);
+          if (!text) {
             throw new AiOutputError(
               "empty",
               `${call.label}: the response carried neither a tool call nor a plan.`,
@@ -311,7 +372,7 @@ export const openaiClient: AiClient = {
             );
           }
           return {
-            output: response.output_parsed,
+            output: call.schema.parse(JSON.parse(text)),
             model: response.model,
             usage,
             toolCalls,
@@ -343,7 +404,7 @@ export const openaiClient: AiClient = {
       );
     } catch (error) {
       if (error instanceof AiOutputError) throw error;
-      throw new BilledFailure(error, usage, GENERATION_MODEL);
+      throw unparseable(error, call.label, usage) ?? new BilledFailure(error, usage, GENERATION_MODEL);
     }
   },
 

@@ -66,8 +66,14 @@ export function TargetsCard({
             In force since {formatDay(target.effectiveFrom)}
             {target.fluidMl ? `. Fluid ${(target.fluidMl / 1000).toFixed(1)} L a day` : ""}.
           </p>
+          {/* Dated, because it was written then: "no block is open" stays in the
+              rationale after a block opens, and read in the present tense it
+              contradicts the tag above. */}
           {target.rationale ? (
-            <p className="mt-2 text-sm text-ink-muted">{target.rationale}</p>
+            <p className="mt-2 text-sm text-ink-muted">
+              <span className="text-ink-faint">When set: </span>
+              {target.rationale}
+            </p>
           ) : null}
           <p className="mt-2 text-xs text-ink-faint">
             {defaultsNote(directionOf(goalOf(target)))}

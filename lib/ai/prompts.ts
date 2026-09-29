@@ -151,6 +151,11 @@ ${lines.join("\n")}
 Return a complete corrected plan, not a patch, in the same schema.${urgency} Change only what these violations require; everything else about the plan was accepted.${normalized}`;
 }
 
+/** The retry after an answer that did not fit the schema, with what did not fit. */
+export function unparseableRequest(reason: string) {
+  return `Your last answer could not be read as a plan. ${reason} Return a complete plan in the required schema, using only the allowed values.`;
+}
+
 /** The model's own plan, echoed back so a repair turn has something to correct. */
 export function priorAttemptTurn(plan: unknown) {
   return `Attempt submitted:\n${JSON.stringify(plan)}`;

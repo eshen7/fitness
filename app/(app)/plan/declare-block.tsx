@@ -110,7 +110,10 @@ export function DeclareBlock({
       </div>
 
       {message ? (
-        <p role="status" className={`text-sm ${ok ? "text-ink-muted" : "text-bad"}`}>
+        <p
+          role="status"
+          className={`text-sm [overflow-wrap:anywhere] ${ok ? "text-ink-muted" : "text-bad"}`}
+        >
           {message}
         </p>
       ) : null}

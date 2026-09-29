@@ -47,6 +47,7 @@ export default async function PlanPage() {
       [...snapshot.directory].map(([id, exercise]) => [String(id), exercise.slug]),
     ),
   };
+  const sidelinedIds = new Set(snapshot.sidelined.map((exclusion) => exclusion.exerciseId));
 
   return (
     <>
@@ -178,6 +179,9 @@ export default async function PlanPage() {
                           {names[String(item.exerciseId)] ?? `Exercise ${item.exerciseId}`}
                         </span>
                         <span className="flex shrink-0 items-center gap-1.5">
+                          {sidelinedIds.has(item.exerciseId) ? (
+                            <Tag tone="warn">out for now</Tag>
+                          ) : null}
                           {item.isMain ? <Tag tone="accent">main</Tag> : null}
                           <span className="text-xs text-ink-faint tabular-nums">
                             {item.targetWeeklyFrequency ?? 2}x/wk
@@ -195,6 +199,26 @@ export default async function PlanPage() {
                     stable. End the block and declare the next one.
                   </p>
                 )}
+                {snapshot.sidelined.length ? (
+                  <div className="mt-3 rounded-field border border-warn/40 bg-warn/5 px-3 py-2.5 text-sm text-ink-muted">
+                    <p>
+                      <span className="font-medium text-warn">
+                        {snapshot.sidelined.length} of {block.declaration.complex.length}{" "}
+                        out for now.
+                      </span>{" "}
+                      The next week is planned without{" "}
+                      {snapshot.sidelined.length === 1 ? "it" : "them"}, and until that
+                      changes a regenerated week meets the same gap. If most of the
+                      complex is out, ending the block and declaring one around what you
+                      can do fits better.
+                    </p>
+                    <ul className="mt-2 space-y-1 text-xs text-ink-faint">
+                      {snapshot.sidelined.map((exclusion) => (
+                        <li key={exclusion.exerciseId}>{exclusion.message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
               </div>
             </Card>
           ) : null}
@@ -203,7 +227,15 @@ export default async function PlanPage() {
 
           {pending ? (
             <>
-              <ProposalReview proposal={pending} names={names} loads={loads} />
+              {/* Keyed by proposal: a regeneration is a different proposal, and an
+                  edit draft or an open reason form carried across to it would
+                  accept the week that was just thrown away under the new one's id. */}
+              <ProposalReview
+                key={pending.id}
+                proposal={pending}
+                names={names}
+                loads={loads}
+              />
               {block && nextWeek ? (
                 <Card>
                   <h2 className="text-base font-semibold text-ink">
@@ -214,6 +246,7 @@ export default async function PlanPage() {
                     it, so the reason it was thrown away stays on the record.
                   </p>
                   <GenerateWeek
+                    key={pending.id}
                     mesocycleId={block.mesocycleId}
                     ordinal={pending.ask?.ordinal ?? nextWeek.ordinal}
                     startDate={pending.ask?.startDate ?? nextWeek.startDate}

@@ -14,7 +14,7 @@ import type {
   PlannedSession,
 } from "@/lib/engine/types";
 import type { SessionKind } from "@/lib/taxonomy";
-import { BilledFailure, GENERATION_MODEL, setAiClient } from "./client";
+import { BilledFailure, GENERATION_MODEL, setAiClient, unparseable } from "./client";
 import type { GenerationContext } from "./context";
 import { fakeAiClient, refused, truncated, type FakeStep } from "./fake";
 import { fixtureBlock, fixtureContext, tendonReading } from "./fixtures";
@@ -26,7 +26,11 @@ import {
   generateWeek,
   repairAttemptsOf,
 } from "./generate";
-import type { DeclarationProposal, WeekProposal } from "./schemas";
+import {
+  declarationProposalSchema,
+  type DeclarationProposal,
+  type WeekProposal,
+} from "./schemas";
 
 /**
  * The generation pipeline end to end, with no key and no database.
@@ -185,6 +189,22 @@ describe("declaring a block", () => {
       null,
     ]);
     expect(repairAttemptsOf(run)).toBe(2);
+  });
+
+  it("tells the model what was off the schema and lets it try again", async () => {
+    const offSchema = unparseable(
+      declarationProposalSchema.safeParse({}).error,
+      "block declaration",
+    );
+    if (!offSchema) throw new Error("expected an unparseable error");
+    const client = use([{ error: offSchema }, { output: declarationProposal() }]);
+    const run = await generateDeclaration({ context: fixtureContext(), ...ask });
+
+    expect(run.passed).toBe(true);
+    expect(run.attempts[0].error).toBe(offSchema.message);
+    expect(client.calls[1].turns).toHaveLength(2);
+    expect(client.calls[1].turns[1].role).toBe("user");
+    expect(client.calls[1].turns[1].content).toContain(offSchema.message);
   });
 });
 

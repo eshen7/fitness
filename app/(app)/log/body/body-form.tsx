@@ -16,7 +16,7 @@ const HINTS: Record<BodyKind, string> = {
     "Only when it was actually measured. Comparing estimated 1RM change against lean mass change is what separates a neural gain from a hypertrophy one.",
   body_fat_pct: "Relative strength is what predicts jumping, so this is context for it.",
   reach_height:
-    "Measured once, and again after a growth spurt. Standing reach turns a vertical into a touch height.",
+    "Measured once, and again after a growth spurt. A touch height minus this is the vertical to log as a test.",
 };
 
 export function BodyForm({ unitSystem }: { unitSystem: UnitSystem }) {

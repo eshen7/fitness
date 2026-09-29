@@ -1,6 +1,6 @@
 "use client";
 
-import { Input, Tag } from "@/components/ui";
+import { DetailLine, Input, Tag } from "@/components/ui";
 import type { MicrocyclePlan, PlannedSet } from "@/lib/engine/types";
 import { loadTypeLabels, sessionKindLabels } from "@/lib/labels";
 import { formatDay } from "@/lib/days";
@@ -113,11 +113,17 @@ export function WeekEditor({
         <Tag tone={week.loadType === "stimulating" ? "accent" : "cool"}>
           {loadTypeLabels.of(week.loadType)}
         </Tag>
-        <span>Week {week.ordinal}</span>
-        <span aria-hidden="true">·</span>
-        <span>from {formatDay(week.startDate)}</span>
-        <span aria-hidden="true">·</span>
-        <span>relative load {week.relativeLoad.toFixed(2)}</span>
+        <span>
+          <DetailLine
+            parts={[
+              `Week ${week.ordinal}`,
+              `from ${formatDay(week.startDate)}`,
+              <span key="load" className="tabular-nums">
+                relative load {week.relativeLoad.toFixed(2)}
+              </span>,
+            ]}
+          />
+        </span>
       </div>
 
       {week.sessions.length === 0 ? (
@@ -146,7 +152,7 @@ export function WeekEditor({
                       a `w-*` here only races it. It takes the room the button leaves. */}
                   <Input
                     type="date"
-                    aria-label={`Day for ${sessionKindLabels.of(session.kind)}`}
+                    aria-label={`Day for ${session.title ?? sessionKindLabels.of(session.kind)}`}
                     value={session.day}
                     onChange={(event) =>
                       onMoveSession?.(sessionIndex, event.target.value)
@@ -156,6 +162,7 @@ export function WeekEditor({
                   <button
                     type="button"
                     onClick={() => onDropSession?.(sessionIndex)}
+                    aria-label={`Drop ${session.title ?? sessionKindLabels.of(session.kind)} on ${formatDay(session.day)}`}
                     className="h-11 shrink-0 rounded-field border border-bad/40 px-3 text-xs font-semibold whitespace-nowrap text-bad transition hover:bg-bad/10"
                   >
                     Drop session
@@ -232,6 +239,7 @@ export function WeekEditor({
                           <button
                             type="button"
                             onClick={() => onDropItem?.(sessionIndex, item.exerciseId)}
+                            aria-label={`Drop ${names[String(item.exerciseId)] ?? `exercise ${item.exerciseId}`} from ${session.title ?? sessionKindLabels.of(session.kind)}`}
                             className="h-11 rounded-field border border-bad/40 px-3 text-xs font-semibold text-bad transition hover:bg-bad/10"
                           >
                             Drop

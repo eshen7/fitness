@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/page-header";
 import { Card, Tag } from "@/components/ui";
-import { readinessForDay } from "@/lib/log/queries";
+import { lastReportedSessionRpe, readinessForDay } from "@/lib/log/queries";
+import { priorRpePrefill } from "@/lib/log/readiness";
 import type { MuscleGroup } from "@/lib/taxonomy";
 import { formatDay, today } from "@/lib/time";
 import { ReadinessForm, type ReadinessPrefill } from "./readiness-form";
@@ -37,15 +38,18 @@ export default async function ReadinessPage({
   searchParams: Promise<{ whoop?: string; reason?: string }>;
 }) {
   const day = today();
-  const [row, { whoop, reason }] = await Promise.all([
+  const [row, lastRpe, { whoop, reason }] = await Promise.all([
     readinessForDay(day),
+    lastReportedSessionRpe(),
     searchParams,
   ]);
+  const priorRpe = priorRpePrefill(row, lastRpe);
 
   const prefill: ReadinessPrefill = {
     soreness: (row?.sorenessByRegion ?? {}) as Partial<Record<MuscleGroup, number>>,
     motivation: row?.motivation ?? null,
-    priorSessionRpe: row?.priorSessionRpe ? String(Number(row.priorSessionRpe)) : "",
+    priorSessionRpe: priorRpe.value,
+    priorSessionRpeFilled: priorRpe.filled,
     notes: row?.notes ?? "",
   };
 
