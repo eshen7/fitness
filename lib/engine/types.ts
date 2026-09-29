@@ -13,7 +13,7 @@ import {
   type MuscleGroup,
   type TendonSite,
 } from "@/lib/taxonomy";
-import type { RuleId } from "./rules";
+import type { Invariant, RuleId } from "./rules";
 
 /**
  * The shapes the rule engine reads and writes.
@@ -36,6 +36,11 @@ export const plannedSetSchema = z.object({
   loadPctOf1rm: z.number().int().min(1).max(120).nullish(),
   loadKg: z.number().nonnegative().nullish(),
   boxHeightCm: z.number().nonnegative().nullish(),
+  /**
+   * How hard the set should feel, 1 to 10. The gate requires one on every working
+   * set of a training session; mobility work and the non-training sessions may
+   * leave it empty.
+   */
   targetRpe: z.number().min(1).max(10).nullish(),
   tempo: z.string().nullish(),
   /** Normalizer-owned. The model may suggest one; the heavy and plyo rest rules decide. */
@@ -162,12 +167,11 @@ export type Change = {
 /**
  * A gate failure, returned to the model as a structured repair request.
  *
- * `closed-set` is not one of the eighteen rules. It is the invariant the three
- * pre-filter rules rely on: a plan naming an exercise outside the candidate set
- * would route around them, so the gate checks it before anything else.
+ * An invariant is not one of the eighteen rules; `INVARIANTS` in `rules.ts` says
+ * what each one protects.
  */
 export type Violation = {
-  rule: RuleId | "closed-set";
+  rule: RuleId | Invariant;
   scope: "mesocycle" | "microcycle" | "session";
   message: string;
   day?: string;

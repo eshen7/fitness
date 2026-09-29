@@ -98,6 +98,20 @@ export const RULES = {
 
 export type RuleId = keyof typeof RULES;
 
+/**
+ * What the gate holds besides the eighteen rules. Neither is a prescription from
+ * the ebook; each is a condition something else depends on.
+ *
+ * - `closed-set`: every exercise named is in the candidate set. The three
+ *   pre-filter rules rely on it, because a plan naming an excluded exercise would
+ *   route around them.
+ * - `target-rpe`: every working set in a training session names a target RPE.
+ *   Effort adherence and prescription calibration hold a reported RPE against it,
+ *   so a week without one leaves both empty however much of it is logged.
+ */
+export const INVARIANTS = ["closed-set", "target-rpe"] as const;
+export type Invariant = (typeof INVARIANTS)[number];
+
 export function rulesIn(stage: RuleStage) {
   return (Object.keys(RULES) as RuleId[]).filter((id) => RULES[id].stage === stage);
 }

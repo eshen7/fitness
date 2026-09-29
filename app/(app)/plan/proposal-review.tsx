@@ -241,7 +241,7 @@ export function ProposalReview({
                   ? attempt.error
                   : attempt.passed
                     ? "passed"
-                    : `${attempt.violations.length} violation${attempt.violations.length === 1 ? "" : "s"} - ${attempt.violations.map((violation) => violation.rule).join(", ")}`}
+                    : `${attempt.violations.length} violation${attempt.violations.length === 1 ? "" : "s"} - ${[...new Set(attempt.violations.map((violation) => violation.rule))].join(", ")}`}
               </li>
             ))}
           </ol>

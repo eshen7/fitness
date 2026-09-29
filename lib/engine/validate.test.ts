@@ -22,6 +22,7 @@ import {
   plyoFrequency,
   stableComplex,
   targetCount,
+  targetRpe,
   type GateInput,
 } from "./validate";
 
@@ -95,6 +96,52 @@ describe("closed-set", () => {
     const week = baselineWeek();
     week.relativeLoad = 0.8;
     expect(gate(input({ eligible, week })).map((v) => v.rule)).toEqual(["closed-set"]);
+  });
+});
+
+describe("target-rpe", () => {
+  function clearRpe(week: MicrocyclePlan, day: number, ids: number[]) {
+    for (const block of week.sessions[day].blocks) {
+      for (const item of block.items) {
+        if (ids.includes(item.exerciseId)) item.targetRpe = null;
+      }
+    }
+    return week;
+  }
+
+  it("names every working set a session left without one, once per exercise", () => {
+    const week = clearRpe(baselineWeek(), 0, [DEPTH_JUMP, BACK_SQUAT, PLANK]);
+    expect(targetRpe(input({ week }))).toEqual([
+      {
+        rule: "target-rpe",
+        scope: "session",
+        day: week.sessions[0].day,
+        exerciseIds: [DEPTH_JUMP, BACK_SQUAT, PLANK],
+        message:
+          "Mon 21 Sept prescribes 3 exercises with no target RPE (Depth jump, Back squat and Plank). Every working set in a training session names one, from 1 to 10, so how hard it felt can be held against how hard it was meant to be.",
+      },
+    ]);
+  });
+
+  it("does not ask one of mobility work", () => {
+    const week = baselineWeek();
+    week.sessions[0].blocks.unshift({
+      label: "Warm-up",
+      items: [{ exerciseId: idOf("ankle-dorsiflexion-mobilization"), sets: 1, reps: 10 }],
+    });
+    expect(targetRpe(input({ week }))).toEqual([]);
+  });
+
+  it("leaves the non-training sessions their own prescriptions", () => {
+    for (const kind of ["tendon_protocol", "test", "mobility", "rest"] as const) {
+      const week = clearRpe(baselineWeek(), 1, [BACK_SQUAT, TRAP_BAR, BENCH]);
+      week.sessions[1].kind = kind;
+      expect(targetRpe(input({ week })), kind).toEqual([]);
+    }
+  });
+
+  it("has nothing to check at declaration", () => {
+    expect(targetRpe(input({ week: undefined }))).toEqual([]);
   });
 });
 

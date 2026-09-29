@@ -56,6 +56,7 @@ const approach = (sets: number): PlannedSet => ({
   exerciseId: APPROACH,
   sets,
   reps: 8,
+  targetRpe: 7,
   restSeconds: 90,
   couplingClass: "short_ssc",
 });
@@ -64,6 +65,7 @@ const depthJump = (sets: number): PlannedSet => ({
   sets,
   reps: 8,
   boxHeightCm: 45,
+  targetRpe: 8,
   restSeconds: 150,
   couplingClass: "short_ssc",
   shockMethod: true,
@@ -72,6 +74,7 @@ const bound = (sets: number): PlannedSet => ({
   exerciseId: BOUND,
   sets,
   reps: 8,
+  targetRpe: 7,
   restSeconds: 90,
   couplingClass: "short_ssc",
 });
@@ -81,11 +84,13 @@ const lift = (
   reps: number,
   loadPctOf1rm: number | null,
   restSeconds: number,
-): PlannedSet => ({ exerciseId, sets, reps, loadPctOf1rm, restSeconds });
+  targetRpe: number,
+): PlannedSet => ({ exerciseId, sets, reps, loadPctOf1rm, targetRpe, restSeconds });
 const plank = (sets: number): PlannedSet => ({
   exerciseId: PLANK,
   sets,
   holdSeconds: 45,
+  targetRpe: 6,
   restSeconds: 60,
 });
 
@@ -100,7 +105,7 @@ export function baselineSessions(start = WEEK_START): PlannedSession[] {
         { label: "Jumps", items: [approach(3), depthJump(4), bound(3)] },
         {
           label: "Strength",
-          items: [lift(BACK_SQUAT, 5, 3, 87, 270), lift(BENCH, 3, 5, 82, 270)],
+          items: [lift(BACK_SQUAT, 5, 3, 87, 270, 8.5), lift(BENCH, 3, 5, 82, 270, 8)],
         },
         { label: "Core", items: [plank(2)] },
       ],
@@ -114,10 +119,10 @@ export function baselineSessions(start = WEEK_START): PlannedSession[] {
         {
           label: "Strength",
           items: [
-            lift(BACK_SQUAT, 3, 3, 80, 270),
-            lift(TRAP_BAR, 3, 5, 75, 180),
-            lift(BENCH, 2, 8, 70, 120),
-            lift(PULL_UP, 2, 8, null, 120),
+            lift(BACK_SQUAT, 3, 3, 80, 270, 7),
+            lift(TRAP_BAR, 3, 5, 75, 180, 7),
+            lift(BENCH, 2, 8, 70, 120, 7),
+            lift(PULL_UP, 2, 8, null, 120, 7),
           ],
         },
         { label: "Core", items: [plank(2)] },
@@ -132,7 +137,7 @@ export function baselineSessions(start = WEEK_START): PlannedSession[] {
         { label: "Jumps", items: [approach(3), depthJump(3), bound(3)] },
         {
           label: "Strength",
-          items: [lift(TRAP_BAR, 4, 4, 85, 270), lift(PULL_UP, 3, 8, null, 120)],
+          items: [lift(TRAP_BAR, 4, 4, 85, 270, 8.5), lift(PULL_UP, 3, 8, null, 120, 7.5)],
         },
       ],
     },

@@ -240,6 +240,32 @@ describe("generating a week", () => {
     expect(repsFor(run.week!, DEPTH_JUMP)).toEqual([12, 8]);
   });
 
+  it("asks for a target RPE and sends back a week that prescribes none", async () => {
+    const client = use([
+      { output: weekProposal(withoutTargetRpe(baselineWeek())) },
+      { output: weekProposal() },
+    ]);
+    const run = await generate({});
+
+    // Without one on every working set, the effort half of Progress has nothing
+    // to hold a reported RPE against, however many sessions are logged.
+    expect(client.calls[0].stable).toContain("targetRpe");
+    expect(run.attempts[0].passed).toBe(false);
+    expect(new Set(run.attempts[0].violations.map((violation) => violation.rule))).toEqual(
+      new Set(["target-rpe"]),
+    );
+    expect(client.calls[1].turns[2].content).toContain(
+      run.attempts[0].violations[0].message,
+    );
+
+    expect(run.passed).toBe(true);
+    const items = run.week!.sessions.flatMap((session) =>
+      session.blocks.flatMap((block) => block.items),
+    );
+    expect(items.length).toBeGreaterThan(0);
+    for (const item of items) expect(item.targetRpe).toBeTypeOf("number");
+  });
+
   describe("a tendon in protocol phase 2", () => {
     const context = fixtureContext({
       block: fixtureBlock(),
@@ -458,6 +484,20 @@ function overdosedPlyos(): MicrocyclePlan {
       },
       ...week.sessions.slice(1),
     ],
+  };
+}
+
+/** A week as the generator wrote it before it was asked for a target RPE. */
+function withoutTargetRpe(week: MicrocyclePlan): MicrocyclePlan {
+  return {
+    ...week,
+    sessions: week.sessions.map((session) => ({
+      ...session,
+      blocks: session.blocks.map((block) => ({
+        ...block,
+        items: block.items.map((item) => ({ ...item, targetRpe: null })),
+      })),
+    })),
   };
 }
 
