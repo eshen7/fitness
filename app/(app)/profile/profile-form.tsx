@@ -45,7 +45,7 @@ type LengthState = { text: string; cm: number | null };
 
 const LENGTH_HINTS: Record<LengthField, string> = {
   heightCm: "Standing, without shoes.",
-  reachCm: "Flat-footed, one arm up. Turns a touch height into a vertical.",
+  reachCm: "Flat-footed, one arm up. A touch height minus this is the vertical to log as a test.",
   femurCm: "Hip crease to knee joint. Longer limbs need more torque for the same force.",
   tibiaCm: "Knee joint to ankle bone.",
 };

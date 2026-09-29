@@ -127,9 +127,13 @@ describe("SpendMeter", () => {
 });
 
 describe("formatUsd", () => {
-  it("keeps four decimals, because a generation costs well under a cent", () => {
+  it("keeps four decimals below a dollar, because a generation costs well under a cent", () => {
     expect(formatUsd(0.00123)).toBe("$0.0012");
     expect(formatUsd(0)).toBe("$0.0000");
-    expect(formatUsd(10)).toBe("$10.0000");
+  });
+
+  it("shows cents from a dollar up, where the fourth place is noise", () => {
+    expect(formatUsd(1)).toBe("$1.00");
+    expect(formatUsd(10)).toBe("$10.00");
   });
 });

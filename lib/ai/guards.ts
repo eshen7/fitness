@@ -1,5 +1,6 @@
 import type { Db } from "@/lib/db";
-import { AiOutputError, BilledFailure, GENERATION_MODEL } from "./client";
+import * as z from "zod";
+import { AiOutputError, BilledFailure, GENERATION_MODEL, schemaIssues } from "./client";
 import { formatUsd, SPEND_CAP_USD } from "./pricing";
 import { recordSpend, totalSpendUsd } from "./proposals";
 
@@ -59,7 +60,10 @@ export async function capReached(db: Db, subject: string): Promise<Refusal | nul
   };
 }
 
-export function reasonOf(error: unknown) {
+/** Why a call failed, short enough for the status line it is shown in. */
+export function reasonOf(error: unknown): string {
+  const cause = error instanceof BilledFailure ? error.cause : error;
+  if (cause instanceof z.ZodError) return `the answer did not match the schema (${schemaIssues(cause)})`;
   return error instanceof Error ? error.message : "unknown error";
 }
 

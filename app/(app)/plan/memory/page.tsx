@@ -110,17 +110,11 @@ export default async function MemoryPage() {
         </section>
 
         <section>
-          {/*
-            Negative bottom margin on the row, not the button: the button's 44px hit
-            area is padding, so a heading row sized by it would sit a thumb's width
-            above the list it labels.
-          */}
-          <div className="-mb-1 flex items-center justify-between gap-3">
+          <RecomputeInsights>
             <h2 className="text-base font-semibold text-ink">
               What the numbers support
             </h2>
-            <RecomputeInsights />
-          </div>
+          </RecomputeInsights>
           <InsightList insights={insights} />
         </section>
 

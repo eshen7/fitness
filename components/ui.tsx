@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import { Fragment, type ComponentProps, type ReactNode } from "react";
 
 /**
  * The shared visual primitives. Deliberately small and unabstracted: this is a
@@ -167,9 +167,12 @@ export function Pips({
 export function EmptyState({
   title,
   children,
+  action,
 }: {
   title: string;
   children?: ReactNode;
+  /** The one thing to do about it, under the explanation. */
+  action?: ReactNode;
 }) {
   return (
     <div className="rounded-box border border-line border-dashed bg-surface/40 px-6 py-10 text-center">
@@ -177,6 +180,31 @@ export function EmptyState({
       {children ? (
         <p className="mx-auto mt-1.5 max-w-sm text-sm text-ink-faint">{children}</p>
       ) : null}
+      {action ? <div className="mt-3 flex justify-center">{action}</div> : null}
     </div>
+  );
+}
+
+/**
+ * A short run of facts, `A · B · C`, that wraps only between facts.
+ *
+ * Each separator travels with the fact after it, so a wrapped line starts with
+ * one instead of the line above ending on one: a separator left hanging at the
+ * edge of a card reads as a missing value. The breakable space is the one before
+ * the separator; the one after it is non-breaking.
+ */
+export function DetailLine({ parts }: { parts: readonly ReactNode[] }) {
+  return (
+    <>
+      {parts.map((part, index) => (
+        <Fragment key={index}>
+          {index > 0 ? " " : null}
+          <span className="whitespace-nowrap">
+            {index > 0 ? <span aria-hidden="true">{"·\u00a0"}</span> : null}
+            {part}
+          </span>
+        </Fragment>
+      ))}
+    </>
   );
 }

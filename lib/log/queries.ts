@@ -218,6 +218,7 @@ export async function finishedSessions(day = today()) {
     .select({
       id: sessions.id,
       kind: sessions.kind,
+      title: sessions.title,
       completedAt: sessions.completedAt,
       sessionRpe: sessions.reportedRpe,
       sets: count(loggedSets.id),
@@ -228,6 +229,7 @@ export async function finishedSessions(day = today()) {
     .groupBy(
       sessions.id,
       sessions.kind,
+      sessions.title,
       sessions.completedAt,
       sessions.reportedRpe,
     )
@@ -240,6 +242,23 @@ export async function finishedSessions(day = today()) {
     sessionRpe: row.sessionRpe === null ? null : Number(row.sessionRpe),
     sets: Number(row.sets),
   }));
+}
+
+/**
+ * How hard the last finished session felt, as reported when it was finished.
+ *
+ * The morning check-in asks the same question, so it starts from this answer
+ * rather than asking the owner to type the number a second time.
+ */
+export async function lastReportedSessionRpe(): Promise<number | null> {
+  const { sessions } = schema;
+  const [row] = await getDb()
+    .select({ rpe: sessions.reportedRpe })
+    .from(sessions)
+    .where(and(isNotNull(sessions.completedAt), isNotNull(sessions.reportedRpe)))
+    .orderBy(desc(sessions.completedAt))
+    .limit(1);
+  return row?.rpe == null ? null : Number(row.rpe);
 }
 
 export async function sessionById(id: number) {

@@ -61,13 +61,19 @@ export function tickIndexes(count: number, wanted = 4) {
  * Dates are wide, so a label per reading would overlap into a gray smear at phone
  * width. The hover readout carries the exact day for any point, which is what
  * makes it safe for the axis to be this sparse.
+ *
+ * A window shorter than the tick count rounds several ticks onto the same day, and
+ * a first week of data is exactly that window: one weigh-in is a zero-day span. The
+ * repeats are dropped rather than stacked, because three copies of one date drawn on
+ * top of each other also share a React key.
  */
 export function dayTicks({ min, max }: { min: number; max: number }) {
   const span = max - min;
   const count = span > 120 ? 5 : span > 40 ? 4 : 3;
-  return Array.from({ length: count }, (_, i) =>
+  const days = Array.from({ length: count }, (_, i) =>
     new Date(Math.round(min + (span * i) / (count - 1)) * 86_400_000)
       .toISOString()
       .slice(0, 10),
   );
+  return [...new Set(days)];
 }

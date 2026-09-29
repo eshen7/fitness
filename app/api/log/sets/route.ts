@@ -1,3 +1,4 @@
+import { and, inArray, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb, schema } from "@/lib/db";
 import { loggedSetBatchSchema, loggedSetSchema } from "@/lib/log/schemas";
@@ -96,6 +97,24 @@ export async function POST(request: Request) {
         }
       }
     }
+  }
+
+  // A planned session is written by accepting a week, long before anyone trains,
+  // so it has no start until its first set lands. The earliest set's own time
+  // rather than now, because a queue flushed after a gym with no signal arrives
+  // an hour late.
+  if (sessionIds.size) {
+    await db
+      .update(schema.sessions)
+      .set({
+        startedAt: sql`(select min(${schema.loggedSets.performedAt}) from ${schema.loggedSets} where ${schema.loggedSets.sessionId} = ${schema.sessions.id})`,
+      })
+      .where(
+        and(
+          inArray(schema.sessions.id, [...sessionIds]),
+          isNull(schema.sessions.startedAt),
+        ),
+      );
   }
 
   for (const id of sessionIds) revalidatePath(`/log/session/${id}`);

@@ -18,6 +18,16 @@ import { displayUnit, round1 } from "@/lib/units";
  */
 const BLANK_ATTEMPTS = ["", "", ""];
 
+/**
+ * What number an attempt is. Nothing converts a touch height, so a vertical is
+ * entered as the jump itself; asking for "(in)" alone invites the reading off
+ * the wall.
+ */
+function attemptHint(kind: TestKind): string {
+  if (kind === "broad_jump") return "Takeoff line to the back of the nearer heel.";
+  return "The jump itself: touch height minus standing reach.";
+}
+
 export function TestForm({ unitSystem }: { unitSystem: UnitSystem }) {
   const [kind, setKind] = useState<TestKind>("standing_vertical");
   const [attempts, setAttempts] = useState<string[]>(BLANK_ATTEMPTS);
@@ -95,6 +105,7 @@ export function TestForm({ unitSystem }: { unitSystem: UnitSystem }) {
           measurement noise floor, and the smallest change the chart is allowed to
           call real is derived from it.
         </p>
+        <p className="mt-1 text-xs text-ink-muted">{attemptHint(kind)}</p>
 
         <div className="mt-4 space-y-2">
           {attempts.map((value, index) => (

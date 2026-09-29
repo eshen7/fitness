@@ -81,13 +81,23 @@ export default async function LogPage() {
         </div>
         {session ? (
           <>
+            {/*
+              A planned session exists from the moment its week is accepted, so
+              an open row with nothing in it is today's plan waiting rather than
+              a workout left running.
+            */}
             <p className="mt-1.5 text-xs text-ink-faint">
-              {sessionKindLabels.of(session.kind)} · open since{" "}
-              {session.startedAt ? formatTime(session.startedAt) : "earlier"} ·{" "}
-              {setsToday} {setsToday === 1 ? "set" : "sets"} logged
+              {session.title ?? sessionKindLabels.of(session.kind)}
+              {setsToday === 0
+                ? session.microcycleId === null
+                  ? " · open, nothing logged yet"
+                  : " · planned for today"
+                : `${session.startedAt ? ` · started ${formatTime(session.startedAt)}` : ""} · ${setsToday} ${setsToday === 1 ? "set" : "sets"} logged`}
             </p>
             <Link href={`/log/session/${session.id}`} className="mt-3 block">
-              <Button className="w-full sm:w-auto">Continue session</Button>
+              <Button className="w-full sm:w-auto">
+                {setsToday === 0 ? "Start session" : "Continue session"}
+              </Button>
             </Link>
           </>
         ) : (
@@ -117,7 +127,7 @@ export default async function LogPage() {
                   className="flex items-baseline justify-between gap-2 text-xs"
                 >
                   <span className="truncate text-ink-muted">
-                    {sessionKindLabels.of(row.kind)}
+                    {row.title ?? sessionKindLabels.of(row.kind)}
                   </span>
                   <span className="tnum shrink-0 text-ink-faint">
                     {row.sets} {row.sets === 1 ? "set" : "sets"}

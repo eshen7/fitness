@@ -32,6 +32,7 @@ import {
   declarationAsk,
   priorAttemptTurn,
   repairRequest,
+  unparseableRequest,
   weekAsk,
 } from "./prompts";
 import {
@@ -365,6 +366,12 @@ async function attemptOnce<T extends DeclarationProposal | WeekProposal>(
       passed: false,
       error: error.message,
     });
+    // An answer off the schema is one the model can fix if it is told how. A
+    // truncated or declined one says nothing it could act on, so it is simply
+    // asked again.
+    if (error.reason === "unparseable") {
+      call.turns.push({ role: "user", content: unparseableRequest(error.message) });
+    }
     return null;
   }
 }

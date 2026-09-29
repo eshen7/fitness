@@ -87,7 +87,7 @@ export function DepthJumpCard({
       {points.length < 2 ? (
         <p className="text-xs text-ink-faint">
           {points.length === 0
-            ? "No depth jumps recorded. Test a standing vertical first, then drop from a low box and measure again."
+            ? "No depth jump tests yet. Depth jumps logged in a session do not count here: on Log, Test, record a standing vertical, then a depth jump test from a low box, raising the box a little each time."
             : "One height recorded. The protocol needs a few, raised progressively, before there is a curve to read."}
         </p>
       ) : (

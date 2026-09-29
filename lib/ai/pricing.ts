@@ -134,7 +134,11 @@ export class SpendMeter {
   }
 }
 
-/** Four decimal places, because a single generation costs well under a cent. */
+/**
+ * Four decimal places below a dollar, because a single generation costs well
+ * under a cent; cents above it, where the fourth place is noise. The cap is the
+ * number read most often, and "$10.0000" reads like a price per token.
+ */
 export function formatUsd(usd: number): string {
-  return `$${usd.toFixed(4)}`;
+  return `$${usd.toFixed(Math.abs(usd) >= 1 ? 2 : 4)}`;
 }
