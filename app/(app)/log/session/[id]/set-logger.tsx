@@ -19,7 +19,7 @@ import {
   planProgress,
   prefill,
   type LoggerFields,
-  type LoggerLastSet,
+  type LoggerOuting,
   type PlanLine,
 } from "@/lib/log/plan";
 import {
@@ -98,7 +98,7 @@ export function SetLogger({
   /** The session's prescription lines in order; empty for an ad-hoc session. */
   plan: PlanLine[];
   serverSets: LoggedSetRow[];
-  lastSets: Record<number, LoggerLastSet>;
+  lastSets: Record<number, LoggerOuting[]>;
   unitSystem: UnitSystem;
   finished: boolean;
 }) {
@@ -246,9 +246,8 @@ export function SetLogger({
       key: formKey,
       fields: prefill({
         line: current.line,
-        linkedTo,
         sessionSets: byExercise.get(current.exerciseId) ?? [],
-        lastOuting: lastSets[current.exerciseId],
+        outings: lastSets[current.exerciseId] ?? [],
         unitSystem,
       }),
     });

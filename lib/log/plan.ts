@@ -38,6 +38,44 @@ export type LoggerLastSet = {
   rpe: number | null;
 };
 
+/** What makes two lines the same work across weeks, whichever row each one is. */
+export type PrescriptionShape = Pick<
+  PlannedSet,
+  "reps" | "holdSeconds" | "loadPctOf1rm" | "targetRpe" | "boxHeightCm"
+>;
+
+/**
+ * A set from an earlier session, with the shape of the line it carried out, or
+ * null for one logged off plan. The latest of each shape, newest first.
+ */
+export type LoggerOuting = LoggerLastSet & { shape: PrescriptionShape | null };
+
+function sameShape(a: PrescriptionShape, b: PrescriptionShape) {
+  return (
+    a.reps === b.reps &&
+    a.holdSeconds === b.holdSeconds &&
+    a.loadPctOf1rm === b.loadPctOf1rm &&
+    a.targetRpe === b.targetRpe &&
+    a.boxHeightCm === b.boxHeightCm
+  );
+}
+
+/**
+ * The earlier outing a new set may borrow from.
+ *
+ * For a planned line only a set that carried out a line of the same shape counts:
+ * last week's back-off is not this week's top set, and borrowing its load would
+ * open the top set at the back-off weight. With no such set there is nothing to
+ * borrow. An unplanned exercise has no shape to match, so its latest set does.
+ */
+export function lastOutingFor(
+  line: PlanLine | null,
+  outings: readonly LoggerOuting[],
+): LoggerOuting | undefined {
+  if (line === null) return outings[0];
+  return outings.find((outing) => outing.shape !== null && sameShape(outing.shape, line));
+}
+
 /** The form as typed, in display units. */
 export type LoggerFields = {
   reps: string;
@@ -98,11 +136,10 @@ export function carriesOut(
  * Load and drop height come first from this session's last set carrying out the
  * same line, because a load adjusted after the first set is the athlete
  * calibrating and retyping it every set is how sets stop being logged; then from
- * the line; then from the exercise's last outing. Only the same line counts: a
- * back-off line of the exercise has a load of its own, and opening it at the top
- * set's would log the back-off at the wrong weight. With no line to carry out, an
- * unplanned exercise or an extra set, the session's last set of the exercise does.
- * The last outing is a previous session, never this one. A load given as a
+ * the line; then from `lastOutingFor`. Only the same line counts: a back-off line
+ * of the exercise has a load of its own, and opening it at the top set's would
+ * log the back-off at the wrong weight. An unplanned exercise carries the
+ * session's last set of it. A load given as a
  * percentage of 1RM stays a percentage: with no 1RM on record there is nothing
  * honest to convert it with, so the field falls back to what was actually lifted
  * last time.
@@ -112,24 +149,23 @@ export function carriesOut(
  */
 export function prefill({
   line,
-  linkedTo,
   sessionSets,
-  lastOuting,
+  outings,
   unitSystem,
 }: {
   line: PlanLine | null;
-  /** From `carriesOut`: the line this set counts toward, if any. */
-  linkedTo: number | null;
   /** This session's sets of the exercise, in order. */
   sessionSets: readonly (LoggerLastSet & PlanEntry)[];
-  lastOuting: LoggerLastSet | undefined;
+  /** The exercise's earlier outings, from `lastSetsByExercise`. */
+  outings: readonly LoggerOuting[];
   unitSystem: UnitSystem;
 }): LoggerFields {
   const inSession = (
-    linkedTo === null
+    line === null
       ? sessionSets
-      : sessionSets.filter((set) => set.prescribedSetId === linkedTo)
+      : sessionSets.filter((set) => set.prescribedSetId === line.id)
   ).at(-1);
+  const lastOuting = lastOutingFor(line, outings);
   const previous = inSession ?? lastOuting;
   const reps = line?.reps ?? previous?.reps;
   const hold = line?.holdSeconds ?? previous?.holdSeconds;

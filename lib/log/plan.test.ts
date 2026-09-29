@@ -137,10 +137,11 @@ describe("plan progress", () => {
 });
 
 describe("prefill", () => {
-  const lastOuting = { reps: 10, loadKg: 100, holdSeconds: null, boxHeightCm: 30, rpe: 9 };
+  const offPlan = { reps: 10, loadKg: 100, holdSeconds: null, boxHeightCm: 30, rpe: 9, shape: null };
+  const outings = [offPlan];
 
   it("fills reps and the plan's box height, in display units", () => {
-    const fields = prefill({ line: depthJump, linkedTo: null, sessionSets: [], lastOuting, unitSystem: "metric" });
+    const fields = prefill({ line: depthJump, sessionSets: [], outings, unitSystem: "metric" });
     expect(fields).toMatchObject({ reps: "6", box: "45", rpe: "" });
   });
 
@@ -148,7 +149,7 @@ describe("prefill", () => {
     const sessionSets = [
       { prescribedSetId: splitSquat.id, reps: 7, loadKg: 26, holdSeconds: null, boxHeightCm: null, rpe: 8 },
     ];
-    const fields = prefill({ line: splitSquat, linkedTo: splitSquat.id, sessionSets, lastOuting, unitSystem: "metric" });
+    const fields = prefill({ line: splitSquat, sessionSets, outings, unitSystem: "metric" });
     expect(fields).toMatchObject({ reps: "8", load: "26" });
   });
 
@@ -160,26 +161,44 @@ describe("prefill", () => {
     const progress = planProgress([top, backOff], sessionSets);
     const next = nextLine(progress);
     expect(next).toBe(backOff);
-    const linkedTo = carriesOut(progress, next!.id);
-    expect(prefill({ line: next, linkedTo, sessionSets, lastOuting, unitSystem: "metric" })).toMatchObject({
+    expect(prefill({ line: next, sessionSets, outings, unitSystem: "metric" })).toMatchObject({
       reps: "8",
       load: "100",
     });
     const adjusted = [...sessionSets, { ...heavy, prescribedSetId: backOff.id, reps: 8, loadKg: 95 }];
-    expect(prefill({ line: backOff, linkedTo, sessionSets: adjusted, lastOuting, unitSystem: "metric" }).load).toBe("95");
+    expect(prefill({ line: backOff, sessionSets: adjusted, outings, unitSystem: "metric" }).load).toBe("95");
   });
 
-  it("opens a percentage back-off line at the last outing, not today's top sets", () => {
+  it("opens each line of a repeated week at its own last load", () => {
     const top = line(5, { exerciseId: 40, sets: 3, reps: 3, loadPctOf1rm: 85 });
     const backOff = line(6, { exerciseId: 40, sets: 2, reps: 8, loadPctOf1rm: 70 });
-    const heavy = { prescribedSetId: top.id, reps: 3, loadKg: 140, holdSeconds: null, boxHeightCm: null, rpe: 8 };
+    // Last week, newest first: the back-off at 100 was logged after the top sets at 140.
+    const lastWeek = [
+      { reps: 8, loadKg: 100, holdSeconds: null, boxHeightCm: null, rpe: 7, shape: backOff },
+      { reps: 3, loadKg: 140, holdSeconds: null, boxHeightCm: null, rpe: 8, shape: top },
+    ];
+    expect(prefill({ line: top, sessionSets: [], outings: lastWeek, unitSystem: "metric" }).load).toBe("140");
+
+    const heavy = { prescribedSetId: top.id, reps: 3, loadKg: 142.5, holdSeconds: null, boxHeightCm: null, rpe: 8 };
     const sessionSets = [heavy, heavy, heavy];
     const progress = planProgress([top, backOff], sessionSets);
-    const linkedTo = carriesOut(progress, nextLine(progress)!.id);
-    expect(linkedTo).toBe(backOff.id);
-    expect(prefill({ line: backOff, linkedTo, sessionSets, lastOuting, unitSystem: "metric" })).toMatchObject({
+    expect(nextLine(progress)).toBe(backOff);
+    expect(prefill({ line: backOff, sessionSets, outings: lastWeek, unitSystem: "metric" })).toMatchObject({
       reps: "8",
       load: "100",
+    });
+  });
+
+  it("leaves the load blank rather than borrow a different line's", () => {
+    const backOff = line(6, { exerciseId: 40, sets: 2, reps: 8, loadPctOf1rm: 70 });
+    const topOnly = [
+      { reps: 3, loadKg: 140, holdSeconds: null, boxHeightCm: 45, rpe: 8, shape: { ...backOff, loadPctOf1rm: 85 } },
+      offPlan,
+    ];
+    expect(prefill({ line: backOff, sessionSets: [], outings: topOnly, unitSystem: "metric" })).toMatchObject({
+      reps: "8",
+      load: "",
+      box: "",
     });
   });
 
@@ -187,28 +206,29 @@ describe("prefill", () => {
     const sessionSets = [
       { prescribedSetId: splitSquat.id, reps: 8, loadKg: 26, holdSeconds: null, boxHeightCm: null, rpe: 8 },
     ];
-    expect(prefill({ line: splitSquat, linkedTo: null, sessionSets, lastOuting, unitSystem: "metric" }).load).toBe("26");
+    expect(prefill({ line: splitSquat, sessionSets, outings, unitSystem: "metric" }).load).toBe("26");
   });
 
   it("uses the planned load in kilograms before the first set", () => {
-    const fields = prefill({ line: splitSquat, linkedTo: null, sessionSets: [], lastOuting, unitSystem: "metric" });
+    const fields = prefill({ line: splitSquat, sessionSets: [], outings, unitSystem: "metric" });
     expect(fields.load).toBe("24");
   });
 
   it("never converts a percentage of 1RM into a load", () => {
-    const fields = prefill({ line: deadlift, linkedTo: null, sessionSets: [], lastOuting, unitSystem: "metric" });
+    const same = [{ ...offPlan, shape: deadlift }];
+    const fields = prefill({ line: deadlift, sessionSets: [], outings: same, unitSystem: "metric" });
     expect(fields.load).toBe("100");
-    const fresh = prefill({ line: deadlift, linkedTo: null, sessionSets: [], lastOuting: undefined, unitSystem: "metric" });
+    const fresh = prefill({ line: deadlift, sessionSets: [], outings: [], unitSystem: "metric" });
     expect(fresh.load).toBe("");
   });
 
   it("falls back to the last outing for an unplanned exercise", () => {
-    const fields = prefill({ line: null, linkedTo: null, sessionSets: [], lastOuting, unitSystem: "metric" });
+    const fields = prefill({ line: null, sessionSets: [], outings, unitSystem: "metric" });
     expect(fields).toMatchObject({ reps: "10", load: "100", box: "30", rpe: "" });
   });
 
   it("fills a planned hold for an isometric line", () => {
     const hold = line(4, { reps: null, holdSeconds: 45 });
-    expect(prefill({ line: hold, linkedTo: null, sessionSets: [], lastOuting: undefined, unitSystem: "metric" })).toMatchObject({ hold: "45", reps: "" });
+    expect(prefill({ line: hold, sessionSets: [], outings: [], unitSystem: "metric" })).toMatchObject({ hold: "45", reps: "" });
   });
 });
