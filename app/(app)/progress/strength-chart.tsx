@@ -18,7 +18,7 @@ import { displayUnit, round1, toDisplay } from "@/lib/units";
 import { dayTicks, shortDay } from "@/lib/progress/axis";
 
 /**
- * Relative strength: estimated 1RM over trend bodyweight, per lift.
+ * Relative strength: 1RM over trend bodyweight, per lift.
  *
  * The ebook is explicit that relative strength predicts jumping and absolute
  * strength does not, so the ratio is what gets the axis and the kilograms live in
@@ -87,12 +87,13 @@ export function StrengthChart({
   return (
     <ChartCard
       title="Relative strength"
-      note="Estimated 1RM over smoothed bodyweight. This is the ratio that predicts jumping, so a lift that grew only as fast as bodyweight reads flat here on purpose."
+      note="1RM over smoothed bodyweight, estimated from heavy sets or tested. This is the ratio that predicts jumping, so a lift that grew only as fast as bodyweight reads flat here on purpose."
     >
       {inChart.length === 0 ? (
         <p className="text-xs text-ink-faint">
-          Needs an estimated 1RM and a bodyweight. Log a heavy set and a morning
-          weight and both halves of the ratio exist.
+          Needs a 1RM and a bodyweight. Log a heavy set of a strength lift, 1 to
+          10 reps with a load, or enter a tested max on its library page, then a
+          morning weight, and both halves of the ratio exist.
         </p>
       ) : (
         <>
@@ -142,7 +143,7 @@ export function StrengthChart({
                 title: shortDay(day),
                 rows: (byDay.get(day) ?? []).map((point) => ({
                   label: point.exerciseName,
-                  value: `${point.relative.toFixed(2)}× · ${showMass(point.oneRmKg)} ${massUnit}`,
+                  value: `${point.relative.toFixed(2)}× · ${showMass(point.oneRmKg)} ${massUnit}${point.source === "tested" ? ", tested" : ""}`,
                   color: SERIES[drawn.findIndex((lift) => lift.id === point.exerciseId)],
                 })),
               }))}
@@ -162,7 +163,7 @@ export function StrengthChart({
           ) : null}
 
           <TableView
-            caption="Estimated 1RM and the ratio to trend bodyweight, per lift"
+            caption="1RM and the ratio to trend bodyweight, per lift"
             columns={["Date", "Lift", `1RM (${massUnit})`, "× bodyweight"]}
             rows={usable
               .slice()
@@ -170,7 +171,7 @@ export function StrengthChart({
               .map((point) => [
                 shortDay(point.day),
                 point.exerciseName,
-                showMass(point.oneRmKg),
+                `${showMass(point.oneRmKg)}${point.source === "tested" ? " tested" : ""}`,
                 point.relative.toFixed(2),
               ])}
           />

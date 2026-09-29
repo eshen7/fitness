@@ -185,7 +185,7 @@ export const measurementKindLabels = labels<MeasurementKind>({
   one_foot_approach_right: "One foot approach, right",
   broad_jump: "Broad jump",
   depth_jump_vertical: "Depth jump",
-  estimated_1rm: "Estimated 1RM",
+  tested_1rm: "Tested 1RM",
   lean_mass: "Lean mass",
   body_fat_pct: "Body fat",
   reach_height: "Standing reach",

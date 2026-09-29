@@ -13,8 +13,10 @@ import {
   invalid,
   readinessSchema,
   tendonSchema,
+  testedMaxSchema,
   testSchema,
 } from "@/lib/log/schemas";
+import { estimatesOneRm } from "@/lib/strength/one-rm";
 import type { SessionKind, TendonSite } from "@/lib/taxonomy";
 import { SESSION_KINDS } from "@/lib/taxonomy";
 import { today } from "@/lib/time";
@@ -109,6 +111,40 @@ export async function logBodyValue(input: unknown): Promise<ActionResult> {
   revalidatePath("/log");
   revalidatePath("/progress");
   return { ok: true, message: "Logged." };
+}
+
+/**
+ * A max the owner tested, which every "% 1RM" prescription of the lift is then
+ * loaded from ahead of the estimate from work sets. Only for a lift a one-rep
+ * max means something for, the same rule the estimates follow.
+ */
+export async function logTestedMax(input: unknown): Promise<ActionResult> {
+  const parsed = testedMaxSchema.safeParse(input);
+  if (!parsed.success) return invalid(parsed.error);
+  const { exerciseId, value } = parsed.data;
+
+  const db = getDb();
+  const [exercise] = await db
+    .select({ slug: schema.exercises.slug, forceVelocity: schema.exercises.forceVelocity })
+    .from(schema.exercises)
+    .where(eq(schema.exercises.id, exerciseId));
+  if (!exercise || !estimatesOneRm(exercise)) {
+    return { ok: false, message: "A one-rep max is only kept for a max strength lift." };
+  }
+
+  const system = await getUnitSystem();
+  await db.insert(schema.measurements).values({
+    kind: "tested_1rm",
+    exerciseId,
+    value: toCanonical(value, "mass", system).toFixed(2),
+    unit: "kg",
+    measuredAt: new Date(),
+    source: "manual",
+  });
+
+  // Today, the plan and the set logger all load prescriptions from the max.
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Saved. Prescriptions now load from it." };
 }
 
 /**

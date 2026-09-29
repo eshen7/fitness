@@ -233,3 +233,23 @@ export type LoggedSetInput = z.input<typeof loggedSetSchema>;
 export const loggedSetBatchSchema = z.object({
   sets: z.array(z.unknown()).min(1).max(200),
 });
+
+/**
+ * A max the owner actually lifted, in display units. The server checks the
+ * exercise is one a one-rep max means something for.
+ */
+export const testedMaxSchema = z.object({
+  exerciseId: z.number().int().positive(),
+  value: z
+    .string()
+    .trim()
+    .min(1, "Enter the weight lifted.")
+    .transform((raw, ctx) => {
+      const value = Number(raw);
+      if (!Number.isFinite(value) || value <= 0 || value > 1000) {
+        ctx.addIssue({ code: "custom", message: "Enter a positive weight." });
+        return z.NEVER;
+      }
+      return value;
+    }),
+});

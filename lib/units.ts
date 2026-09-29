@@ -40,7 +40,7 @@ const DIMENSIONS: Record<MeasurementKind, Dimension> = {
   one_foot_approach_right: "length",
   broad_jump: "length",
   depth_jump_vertical: "length",
-  estimated_1rm: "mass",
+  tested_1rm: "mass",
   lean_mass: "mass",
   body_fat_pct: "percent",
   reach_height: "length",

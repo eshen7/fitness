@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { NeedsMaxNote } from "@/components/needs-max-note";
 import { Button, Card, Field, Tag, Textarea } from "@/components/ui";
 import { acceptProposal, rejectProposalAction } from "@/lib/ai/actions";
 import { diffWeeks, identityOrigins } from "@/lib/ai/edits";
@@ -22,8 +23,9 @@ import {
   movementPatternLabels,
   muscleGroupLabels,
 } from "@/lib/labels";
+import { liftsNeedingMax } from "@/lib/prescription";
 import { useVerdictOutcome } from "./verdict-outcome";
-import { WeekEditor, type WeekEdit } from "./week-editor";
+import { WeekEditor, type PlanLoads, type WeekEdit } from "./week-editor";
 
 /**
  * Stage 5 of the pipeline: the proposal, everything behind it, and a verdict.
@@ -43,10 +45,12 @@ import { WeekEditor, type WeekEdit } from "./week-editor";
 export function ProposalReview({
   proposal,
   names,
+  loads,
   canRegenerate,
 }: {
   proposal: StoredProposal;
   names: Record<string, string>;
+  loads: PlanLoads;
   canRegenerate?: boolean;
 }) {
   const router = useRouter();
@@ -181,6 +185,7 @@ export function ProposalReview({
               week={shown}
               proposed={week ?? undefined}
               names={names}
+              loads={loads}
               editing={edited !== null}
               sessionKeys={draft?.origins}
               onChange={change}
@@ -197,6 +202,19 @@ export function ProposalReview({
                     : current,
                 )
               }
+            />
+          </div>
+          <div className="mt-2 empty:hidden">
+            <NeedsMaxNote
+              lifts={liftsNeedingMax(
+                shown.sessions.flatMap((session) =>
+                  session.blocks.flatMap((block) => block.items),
+                ),
+                loads.maxes,
+              ).map((id) => ({
+                name: names[String(id)] ?? `Exercise ${id}`,
+                slug: loads.slugs[String(id)] ?? "",
+              }))}
             />
           </div>
           {edited ? (

@@ -263,7 +263,7 @@ async function seedMeasurements(
     });
   }
 
-  // Estimated 1RMs every four weeks. Squat and deadlift climb faster than the
+  // Tested maxes every four weeks. Squat and deadlift climb faster than the
   // bench, which is what makes the relative strength lines separate at all.
   const growth: Record<string, [number, number]> = {
     "back-squat": [140, 160],
@@ -275,7 +275,7 @@ async function seedMeasurements(
     for (const slug of TESTED_LIFTS) {
       const [from, to] = growth[slug];
       rows.push({
-        kind: "estimated_1rm",
+        kind: "tested_1rm",
         exerciseId: liftIds.get(slug),
         value: (from + ((to - from) * d) / totalDays + jitter(1.2)).toFixed(2),
         unit: "kg",

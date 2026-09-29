@@ -1,10 +1,17 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
+import { NeedsMaxNote } from "@/components/needs-max-note";
 import { Card, EmptyState, Tag } from "@/components/ui";
 import { loadDirectory, loadOpenBlock, loadPlannedDay } from "@/lib/ai/queries";
 import { formatDay } from "@/lib/days";
 import { loadTypeLabels, mesocycleTypeLabels, sessionKindLabels } from "@/lib/labels";
-import { describePrescription, prescriptionDetail } from "@/lib/prescription";
+import { getUnitSystem } from "@/lib/log/queries";
+import {
+  describePrescription,
+  liftsNeedingMax,
+  prescriptionDetail,
+} from "@/lib/prescription";
+import { currentOneRms } from "@/lib/strength/queries";
 import { today } from "@/lib/time";
 
 export const metadata = { title: "Today" };
@@ -18,10 +25,12 @@ export const metadata = { title: "Today" };
  */
 export default async function TodayPage() {
   const day = today();
-  const [days, block, directory] = await Promise.all([
+  const [days, block, directory, unitSystem, maxes] = await Promise.all([
     loadPlannedDay(day),
     loadOpenBlock(),
     loadDirectory(),
+    getUnitSystem(),
+    currentOneRms(),
   ]);
 
   return (
@@ -109,7 +118,11 @@ export default async function TodayPage() {
                               `Exercise ${prescription.exerciseId}`}
                           </span>
                           <span className="text-xs text-ink-muted tabular-nums">
-                            {describePrescription(prescription)}
+                            {describePrescription(
+                              prescription,
+                              unitSystem,
+                              maxes[String(prescription.exerciseId)]?.kg,
+                            )}
                           </span>
                         </div>
                         <p className="mt-0.5 text-xs text-ink-faint">
@@ -121,6 +134,16 @@ export default async function TodayPage() {
                 </div>
               ))}
             </div>
+
+            <NeedsMaxNote
+              lifts={liftsNeedingMax(
+                session.blocks.flatMap((item) => item.items),
+                maxes,
+              ).flatMap((id) => {
+                const exercise = directory.directory.get(id);
+                return exercise ? [{ name: exercise.name, slug: exercise.slug }] : [];
+              })}
+            />
 
             {completedAt || skippedAt ? null : (
               <Link

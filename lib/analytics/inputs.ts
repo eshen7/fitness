@@ -13,6 +13,7 @@ import type {
   TendonSite,
   TestKind,
 } from "@/lib/taxonomy";
+import { estimateOneRmKg, estimatesOneRm } from "@/lib/strength/one-rm";
 import { kalmanLevel } from "./stats";
 
 /**
@@ -309,26 +310,6 @@ export function weightOn(
 // Estimated one-rep max
 // -----------------------------------------------------------------------------
 
-/**
- * Above this many reps an estimate stops being an estimate.
- *
- * Every rep-max formula is fit near the top of the curve, and a set of fifteen is
- * limited by how long the muscle can keep going rather than by how much force it
- * can make. Including those sets does not add data to a strength trend, it adds a
- * different measurement wearing the same units.
- */
-export const MAX_REPS_FOR_ONE_RM = 10;
-
-/**
- * Epley. One formula rather than an average of several, because the absolute
- * number matters far less here than its comparability over time: every insight
- * built on this reads a *trend*, and a systematic bias cancels in a slope while a
- * formula that changed between months would not.
- */
-export function epley(loadKg: number, reps: number): number {
-  return loadKg * (1 + reps / 30);
-}
-
 export type OneRmPoint = {
   day: string;
   exerciseId: number;
@@ -337,7 +318,8 @@ export type OneRmPoint = {
 };
 
 /**
- * The best estimated one-rep max per exercise per day, from logged reps at load.
+ * The best estimated one-rep max per exercise per day, from logged reps at load,
+ * by the rule in `lib/strength/one-rm.ts` that Progress and the prescriptions use.
  *
  * The daily maximum rather than the mean of the day's sets: back-off sets and
  * warm-ups are in the log too, and averaging them in would make a session's
@@ -347,15 +329,10 @@ export type OneRmPoint = {
 export function oneRmSeries(inputs: AnalyticsInputs): OneRmPoint[] {
   const best = new Map<string, OneRmPoint>();
   for (const set of inputs.loggedSets) {
-    if (set.loadKg === null || set.loadKg <= 0) continue;
-    if (set.reps === null || set.reps < 1 || set.reps > MAX_REPS_FOR_ONE_RM) continue;
     const exercise = inputs.exercises.get(set.exerciseId);
-    if (!exercise) continue;
-    // Jumps and throws carry load and reps too; a one-rep max of a depth jump is
-    // not a quantity, so only the slow strength end of the curve is estimated.
-    if (exercise.forceVelocity !== "max_strength") continue;
-
-    const oneRmKg = epley(set.loadKg, set.reps);
+    if (!exercise || !estimatesOneRm(exercise)) continue;
+    const oneRmKg = estimateOneRmKg(set);
+    if (oneRmKg === null) continue;
     const key = `${set.day}:${set.exerciseId}`;
     const held = best.get(key);
     if (!held || oneRmKg > held.oneRmKg) {

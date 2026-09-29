@@ -30,9 +30,16 @@ describe("describePrescription", () => {
     );
   });
 
-  it("keeps a percentage of 1RM as a percentage", () => {
+  it("says a max is needed for a percentage of 1RM with none on record", () => {
     expect(describePrescription({ ...base, reps: 5, loadPctOf1rm: 85 }, "imperial")).toBe(
-      "3 x 5 at 85% 1RM, RPE 7",
+      "3 x 5 at 85% 1RM (needs a max), RPE 7",
     );
+  });
+
+  it("loads a percentage of 1RM from the max, in the owner's units", () => {
+    // An Epley estimate of 140 kg from 120 kg x 5; 87% of it is 268.5 lb.
+    const squat = { ...base, sets: 5, reps: 3, loadPctOf1rm: 87, targetRpe: null };
+    expect(describePrescription(squat, "imperial", 140)).toBe("5 x 3 at 270 lb (87% 1RM)");
+    expect(describePrescription(squat, "metric", 140)).toBe("5 x 3 at 122.5 kg (87% 1RM)");
   });
 });

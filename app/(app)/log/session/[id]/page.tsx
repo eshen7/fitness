@@ -10,6 +10,7 @@ import {
   plannedSetsForSession,
   sessionById,
 } from "@/lib/log/queries";
+import { currentOneRms } from "@/lib/strength/queries";
 import type { SessionKind } from "@/lib/taxonomy";
 import { formatDay, formatTime } from "@/lib/time";
 import { SetLogger, type LoggerExercise } from "./set-logger";
@@ -34,12 +35,13 @@ export default async function SessionPage({ params }: { params: Params }) {
   const session = await sessionById(id);
   if (!session) notFound();
 
-  const [rows, plan, sets, lastSets, unitSystem] = await Promise.all([
+  const [rows, plan, sets, lastSets, unitSystem, maxes] = await Promise.all([
     listExercises(),
     plannedSetsForSession(id),
     loggedSetsForSession(id),
     lastSetsByExercise(id),
     getUnitSystem(),
+    currentOneRms(),
   ]);
 
   // Available ones, plus whatever the plan prescribes: the search offers what the
@@ -87,6 +89,9 @@ export default async function SessionPage({ params }: { params: Params }) {
         plan={plan}
         serverSets={sets}
         lastSets={lastSets}
+        maxes={Object.fromEntries(
+          Object.entries(maxes).map(([exerciseId, max]) => [exerciseId, max.kg]),
+        )}
         unitSystem={unitSystem}
         finished={finished}
       />

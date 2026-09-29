@@ -14,6 +14,8 @@ import {
   type JumpSitting,
   type TendonWeek,
 } from "./derive";
+import { oneRmHistories } from "@/lib/strength/queries";
+import type { OneRmSource } from "@/lib/strength/one-rm";
 import { weekStart } from "./scale";
 
 export type { BlockBand, JumpSitting, TendonWeek };
@@ -151,40 +153,29 @@ export type StrengthPoint = {
   exerciseId: number;
   exerciseName: string;
   oneRmKg: number;
-  /** Estimated 1RM over trend bodyweight, null until there is a bodyweight. */
+  /** A max the owner tested, or the day's best estimate from logged sets. */
+  source: OneRmSource;
+  /** 1RM over trend bodyweight, null until there is a bodyweight. */
   relative: number | null;
 };
 
 /**
- * Relative strength: estimated 1RM over bodyweight, per lift.
+ * Relative strength: 1RM over bodyweight, per lift.
  *
  * Absolute load is the number that feels like progress and relative strength is
  * the one that predicts jumping, so this chart plots the ratio and leaves the
  * kilograms to the tooltip. Bodyweight is smoothed before dividing, because a
- * two-kilo day of water would otherwise show up as a strength change.
+ * two-kilo day of water would otherwise show up as a strength change. The 1RM is
+ * each day's best estimate from logged heavy sets, or a tested max on the day one
+ * was tested, by the rule in `lib/strength/one-rm.ts`.
  */
 export async function relativeStrength(days = 180): Promise<StrengthPoint[]> {
-  const { measurements, exercises } = schema;
-  const since = new Date(`${dayMinus(days)}T00:00:00Z`);
+  const { measurements } = schema;
+  const sinceDay = dayMinus(days);
+  const since = new Date(`${sinceDay}T00:00:00Z`);
 
   const [lifts, weights] = await Promise.all([
-    getDb()
-      .select({
-        exerciseId: measurements.exerciseId,
-        exerciseName: exercises.name,
-        value: measurements.value,
-        measuredAt: measurements.measuredAt,
-      })
-      .from(measurements)
-      .innerJoin(exercises, eq(exercises.id, measurements.exerciseId))
-      .where(
-        and(
-          eq(measurements.kind, "estimated_1rm"),
-          isNotNull(measurements.exerciseId),
-          gte(measurements.measuredAt, since),
-        ),
-      )
-      .orderBy(asc(measurements.measuredAt)),
+    oneRmHistories({ sinceDay, testedSinceDay: sinceDay }),
     getDb()
       .select({ value: measurements.value, measuredAt: measurements.measuredAt })
       .from(measurements)
@@ -198,18 +189,21 @@ export async function relativeStrength(days = 180): Promise<StrengthPoint[]> {
     weights.map((row) => ({ day: dayOf(row.measuredAt), kg: Number(row.value) })),
   );
 
-  return lifts.map((row): StrengthPoint => {
-    const day = dayOf(row.measuredAt);
-    const oneRmKg = Number(row.value);
-    const bodyweight = bodyweightOn(trend, day);
-    return {
-      day,
-      exerciseId: row.exerciseId as number,
-      exerciseName: row.exerciseName,
-      oneRmKg,
-      relative: bodyweight === null ? null : oneRmKg / bodyweight,
-    };
-  });
+  return lifts
+    .flatMap((lift) =>
+      lift.readings.map((reading): StrengthPoint => {
+        const bodyweight = bodyweightOn(trend, reading.day);
+        return {
+          day: reading.day,
+          exerciseId: lift.exerciseId,
+          exerciseName: lift.exerciseName,
+          oneRmKg: reading.kg,
+          source: reading.source,
+          relative: bodyweight === null ? null : reading.kg / bodyweight,
+        };
+      }),
+    )
+    .sort((a, b) => a.day.localeCompare(b.day) || a.exerciseName.localeCompare(b.exerciseName));
 }
 
 export type SessionOutcome = {

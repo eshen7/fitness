@@ -143,7 +143,7 @@ export const MEASUREMENT_KINDS = [
   "one_foot_approach_right",
   "broad_jump",
   "depth_jump_vertical",
-  "estimated_1rm",
+  "tested_1rm",
   "lean_mass",
   "body_fat_pct",
   "reach_height",

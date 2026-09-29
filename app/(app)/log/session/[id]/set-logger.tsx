@@ -90,6 +90,7 @@ export function SetLogger({
   plan,
   serverSets,
   lastSets,
+  maxes,
   unitSystem,
   finished,
 }: {
@@ -99,6 +100,8 @@ export function SetLogger({
   plan: PlanLine[];
   serverSets: LoggedSetRow[];
   lastSets: Record<number, LoggerOuting[]>;
+  /** Each lift's current max in kilograms, keyed by exercise id, for "% 1RM" lines. */
+  maxes: Record<string, number>;
   unitSystem: UnitSystem;
   finished: boolean;
 }) {
@@ -249,6 +252,7 @@ export function SetLogger({
         sessionSets: byExercise.get(current.exerciseId) ?? [],
         outings: lastSets[current.exerciseId] ?? [],
         unitSystem,
+        oneRmKg: maxes[String(current.exerciseId)],
       }),
     });
   }
@@ -424,7 +428,11 @@ export function SetLogger({
                     Target
                   </p>
                   <p className="mt-0.5 text-sm text-ink tabular-nums">
-                    {describePrescription(current.line, unitSystem)}
+                    {describePrescription(
+                      current.line,
+                      unitSystem,
+                      maxes[String(current.exerciseId)],
+                    )}
                   </p>
                   {prescriptionDetail(current.line) ? (
                     <p className="mt-0.5 text-xs text-ink-faint">
@@ -600,7 +608,11 @@ export function SetLogger({
                                       ?.name ?? `Exercise ${line.exerciseId}`}
                                   </span>
                                   <span className="block text-xs text-ink-muted tabular-nums">
-                                    {describePrescription(line, unitSystem)}
+                                    {describePrescription(
+                                      line,
+                                      unitSystem,
+                                      maxes[String(line.exerciseId)],
+                                    )}
                                   </span>
                                 </span>
                                 <Tag tone={done >= line.sets ? "accent" : "neutral"}>
