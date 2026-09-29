@@ -3,6 +3,8 @@ import { hasApiKey } from "@/lib/ai/client";
 import { SPEND_CAP_USD } from "@/lib/ai/pricing";
 import { totalSpendUsd } from "@/lib/ai/proposals";
 import { loadOpenBlock } from "@/lib/ai/queries";
+import { measuredMaintenance } from "@/lib/analytics/nutrition";
+import { loadEnergyBalanceInputs } from "@/lib/analytics/queries";
 import { getDb, schema, type Db } from "@/lib/db";
 import { getUnitSystem, latestTendonBySite } from "@/lib/log/queries";
 import { bodyweightOn, bodyweightTrend } from "@/lib/progress/derive";
@@ -314,6 +316,7 @@ export async function nutritionSnapshot(
     unitSystem,
     spendUsd,
     hasHistory,
+    maintenance,
   ] = await Promise.all([
     dayLog(day, db),
     activeTarget(day, db),
@@ -324,6 +327,7 @@ export async function nutritionSnapshot(
     getUnitSystem(),
     totalSpendUsd(db),
     hasLoggedFood(db),
+    maintenanceOn(day, db),
   ]);
 
   const weight = weightView({ readings, target, day });
@@ -339,7 +343,7 @@ export async function nutritionSnapshot(
   const proposalFor = (goal: TargetGoal) =>
     trendKg === null
       ? null
-      : proposeTargets({ bodyweightKg: trendKg, blockType, tendon, goal });
+      : proposeTargets({ bodyweightKg: trendKg, blockType, tendon, maintenance, goal });
   const proposal = proposalFor(suggestedGoal);
   const inForce = target === null ? null : proposalFor(goalOf(target));
   const stale =
@@ -400,10 +404,11 @@ export async function targetInputsFor(
   day = today(),
   db: Db = getDb(),
 ): Promise<TargetProposal | null> {
-  const [readings, tendon, block] = await Promise.all([
+  const [readings, tendon, block, maintenance] = await Promise.all([
     bodyweightReadings(WEIGHT_WINDOW_DAYS, db),
     tendonStates(),
     loadOpenBlock(db),
+    maintenanceOn(day, db),
   ]);
   const trendKg = bodyweightOn(bodyweightTrend(readings), day);
   if (trendKg === null) return null;
@@ -411,6 +416,17 @@ export async function targetInputsFor(
     bodyweightKg: trendKg,
     blockType: block?.declaration.type ?? null,
     tendon,
+    maintenance,
     goal,
   });
+}
+
+/**
+ * Maintenance measured from the owner's own intake and weight, or null while the
+ * history is too thin and the per-kilogram default stands in. Computed on read
+ * rather than taken from the nightly insight row, so a week logged this morning
+ * counts today and a fresh database has nothing stale to disagree with.
+ */
+async function maintenanceOn(day: string, db: Db) {
+  return measuredMaintenance(await loadEnergyBalanceInputs({ asOf: day, db }));
 }

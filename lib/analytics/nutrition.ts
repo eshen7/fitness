@@ -96,10 +96,10 @@ export function bodyweightTrend(inputs: AnalyticsInputs): Insight[] {
 // -----------------------------------------------------------------------------
 
 /** Complete weeks of paired intake and weight before maintenance is estimable. */
-const MIN_INTAKE_WEEKS = 5;
+export const MIN_INTAKE_WEEKS = 5;
 
 /** Days a week needs logged intake on before it counts as a logged week. */
-const MIN_LOGGED_DAYS_PER_WEEK = 4;
+export const MIN_LOGGED_DAYS_PER_WEEK = 4;
 
 /**
  * The energy in a kilogram of bodyweight change, used only as a sanity bound.
@@ -218,6 +218,33 @@ export function maintenanceCalories(inputs: AnalyticsInputs): Insight[] {
       },
     }),
   ];
+}
+
+/** Maintenance as the targets consume it: the figure, and the weeks it rests on. */
+export type MeasuredMaintenance = { kcal: number; weeks: number };
+
+/**
+ * The maintenance figure the daily targets should rest on, or null while the history
+ * cannot support one and the per-kilogram default has to stand in.
+ *
+ * The insight above, read without the suite's gate. The gate asks whether the
+ * figure is distinguishable from what the athlete already eats, which is the right
+ * question before telling them something new and the wrong one here: a measured
+ * maintenance that equals current intake is useless as an insight and exactly what
+ * a hold should be set to. What does carry over is every sufficiency rule the
+ * estimate already applies: the weeks, the logged days in each, a line that rises.
+ *
+ * The `plausible` flag is deliberately not one of them. The weekly rates come off
+ * the smoothed trend, which damps a week-to-week swing in intake far more than a
+ * block-long one, so a well-logged history can fail it while the level read off the
+ * line is sound. And under-reporting, the thing it is there to flag, shifts logged
+ * intake and this figure together, which leaves a target set from it in step with
+ * the log the day is read against.
+ */
+export function measuredMaintenance(inputs: AnalyticsInputs): MeasuredMaintenance | null {
+  const [insight] = maintenanceCalories(inputs);
+  if (!insight) return null;
+  return { kcal: Math.round(insight.value), weeks: insight.n };
 }
 
 function round(value: number): number {

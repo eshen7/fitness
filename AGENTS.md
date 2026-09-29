@@ -21,7 +21,7 @@ The build plan lives at `~/.claude/plans/splendid-munching-map.md`.
 | `npm run db:generate` | Emit a migration from the schema |
 | `npm run db:migrate` | Apply migrations, and create the `vector` extension |
 | `npm run db:seed` | Idempotent seed |
-| `npm run db:seed:history -- --replace` | Replace training history with a deterministic twenty-week dev fixture (destructive, local only) |
+| `npm run db:seed:history -- --replace` | Replace training history and the food log with a deterministic twenty-week dev fixture (destructive, local only) |
 | `npm run passcode` | Print a fresh `PASSCODE_HASH` and `SESSION_SECRET` |
 | `npm run bench:generation -- --runs 50 --budget 1` | Measure the generation exit criteria against the live model (needs `OPENAI_API_KEY`, spends real money, writes only its spend to `spend_ledger`) |
 

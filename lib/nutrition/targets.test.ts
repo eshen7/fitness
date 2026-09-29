@@ -9,6 +9,7 @@ import {
   TARGET_DRIFT_KCAL,
   cutRefusal,
   defaultGoalFor,
+  defaultsNote,
   goalOf,
   proposeTargets,
   remaining,
@@ -173,12 +174,15 @@ describe("proposeTargets", () => {
       bodyweightKg: BODYWEIGHT,
       blockType: null,
       tendon: healthy,
-      maintenanceKcal: 3100,
+      maintenance: { kcal: 3100, weeks: 7 },
       goal: "hold",
     });
     expect(measured.maintenanceKcal).toBe(3100);
+    expect(measured.maintenanceWeeks).toBe(7);
     expect(measured.kcal).toBe(3100);
-    expect(measured.rationale).toContain("measured");
+    expect(measured.rationale).toContain(
+      "Maintenance 3100 kcal, measured from 7 weeks of logged intake",
+    );
 
     const estimated = proposeTargets({
       bodyweightKg: BODYWEIGHT,
@@ -186,7 +190,10 @@ describe("proposeTargets", () => {
       tendon: healthy,
       goal: "hold",
     });
-    expect(estimated.rationale).toContain("estimated");
+    expect(estimated.maintenanceWeeks).toBeNull();
+    expect(estimated.rationale).toContain(
+      `Maintenance ${MAINTENANCE} kcal, the ${MAINTENANCE_KCAL_PER_KG} kcal/kg default`,
+    );
   });
 
   it("clamps carbohydrate at zero rather than reporting a negative target", () => {
@@ -195,7 +202,7 @@ describe("proposeTargets", () => {
       bodyweightKg: BODYWEIGHT,
       blockType: null,
       tendon: healthy,
-      maintenanceKcal: 800,
+      maintenance: { kcal: 800, weeks: 6 },
       goal: "hold",
     });
     expect(target.carbsG).toBe(0);
@@ -394,5 +401,19 @@ describe("remaining", () => {
     expect(
       remaining(target, { kcal: 3000, proteinG: 120.5, carbsG: 400, fatG: 60 }),
     ).toEqual({ kcal: -100, proteinG: 29.5, carbsG: -50, fatG: 20 });
+  });
+});
+
+describe("defaultsNote", () => {
+  it("names only the multipliers the direction applies, and calls them defaults", () => {
+    expect(defaultsNote("hold")).toBe(
+      "Protein at 1.8 g/kg, fat at 0.9 g/kg and fluid at 35 ml/kg are defaults, not measured.",
+    );
+    expect(defaultsNote("surplus")).toBe(
+      "The 10% surplus, protein at 1.8 g/kg, fat at 1 g/kg and fluid at 35 ml/kg are defaults, not measured.",
+    );
+    expect(defaultsNote("deficit")).toBe(
+      "The 15% deficit, protein at 2.4 g/kg, fat at 0.8 g/kg and fluid at 35 ml/kg are defaults, not measured.",
+    );
   });
 });

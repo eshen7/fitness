@@ -12,9 +12,9 @@
  * Deterministic: the same seed produces the same history, so a screenshot taken
  * today is comparable with one taken next week.
  *
- * This is destructive. It deletes the existing training history, measurements and
- * tendon records before writing, so it is gated behind an explicit flag and
- * refuses a non-local database unless told otherwise.
+ * This is destructive. It deletes the existing training history, measurements,
+ * tendon records and food log before writing, so it is gated behind an explicit
+ * flag and refuses a non-local database unless told otherwise.
  *
  *     npx tsx scripts/seed-history.ts --replace
  */
@@ -23,7 +23,7 @@ import { inArray, sql as raw } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "../lib/db/schema";
-import { addDays } from "../lib/progress/scale";
+import { addDays, dayNumber } from "../lib/progress/scale";
 
 config({ path: [".env.local", ".env"], quiet: true });
 
@@ -132,6 +132,7 @@ async function clear(db: Db) {
   await db.delete(schema.macrocycles);
   await db.delete(schema.measurements);
   await db.delete(schema.tendonStatus);
+  await db.delete(schema.foodLogEntries);
 }
 
 type Block = {
@@ -248,13 +249,14 @@ async function seedMeasurements(
     });
   }
 
-  // Bodyweight every third day, trending up about a kilo and a half across the
-  // season with day-to-day water noise on top, because everything that divides by
-  // bodyweight has to have something worth smoothing.
+  // Bodyweight every third day, following the energy balance the food log below
+  // records - up about a kilo and a half across the season, gaining in accumulation
+  // and giving some back in each taper - with day-to-day water noise on top, because
+  // everything that divides by bodyweight has to have something worth smoothing.
   const totalDays = BLOCKS.reduce((sum, block) => sum + block.weeks * 7, 0);
   for (let d = 0; d <= totalDays; d += 3) {
     if (addDays(START, d) > today) break;
-    const trend = 80 + (1.6 * d) / totalDays;
+    const trend = trendKgOn(addDays(START, d));
     rows.push({
       kind: "bodyweight",
       value: (trend + jitter(0.5)).toFixed(2),
@@ -285,6 +287,113 @@ async function seedMeasurements(
   }
 
   await db.insert(schema.measurements).values(rows);
+  return rows.length;
+}
+
+// -----------------------------------------------------------------------------
+// Energy balance
+// -----------------------------------------------------------------------------
+
+/**
+ * The intake the fixture athlete's weight holds at, which is what the maintenance
+ * estimate should recover from the food log and the bodyweight trend. Deliberately
+ * well away from 33 kcal/kg of an 80 kg athlete, so a target resting on the default
+ * multiplier and one resting on the measurement are told apart at a glance.
+ */
+const MAINTENANCE_KCAL = 3000;
+
+/** Energy in a kilogram of bodyweight change, matching the analytics' reference. */
+const KCAL_PER_KG = 7700;
+
+/**
+ * The daily surplus each week was eaten at: a surplus in accumulation, about level
+ * in transmutation, a small deficit in each taper. Varied week to week as well, since
+ * maintenance is read off a line through weeks and weeks eaten identically within a
+ * block would leave that line almost nothing to be fitted through.
+ */
+function surplusOn(day: string) {
+  const offset = dayNumber(day) - dayNumber(START);
+  let start = 0;
+  for (const block of BLOCKS) {
+    const end = start + block.weeks * 7;
+    if (offset < end) {
+      const week = Math.floor((offset - start) / 7);
+      const base =
+        block.type === "accumulation" ? 200 : block.type === "transmutation" ? 50 : -200;
+      return base + [60, -40, 20, -60][week % 4];
+    }
+    start = end;
+  }
+  return 0;
+}
+
+/** Trend bodyweight on a day, as the running energy balance since the season began. */
+function trendKgOn(day: string) {
+  let kg = 80;
+  for (let d = START; d < day; d = addDays(d, 1)) kg += surplusOn(d) / KCAL_PER_KG;
+  return kg;
+}
+
+/**
+ * Fixture foods, one per meal, so a day of eating reads as meals rather than one
+ * row. Keyed apart from anything the parser would ever write.
+ */
+const FIXTURE_FOODS = [
+  { key: "fixture:oats-with-whey", name: "Oats with whey and banana", meal: "breakfast", share: 0.25, kcal: 520, protein: 38, carbs: 72, fat: 9 },
+  { key: "fixture:chicken-rice-bowl", name: "Chicken rice bowl", meal: "lunch", share: 0.3, kcal: 680, protein: 48, carbs: 82, fat: 16 },
+  { key: "fixture:salmon-potatoes", name: "Salmon with potatoes and greens", meal: "dinner", share: 0.3, kcal: 720, protein: 44, carbs: 64, fat: 30 },
+  { key: "fixture:greek-yogurt-granola", name: "Greek yogurt with granola", meal: "snack", share: 0.15, kcal: 340, protein: 22, carbs: 42, fat: 9 },
+] as const;
+
+/**
+ * A food log that agrees with the bodyweight above, every day up to yesterday.
+ *
+ * Five days in seven, with the skipped days rotating, because a real log has gaps and
+ * the maintenance estimate is built to count a week only once it has enough logged
+ * days. Today is left empty: it is still being eaten. Its own random stream, so adding
+ * it left every jittered number the rest of the fixture draws exactly as it was.
+ */
+async function seedFood(db: Db, today: string) {
+  await db
+    .insert(schema.foods)
+    .values(
+      FIXTURE_FOODS.map((food) => ({
+        key: food.key,
+        name: food.name,
+        unit: "item",
+        kcalPerUnit: food.kcal.toFixed(4),
+        proteinGPerUnit: food.protein.toFixed(4),
+        carbsGPerUnit: food.carbs.toFixed(4),
+        fatGPerUnit: food.fat.toFixed(4),
+        provenance: "owner",
+      })),
+    )
+    .onConflictDoNothing({ target: schema.foods.key });
+  const foods = await db
+    .select({ id: schema.foods.id, key: schema.foods.key })
+    .from(schema.foods)
+    .where(inArray(schema.foods.key, FIXTURE_FOODS.map((food) => food.key)));
+  const foodIds = new Map(foods.map((food) => [food.key, food.id]));
+
+  const eat = rng(20260929);
+  const rows: (typeof schema.foodLogEntries.$inferInsert)[] = [];
+  for (let day = START; day < today; day = addDays(day, 1)) {
+    const offset = dayNumber(day) - dayNumber(START);
+    if ((offset + Math.floor(offset / 7)) % 7 >= 5) continue;
+    const kcal = MAINTENANCE_KCAL + surplusOn(day) + (eat() - 0.5) * 2 * 250;
+    for (const [i, food] of FIXTURE_FOODS.entries()) {
+      rows.push({
+        foodId: foodIds.get(food.key)!,
+        quantity: ((kcal * food.share) / food.kcal).toFixed(2),
+        meal: food.meal,
+        day,
+        loggedAt: at(day, 11 + i * 4),
+        rawText: food.name.toLowerCase(),
+      });
+    }
+  }
+
+  await db.insert(schema.foodLogEntries).values(rows);
   return rows.length;
 }
 
@@ -495,9 +604,9 @@ async function main() {
 
   if (!process.argv.includes("--replace")) {
     console.error(
-      "This deletes the existing training history, measurements and tendon\n" +
-        "records, then writes a fixture season in their place. Re-run with\n" +
-        "--replace to confirm.",
+      "This deletes the existing training history, measurements, tendon\n" +
+        "records and food log, then writes a fixture season in their place.\n" +
+        "Re-run with --replace to confirm.",
     );
     process.exit(1);
   }
@@ -532,12 +641,14 @@ async function main() {
   const measurements = await seedMeasurements(db, ids, today);
   const { sessionCount, loggedCount } = await seedSessions(db, blocks, ids, today);
   const tendon = await seedTendon(db, blocks, today);
+  const food = await seedFood(db, today);
 
   console.log(`blocks:       ${blocks.length}`);
   console.log(`measurements: ${measurements}`);
   console.log(`sessions:     ${sessionCount}`);
   console.log(`logged sets:  ${loggedCount}`);
   console.log(`tendon rows:  ${tendon}`);
+  console.log(`food entries: ${food}`);
 
   await sql.end();
 }
