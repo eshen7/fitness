@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui";
 import { loadGuideState } from "@/lib/guide/queries";
@@ -64,18 +65,11 @@ export default async function GuidePage() {
 
   return (
     <>
-      <header className="mb-6">
-        <Link
-          href="/today"
-          className="-my-2 inline-flex min-h-11 items-center text-sm text-ink-faint hover:text-ink-muted"
-        >
-          ← Today
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-ink">Getting started</h1>
-        <p className="mt-1 text-sm text-ink-faint">
-          Set up once, then a daily habit and a weekly one.
-        </p>
-      </header>
+      <PageHeader
+        title="Getting started"
+        back={{ href: "/today", label: "Today" }}
+        subtitle="Set it up once. After that it is a two-minute morning check-in and one planning sitting a week."
+      />
 
       <div className="space-y-5">
         <Section
@@ -95,12 +89,17 @@ export default async function GuidePage() {
                   <div className="min-w-0">
                     <Link
                       href={STEP_COPY[step].href}
-                      className={`-my-2 inline-flex min-h-11 items-center text-sm font-medium underline-offset-2 hover:underline ${
+                      className={`group/link -my-2 inline-flex min-h-11 items-center text-sm font-medium underline-offset-4 hover:underline ${
                         done ? "text-ink-muted" : "text-accent"
                       }`}
                     >
                       {STEP_COPY[step].title}
-                      <span aria-hidden className="ml-1">→</span>
+                      <span
+                        aria-hidden
+                        className="ml-1 transition-transform duration-150 group-hover/link:translate-x-0.5"
+                      >
+                        →
+                      </span>
                     </Link>
                     {done ? <span className="sr-only"> (done)</span> : null}
                     <p className="text-sm text-ink-faint">{SETUP_WHY[step]}</p>
@@ -109,7 +108,7 @@ export default async function GuidePage() {
               );
             })}
           </ol>
-          <p className="mt-4 rounded-field border border-line bg-surface-sunken px-3 py-2 text-sm text-ink-muted">
+          <p className="mt-5 border-l-2 border-warn py-0.5 pl-4 text-sm text-ink-muted">
             <Strong>A sore tendon?</Strong> Log it on{" "}
             <InlineLink href="/log/tendon">Log, Tendon</InlineLink> before declaring a
             block: pain from 0 to 10 in the morning, during and after, and its rehab
@@ -238,7 +237,7 @@ function Section({
     <Card>
       <section>
         <div className="mb-3 flex items-baseline justify-between gap-3">
-          <h2 className="text-base font-semibold text-ink">{title}</h2>
+          <h2 className="font-display text-xl leading-tight font-bold text-ink">{title}</h2>
           {aside}
         </div>
         {children}
@@ -255,7 +254,7 @@ function Step({ title, children }: { title: string; children: ReactNode }) {
   return (
     <li>
       <p className="text-sm font-medium text-ink">{title}</p>
-      <p className="mt-0.5 text-sm text-ink-faint">{children}</p>
+      <p className="mt-0.5 text-sm text-ink-muted">{children}</p>
     </li>
   );
 }
@@ -265,8 +264,8 @@ function Marker({ done, children }: { done: boolean; children: ReactNode }) {
   return (
     <span
       aria-hidden="true"
-      className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold tabular-nums ${
-        done ? "border-accent bg-accent/15 text-accent" : "border-line-strong text-ink-muted"
+      className={`numeral mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-sm ${
+        done ? "border-good bg-good/15 text-good" : "border-line-strong text-ink-muted"
       }`}
     >
       {done ? "✓" : children}
@@ -276,7 +275,10 @@ function Marker({ done, children }: { done: boolean; children: ReactNode }) {
 
 function InlineLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} className="font-medium text-accent underline-offset-2 hover:underline">
+    <Link
+      href={href}
+      className="font-medium text-ink underline decoration-ink-faint underline-offset-3 hover:decoration-ink"
+    >
       {children}
     </Link>
   );

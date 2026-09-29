@@ -23,7 +23,7 @@ export function QueuedSets() {
   const count = queue.items.length;
 
   return (
-    <p className="mt-2 max-w-xs text-sm text-ink-muted text-balance">
+    <p className="mt-3 max-w-xs text-sm text-balance text-ink-muted">
       {count > 0 ? (
         <>
           <span className="tnum font-medium text-ink">{count}</span>{" "}

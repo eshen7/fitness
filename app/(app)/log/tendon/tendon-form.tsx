@@ -130,7 +130,7 @@ export function TendonForm({ prefill }: { prefill: TendonPrefill }) {
                 type="button"
                 onClick={() => setOpen((c) => ({ ...c, [site]: !c[site] }))}
                 aria-expanded={expanded}
-                className="-my-2 flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-2 text-left text-sm font-semibold text-ink"
+                className="-my-2 flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-2 text-left font-display text-lg leading-tight font-bold text-ink"
               >
                 <span className="truncate">{tendonSiteLabels.of(site)}</span>
                 {answered === 0 ? (
@@ -138,7 +138,7 @@ export function TendonForm({ prefill }: { prefill: TendonPrefill }) {
                 ) : answered < 3 ? (
                   <Tag tone="warn">Incomplete</Tag>
                 ) : worst === 0 ? (
-                  <Tag tone="accent">Clear</Tag>
+                  <Tag tone="good">Clear</Tag>
                 ) : (
                   <Tag tone="warn">Worst {worst}</Tag>
                 )}
@@ -150,7 +150,7 @@ export function TendonForm({ prefill }: { prefill: TendonPrefill }) {
                 <button
                   type="button"
                   onClick={() => update(site, CLEAR)}
-                  className="-my-2 inline-flex min-h-11 items-center text-xs font-medium whitespace-nowrap text-accent hover:underline"
+                  className="press -my-2 inline-flex min-h-11 items-center text-sm font-medium whitespace-nowrap text-accent underline-offset-4 hover:underline"
                 >
                   All clear
                 </button>

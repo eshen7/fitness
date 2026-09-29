@@ -15,24 +15,29 @@ export default async function LogBodyPage() {
 
   return (
     <>
-      <PageHeader title="Body" subtitle="Bodyweight and composition." />
+      <PageHeader
+        back={{ href: "/log", label: "Log" }}
+        title="Body"
+        subtitle="Weigh in the same way each morning. The trend is what the targets read, not any one day."
+      />
 
       <BodyForm unitSystem={unitSystem} />
 
-      <h2 className="mt-8 mb-3 text-sm font-semibold text-ink">
-        Recent bodyweight
-      </h2>
+      <h2 className="eyebrow mt-9 mb-2">Recent bodyweight</h2>
       {weights.length === 0 ? (
-        <EmptyState title="No bodyweight logged yet.">
-          Relative strength, meaning a lift over the trend bodyweight, is what the
-          ebook ties jumping to, so this series is an input to most of the strength
-          insights rather than a vanity number.
+        <EmptyState title="No bodyweight logged yet">
+          Relative strength, meaning a lift over the trend bodyweight, is what
+          the ebook ties jumping to, so this series is an input to most of the
+          strength insights rather than a vanity number.
         </EmptyState>
       ) : (
-        <ul className="space-y-2">
-          {weights.map((row) => (
-            <li key={row.id}>
-              <Card className="flex items-baseline justify-between gap-4">
+        <Card className="py-1 sm:py-1">
+          <ul>
+            {weights.map((row) => (
+              <li
+                key={row.id}
+                className="flex min-h-14 items-center justify-between gap-4 border-t border-line py-2.5 first:border-t-0"
+              >
                 <div>
                   <p className="text-sm text-ink-muted">
                     {formatDay(dayOf(row.measuredAt))}
@@ -48,14 +53,14 @@ export default async function LogBodyPage() {
                   {row.source !== "manual" ? (
                     <Tag tone="cool">{row.source}</Tag>
                   ) : null}
-                  <span className="tnum font-display text-lg font-semibold text-ink">
+                  <span className="numeral text-xl text-ink">
                     {formatMeasurement(row.value, "bodyweight", unitSystem)}
                   </span>
                 </div>
-              </Card>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
     </>
   );

@@ -99,7 +99,7 @@ export function TestForm({ unitSystem }: { unitSystem: UnitSystem }) {
       </Card>
 
       <Card>
-        <h2 className="text-sm font-semibold text-ink">Attempts</h2>
+        <h2 className="font-display text-xl leading-tight font-bold text-ink">Attempts</h2>
         <p className="mt-1 text-xs text-ink-faint">
           Every attempt, not just the best one. The spread within a sitting is the
           measurement noise floor, and the smallest change the chart is allowed to
@@ -140,7 +140,7 @@ export function TestForm({ unitSystem }: { unitSystem: UnitSystem }) {
                 }
                 disabled={attempts.length === 1}
                 aria-label={`Remove attempt ${index + 1}`}
-                className="flex size-11 shrink-0 items-center justify-center rounded-field border border-line-strong text-ink-faint transition hover:border-ink-faint hover:text-ink-muted disabled:opacity-30"
+                className="flex size-11 shrink-0 items-center justify-center rounded-field border border-line-strong text-ink-faint press hover:border-ink-faint hover:text-ink-muted disabled:opacity-30"
               >
                 <svg
                   viewBox="0 0 24 24"

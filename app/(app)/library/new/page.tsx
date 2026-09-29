@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
+import { QUIET_LINK } from "@/components/ui";
 import { createExercise } from "@/lib/exercises/actions";
 import { ExerciseForm } from "../exercise-form";
 
@@ -10,9 +11,9 @@ export default function NewExercisePage() {
     <>
       <PageHeader
         title="Add exercise"
-        subtitle="Everything tagged here is read by the pre-filter, the normalizer, or the session ordering."
+        subtitle="Tag it honestly: the tags decide which weeks can use it, what it costs the tendons and where it lands in a session."
       >
-        <Link href="/library" className="-my-2 inline-flex min-h-11 items-center text-sm text-ink-faint hover:text-ink-muted">
+        <Link href="/library" className={QUIET_LINK}>
           Cancel
         </Link>
       </PageHeader>

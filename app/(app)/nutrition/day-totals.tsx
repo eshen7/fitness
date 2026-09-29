@@ -37,18 +37,16 @@ export function DayTotals({
     <Card>
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div>
-          <p className="text-xs font-medium tracking-wide text-ink-faint uppercase">
-            Eaten today
-          </p>
-          <p className="tnum mt-1 text-3xl leading-none font-semibold text-ink">
+          <p className="eyebrow">Eaten today</p>
+          <p className="numeral mt-1.5 text-[3.25rem] leading-none text-ink">
             {totals.kcal}
-            <span className="ml-1.5 text-base font-normal text-ink-faint">kcal</span>
+            <span className="ml-1.5 font-sans text-base font-normal text-ink-faint">kcal</span>
           </p>
         </div>
         {target && remaining ? (
           <p className="tnum text-right text-sm text-ink-muted">
             <span
-              className={`text-lg font-semibold ${remaining.kcal < 0 ? "text-warn" : "text-ink"}`}
+              className={`numeral text-2xl ${remaining.kcal < 0 ? "text-warn" : "text-ink"}`}
             >
               {Math.abs(remaining.kcal)}
             </span>{" "}
@@ -62,7 +60,7 @@ export function DayTotals({
         )}
       </div>
 
-      <div className="mt-4 space-y-2.5">
+      <div className="mt-5 space-y-3">
         <Meter
           label="Calories"
           eaten={totals.kcal}
@@ -95,10 +93,8 @@ export function DayTotals({
       </div>
 
       {split ? (
-        <div className="mt-4">
-          <p className="text-xs font-medium tracking-wide text-ink-faint uppercase">
-            Where the energy came from
-          </p>
+        <div className="mt-5">
+          <p className="eyebrow">Where the energy came from</p>
           <div
             className="mt-1.5 flex h-2 overflow-hidden rounded-full bg-surface-sunken"
             role="img"
@@ -124,7 +120,7 @@ export function DayTotals({
             ).map(([label, pct, color]) => (
               <li
                 key={label}
-                className="flex items-center gap-1.5 text-[11px] text-ink-muted"
+                className="flex items-center gap-1.5 text-xs text-ink-muted"
               >
                 <span
                   aria-hidden="true"
@@ -176,7 +172,7 @@ function Meter({
 
   return (
     <div>
-      <div className="flex items-baseline justify-between gap-2 text-xs">
+      <div className="flex items-baseline justify-between gap-2 text-sm">
         <span className="text-ink-muted">{label}</span>
         <span className="tnum text-ink-faint">
           <span className={over ? "font-medium text-warn" : "font-medium text-ink"}>

@@ -61,7 +61,7 @@ function Section({
 }) {
   return (
     <Card>
-      <h2 className="text-sm font-semibold text-ink">{title}</h2>
+      <h2 className="font-display text-xl leading-tight font-bold text-ink">{title}</h2>
       {description ? (
         <p className="mt-1 text-xs text-ink-faint">{description}</p>
       ) : null}
@@ -108,7 +108,7 @@ function Segmented<T extends string>({
               role="radio"
               aria-checked={selected}
               onClick={() => onChange(option)}
-              className={`min-h-11 rounded-field border px-2 py-2 text-sm font-medium transition ${
+              className={`min-h-11 rounded-field border px-2 py-2 text-sm font-medium press ${
                 selected
                   ? "border-accent bg-accent/15 text-accent"
                   : "border-line-strong bg-surface-sunken text-ink-muted hover:border-ink-faint"
@@ -244,7 +244,7 @@ export function ProfileForm({
                   aria-pressed={on}
                   aria-label={day.long}
                   onClick={() => toggleWeekday(day.value)}
-                  className={`h-11 rounded-field border text-sm font-medium transition ${
+                  className={`h-11 rounded-field border text-sm font-medium press ${
                     on
                       ? "border-accent bg-accent/15 text-accent"
                       : "border-line-strong bg-surface-sunken text-ink-muted hover:border-ink-faint"

@@ -67,9 +67,9 @@ function Section({
 }) {
   return (
     <Card>
-      <h2 className="text-sm font-semibold text-ink">{title}</h2>
+      <h2 className="font-display text-xl leading-tight font-bold text-ink">{title}</h2>
       {description ? (
-        <p className="mt-1 text-xs text-ink-faint">{description}</p>
+        <p className="mt-1 text-sm text-ink-muted">{description}</p>
       ) : null}
       <div className="mt-4 space-y-4">{children}</div>
     </Card>
@@ -389,8 +389,13 @@ export function ExerciseForm({
           capped measure inside a much wider main, so a floating band would end
           mid-screen with the form visible past its edge: it becomes an ordinary
           footer instead. */}
-      <div className="sticky bottom-14 z-10 -mx-4 border-t border-line bg-surface-sunken/95 px-4 py-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:px-0 md:backdrop-blur-none">
-        <Button type="submit" disabled={pending} className="w-full sm:w-auto">
+      <div
+        className="sticky z-10 -mx-4 border-t border-line bg-surface-sunken/92 px-4 py-3 backdrop-blur-md md:static md:mx-0 md:border-0 md:bg-transparent md:px-0 md:backdrop-blur-none"
+        // Over the home-indicator inset too, as `SubmitBar` does: the tab bar grows
+        // by it in an installed PWA.
+        style={{ bottom: "calc(3.5rem + env(safe-area-inset-bottom))" }}
+      >
+        <Button type="submit" disabled={pending} className="w-full sm:w-auto sm:min-w-40">
           {pending ? "Saving…" : submitLabel}
         </Button>
       </div>

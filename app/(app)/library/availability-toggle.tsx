@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useOptimistic, useTransition } from "react";
 import { setExerciseAvailability } from "@/lib/exercises/actions";
 
 /**
@@ -20,34 +20,41 @@ export function AvailabilityToggle({
   size?: "sm" | "md";
 }) {
   const [pending, startTransition] = useTransition();
+  // The switch moves on the tap rather than on the round trip. The flag is one
+  // boolean the owner can flip straight back, so showing it early is safe, and
+  // a failed write falls back to the server's value when the transition ends.
+  const [shown, setShown] = useOptimistic(available);
 
   return (
     <button
       type="button"
       role="switch"
-      aria-checked={available}
+      aria-checked={shown}
       aria-label={`${name} available`}
       disabled={pending}
       onClick={() =>
-        startTransition(() => setExerciseAvailability(slug, !available))
+        startTransition(async () => {
+          setShown(!available);
+          await setExerciseAvailability(slug, !available);
+        })
       }
-      title={available ? "Available. Tap to disable." : "Unavailable. Tap to enable."}
+      title={shown ? "Available. Tap to disable." : "Unavailable. Tap to enable."}
       // A switch track reads as a switch at 24px and cannot be hit at 24px, so the
       // 44px target is a centred pseudo-element rather than the track itself. It
       // overhangs the row's own padding, which is the right place for it: a tap
       // just above the toggle was aimed at the toggle.
-      className={`relative shrink-0 rounded-full border transition before:absolute before:top-1/2 before:left-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[''] disabled:opacity-50 ${
+      className={`relative shrink-0 rounded-full border transition-colors duration-200 before:absolute before:top-1/2 before:left-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[''] ${
         size === "md" ? "h-7 w-12" : "h-6 w-10"
-      } ${available ? "border-accent/50 bg-accent/25" : "border-line-strong bg-surface-sunken"}`}
+      } ${shown ? "border-good/50 bg-good/25" : "border-line-strong bg-surface-sunken"}`}
     >
       <span
         aria-hidden="true"
-        className={`absolute top-1/2 -translate-y-1/2 rounded-full transition-all ${
+        className={`absolute top-1/2 left-1 -translate-y-1/2 rounded-full transition-[translate,background-color] duration-200 ease-out-quick motion-reduce:transition-none ${
           size === "md" ? "h-5 w-5" : "h-4 w-4"
         } ${
-          available
-            ? "bg-accent " + (size === "md" ? "left-6" : "left-5")
-            : "bg-ink-faint left-1"
+          shown
+            ? "bg-good " + (size === "md" ? "translate-x-5" : "translate-x-4")
+            : "bg-ink-faint"
         }`}
       />
     </button>

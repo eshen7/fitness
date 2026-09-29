@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { NeedsMaxNote } from "@/components/needs-max-note";
-import { Card, DetailLine, EmptyState, Tag } from "@/components/ui";
+import { PrescriptionRow } from "@/components/prescription";
+import { ButtonLink, Card, DetailLine, EmptyState, Notice, QUIET_LINK, Tag, TextLink } from "@/components/ui";
 import { loadDirectory, loadOpenBlock, loadPlannedDay } from "@/lib/ai/queries";
 import { formatDay } from "@/lib/days";
 import { loadGuideState } from "@/lib/guide/queries";
@@ -10,10 +11,11 @@ import { loadTypeLabels, mesocycleTypeLabels, sessionKindLabels } from "@/lib/la
 import { getUnitSystem } from "@/lib/log/queries";
 import { quietDay, type QuietDay } from "@/lib/plan/today";
 import {
-  describePrescription,
   liftsNeedingMax,
   prescriptionDetail,
+  prescriptionLoad,
   prescriptionMaxes,
+  prescriptionVolume,
 } from "@/lib/prescription";
 import { currentOneRms } from "@/lib/strength/queries";
 import { today } from "@/lib/time";
@@ -43,21 +45,14 @@ export default async function TodayPage() {
 
   return (
     <>
-      <PageHeader
-        title="Today"
-        subtitle={`${formatDay(day)}. The generated session, with the reasoning behind it.`}
-      >
+      <PageHeader eyebrow={formatDay(day)} title="Today">
         {/* Always here, so the guide outlives the prompt that offers it. */}
-        <Link
-          href="/guide"
-          className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-accent underline-offset-2 hover:underline"
-        >
+        <Link href="/guide" className={QUIET_LINK}>
           Guide
-          <span aria-hidden className="ml-1">→</span>
         </Link>
       </PageHeader>
 
-      <div className="space-y-5">
+      <div className="space-y-6">
         {guided ? <GuidePrompt progress={setupProgress(guide.facts)} /> : null}
 
         {days.length === 0 ? (
@@ -74,87 +69,76 @@ export default async function TodayPage() {
         ) : null}
 
         {days.map(({ sessionId, session, week, block: meta, completedAt, skippedAt }) => (
-          <Card key={sessionId} className="space-y-4">
-            <header className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-base font-semibold text-ink">
-                  {session.title ?? sessionKindLabels.of(session.kind)}
-                </h2>
-                <Tag>{sessionKindLabels.of(session.kind)}</Tag>
-                <Tag tone={session.plannedIntensity >= 8 ? "warn" : "neutral"}>
-                  intensity {session.plannedIntensity}
-                </Tag>
-                {completedAt ? <Tag tone="accent">done</Tag> : null}
-                {skippedAt ? <Tag tone="bad">skipped</Tag> : null}
-              </div>
-              <p className="text-xs text-ink-faint">
+          <article key={sessionId} className="space-y-5">
+            <header>
+              <p className="eyebrow">
                 <DetailLine
                   parts={[
-                    `Block ${meta.ordinal}, ${mesocycleTypeLabels.of(meta.type)}`,
+                    `Block ${meta.ordinal} · ${mesocycleTypeLabels.of(meta.type)}`,
                     `Week ${week.ordinal}`,
                     loadTypeLabels.of(week.loadType),
-                    <span key="load" className="tabular-nums">
-                      relative load {week.relativeLoad.toFixed(2)}
+                    <span key="load" className="tnum">
+                      Load {week.relativeLoad.toFixed(2)}
                     </span>,
                   ]}
                 />
               </p>
+              <h2 className="mt-2 font-display text-2xl font-bold text-ink">
+                {session.title ?? sessionKindLabels.of(session.kind)}
+              </h2>
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                <Tag>{sessionKindLabels.of(session.kind)}</Tag>
+                <Tag tone={session.plannedIntensity >= 8 ? "warn" : "neutral"}>
+                  Intensity {session.plannedIntensity}/10
+                </Tag>
+                {completedAt ? <Tag tone="good">Done</Tag> : null}
+                {skippedAt ? <Tag tone="bad">Skipped</Tag> : null}
+              </div>
             </header>
 
             {week.loadType !== "stimulating" ? (
-              <p className="rounded-field border border-cool/40 bg-cool/5 px-3 py-2 text-sm text-ink-muted">
-                This is a {loadTypeLabels.of(week.loadType).toLowerCase()} week. The
-                easy period is what realizes the adaptation the hard weeks built, so
-                the low numbers are the plan rather than a shortfall.
-              </p>
+              <Notice tone="cool">
+                <span className="font-semibold text-ink">
+                  {loadTypeLabels.of(week.loadType)} week.
+                </span>{" "}
+                Easy on purpose: this is where the hard weeks turn into jump height, so
+                the low numbers are the plan, not a shortfall.
+              </Notice>
             ) : null}
 
             {week.rationale ? (
-              <section>
-                <h3 className="text-xs font-medium tracking-wide text-ink-faint uppercase">
-                  Why this week
-                </h3>
-                <p className="mt-1.5 text-sm whitespace-pre-line text-ink-muted">
-                  {week.rationale}
-                </p>
-              </section>
+              <Notice>
+                <h3 className="eyebrow">Why this week</h3>
+                <p className="mt-1.5 whitespace-pre-line">{week.rationale}</p>
+              </Notice>
             ) : null}
 
             <div className="space-y-3">
               {session.blocks.map((item, index) => (
-                <div key={`${item.label}-${index}`}>
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs font-medium tracking-wide text-ink-muted uppercase">
-                      {item.label}
-                    </p>
-                    {item.complexPair ? <Tag tone="cool">complex pair</Tag> : null}
+                <Card key={`${item.label}-${index}`}>
+                  <div className="mb-3 flex items-center gap-2">
+                    <h3 className="eyebrow text-ink-muted">{item.label}</h3>
+                    {item.complexPair ? <Tag tone="cool">Complex pair</Tag> : null}
                   </div>
-                  <ul className="mt-1.5 space-y-1.5">
+                  <ul>
                     {item.items.map((prescription) => (
-                      <li
+                      <PrescriptionRow
                         key={prescription.exerciseId}
-                        className="rounded-field border border-line bg-surface-sunken px-3 py-2"
-                      >
-                        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                          <span className="text-sm text-ink">
-                            {directory.directory.get(prescription.exerciseId)?.name ??
-                              `Exercise ${prescription.exerciseId}`}
-                          </span>
-                          <span className="text-xs text-ink-muted tabular-nums">
-                            {describePrescription(
-                              prescription,
-                              unitSystem,
-                              maxes[String(prescription.exerciseId)],
-                            )}
-                          </span>
-                        </div>
-                        <p className="mt-0.5 text-xs text-ink-faint">
-                          {prescriptionDetail(prescription)}
-                        </p>
-                      </li>
+                        name={
+                          directory.directory.get(prescription.exerciseId)?.name ??
+                          `Exercise ${prescription.exerciseId}`
+                        }
+                        volume={prescriptionVolume(prescription)}
+                        load={prescriptionLoad(
+                          prescription,
+                          unitSystem,
+                          maxes[String(prescription.exerciseId)],
+                        )}
+                        detail={prescriptionDetail(prescription)}
+                      />
                     ))}
                   </ul>
-                </div>
+                </Card>
               ))}
             </div>
 
@@ -169,14 +153,15 @@ export default async function TodayPage() {
             />
 
             {completedAt || skippedAt ? null : (
-              <Link
+              <ButtonLink
                 href={`/log/session/${sessionId}`}
-                className="inline-flex h-11 items-center justify-center rounded-field bg-accent px-4 text-sm font-semibold text-accent-ink transition hover:brightness-105"
+                size="lg"
+                className="w-full sm:w-auto sm:min-w-56"
               >
                 Log this session
-              </Link>
+              </ButtonLink>
             )}
-          </Card>
+          </article>
         ))}
       </div>
     </>
@@ -251,13 +236,5 @@ function NothingToday({ quiet, guided }: { quiet: QuietDay; guided: boolean }) {
 }
 
 function PlanLink({ children }: { children: React.ReactNode }) {
-  return (
-    <Link
-      href="/plan"
-      className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-accent underline-offset-2 hover:underline"
-    >
-      {children}
-      <span aria-hidden className="ml-1">→</span>
-    </Link>
-  );
+  return <TextLink href="/plan">{children}</TextLink>;
 }

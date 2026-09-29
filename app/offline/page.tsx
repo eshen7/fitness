@@ -1,4 +1,5 @@
 import { QueuedSets } from "@/app/offline/queued-sets";
+import { buttonClass } from "@/components/ui";
 
 export const metadata = { title: "Offline" };
 
@@ -12,12 +13,12 @@ export const metadata = { title: "Offline" };
 export default function OfflinePage() {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-6 text-center">
-      <h1 className="text-xl font-semibold text-ink">No connection</h1>
+      <h1 className="text-3xl leading-none font-bold text-ink uppercase">No connection</h1>
       <QueuedSets />
       {/* A link to the address it is on, so retrying needs no JavaScript. */}
       <a
         href=""
-        className="mt-6 flex h-14 items-center justify-center rounded-field bg-accent px-6 text-base font-semibold text-accent-ink transition hover:brightness-105"
+        className={buttonClass("primary", "mt-7 px-8", "lg")}
       >
         Try again
       </a>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
-import { Card, EmptyState, Tag } from "@/components/ui";
+import { Card, EmptyState, Notice, QUIET_LINK, Tag, TextLink } from "@/components/ui";
 import { planSnapshot } from "@/lib/ai/proposals";
 import { loadProfile } from "@/lib/ai/queries";
 import { formatUsd } from "@/lib/ai/pricing";
@@ -51,101 +51,84 @@ export default async function PlanPage() {
 
   return (
     <>
-      <PageHeader title="Plan" subtitle="Blocks up front, weeks rolling.">
+      <PageHeader
+        title="Plan"
+        eyebrow={
+          block
+            ? `Block ${block.ordinal} · ${block.priorWeeks.length} of ${block.declaration.plannedMicrocycles} weeks written`
+            : "No block open"
+        }
+      >
         {/*
-          Start-aligned until `sm`: at phone widths `PageHeader` wraps this under the
-          subtitle, where right-aligning the link to the end of the spend line leaves it
-          floating mid-row.
+          All here rather than in the nav, which stays at six items. The profile and
+          memory are what the generator reads, so the screen it is generated from is
+          where a wrong fact gets noticed; the export is the same kind of thing one
+          level up - it is what you reach for when you want the data out from under
+          the app.
         */}
-        <div className="flex flex-col items-start gap-1 sm:items-end">
-          <span className="text-xs text-ink-faint tabular-nums">
-            {formatUsd(snapshot.spendUsd)} of {formatUsd(snapshot.spendCapUsd)} spent
-          </span>
-          {/*
-            All here rather than in the nav, which stays at six items. The profile and
-            memory are what the generator reads, so the screen it is generated from is
-            where a wrong fact gets noticed; the export is the same kind of thing one
-            level up - it is what you reach for when you want the data out from under
-            the app.
-          */}
-          <div className="flex items-center gap-4">
-            <Link
-              href="/profile"
-              className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-accent underline-offset-2 hover:underline"
-            >
-              Profile
-              <span aria-hidden className="ml-1">→</span>
-            </Link>
-            <Link
-              href="/plan/memory"
-              className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-accent underline-offset-2 hover:underline"
-            >
-              Memory
-              {pendingFacts > 0 ? (
-                <span className="ml-1.5 text-warn tabular-nums">
-                  {pendingFacts} waiting
-                </span>
-              ) : null}
-              <span aria-hidden className="ml-1">→</span>
-            </Link>
-            <Link
-              href="/export"
-              className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-ink-faint underline-offset-2 hover:text-ink-muted hover:underline"
-            >
-              Export
-              <span aria-hidden className="ml-1">↓</span>
-            </Link>
-          </div>
+        <div className="flex items-center gap-5">
+          <Link href="/profile" className={QUIET_LINK}>
+            Profile
+          </Link>
+          <Link href="/plan/memory" className={QUIET_LINK}>
+            Memory
+            {pendingFacts > 0 ? (
+              <Tag tone="warn">{`${pendingFacts} waiting`}</Tag>
+            ) : null}
+          </Link>
+          <Link href="/export" className={QUIET_LINK}>
+            Export
+          </Link>
         </div>
       </PageHeader>
 
       <VerdictOutcomeProvider>
         <div className="space-y-5">
           {gaps ? (
-            <Card>
-              <p className="text-sm text-ink-muted">
-                <span className="font-medium text-warn">Profile incomplete.</span>{" "}
-                {gaps}{" "}
-                <Link
-                  href="/profile"
-                  className="font-medium text-accent underline-offset-2 hover:underline"
-                >
-                  Set up your profile
-                  <span aria-hidden> →</span>
-                </Link>
+            <Notice tone="warn">
+              <p>
+                <span className="font-semibold text-ink">Profile incomplete.</span>{" "}
+                {gaps}
               </p>
-            </Card>
+              <TextLink href="/profile" className="mt-1">
+                Set up your profile
+              </TextLink>
+            </Notice>
           ) : null}
 
           {!snapshot.hasKey ? (
-            <Card>
-              <p className="text-sm text-ink-muted">
-                <span className="font-medium text-warn">No API key.</span> Generation
+            <Notice tone="warn">
+              <p>
+                <span className="font-semibold text-ink">No API key.</span> Generation
                 needs <code className="text-xs">OPENAI_API_KEY</code> in the
                 environment. Everything already written still reads normally.
               </p>
-            </Card>
+            </Notice>
           ) : null}
 
           {block ? (
             <Card>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-base font-semibold text-ink">
-                      Block {block.ordinal}
-                    </h2>
-                    <Tag tone="accent">
+                  <p className="eyebrow">From {formatDay(block.startDate)}</p>
+                  <h2 className="mt-1.5 font-display text-2xl font-bold text-ink">
+                    Block {block.ordinal}
+                    <span className="text-ink-faint">
+                      {" · "}
                       {mesocycleTypeLabels.of(block.declaration.type)}
-                    </Tag>
-                    <Tag>
-                      {block.priorWeeks.length} of{" "}
-                      {block.declaration.plannedMicrocycles} weeks
-                    </Tag>
+                    </span>
+                  </h2>
+                  {/* The block's length, week by week, filled as they are written. */}
+                  <div aria-hidden="true" className="mt-2.5 flex w-40 gap-1">
+                    {Array.from({ length: block.declaration.plannedMicrocycles }, (_, i) => (
+                      <span
+                        key={i}
+                        className={`h-1 flex-1 rounded-full ${
+                          i < block.priorWeeks.length ? "bg-ink-muted" : "bg-surface-raised"
+                        }`}
+                      />
+                    ))}
                   </div>
-                  <p className="mt-1 text-xs text-ink-faint">
-                    From {formatDay(block.startDate)}
-                  </p>
                 </div>
                 <CloseBlock />
               </div>
@@ -165,15 +148,13 @@ export default async function PlanPage() {
               ) : null}
 
               <div className="mt-4">
-                <p className="text-xs font-medium tracking-wide text-ink-faint uppercase">
-                  The complex
-                </p>
+                <p className="eyebrow">The complex</p>
                 {block.declaration.complex.length ? (
-                  <ul className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
+                  <ul className="mt-1.5 grid sm:grid-cols-2 sm:gap-x-6">
                     {block.declaration.complex.map((item) => (
                       <li
                         key={item.exerciseId}
-                        className="flex items-center justify-between gap-2 rounded-field border border-line bg-surface-sunken px-3 py-2"
+                        className="flex min-h-10 items-center justify-between gap-2 border-b border-line py-1.5"
                       >
                         <span className="min-w-0 truncate text-sm text-ink">
                           {names[String(item.exerciseId)] ?? `Exercise ${item.exerciseId}`}
@@ -183,7 +164,7 @@ export default async function PlanPage() {
                             <Tag tone="warn">out for now</Tag>
                           ) : null}
                           {item.isMain ? <Tag tone="accent">main</Tag> : null}
-                          <span className="text-xs text-ink-faint tabular-nums">
+                          <span className="tnum text-sm text-ink-faint">
                             {item.targetWeeklyFrequency ?? 2}x/wk
                           </span>
                         </span>
@@ -200,9 +181,9 @@ export default async function PlanPage() {
                   </p>
                 )}
                 {snapshot.sidelined.length ? (
-                  <div className="mt-3 rounded-field border border-warn/40 bg-warn/5 px-3 py-2.5 text-sm text-ink-muted">
+                  <Notice tone="warn" className="mt-4">
                     <p>
-                      <span className="font-medium text-warn">
+                      <span className="font-semibold text-ink">
                         {snapshot.sidelined.length} of {block.declaration.complex.length}{" "}
                         out for now.
                       </span>{" "}
@@ -217,7 +198,7 @@ export default async function PlanPage() {
                         <li key={exclusion.exerciseId}>{exclusion.message}</li>
                       ))}
                     </ul>
-                  </div>
+                  </Notice>
                 ) : null}
               </div>
             </Card>
@@ -238,10 +219,10 @@ export default async function PlanPage() {
               />
               {block && nextWeek ? (
                 <Card>
-                  <h2 className="text-base font-semibold text-ink">
+                  <h2 className="font-display text-xl font-bold text-ink">
                     Not what you wanted?
                   </h2>
-                  <p className="mt-1 mb-3 text-sm text-ink-faint">
+                  <p className="mt-1 mb-4 text-sm text-ink-muted">
                     Regenerating supersedes the proposal above rather than replacing
                     it, so the reason it was thrown away stays on the record.
                   </p>
@@ -258,12 +239,13 @@ export default async function PlanPage() {
             </>
           ) : block && nextWeek ? (
             <Card>
-              <h2 className="text-base font-semibold text-ink">
+              <p className="eyebrow">Next</p>
+              <h2 className="mt-1.5 font-display text-2xl font-bold text-ink">
                 Week {nextWeek.ordinal}
               </h2>
-              <p className="mt-1 mb-4 text-sm text-ink-faint">
-                Generated inside the declaration above: the complex is fixed, the load
-                is what varies.
+              <p className="mt-1 mb-4 text-sm text-ink-muted">
+                Written inside the block above: the exercises hold still and the load
+                is what moves.
               </p>
               <GenerateWeek
                 mesocycleId={block.mesocycleId}
@@ -274,8 +256,8 @@ export default async function PlanPage() {
             </Card>
           ) : (
             <Card>
-              <h2 className="text-base font-semibold text-ink">Declare a block</h2>
-              <p className="mt-1 mb-4 text-sm text-ink-faint">
+              <h2 className="font-display text-2xl font-bold text-ink">Declare a block</h2>
+              <p className="mt-1 mb-4 text-sm text-ink-muted">
                 Type, one or two target abilities, one technical focus, and a stable
                 complex of about ten exercises. Weeks are generated inside it
                 afterwards, one at a time.
@@ -284,38 +266,46 @@ export default async function PlanPage() {
             </Card>
           )}
 
-          <section>
-            <h2 className="mb-2 text-base font-semibold text-ink">Recent proposals</h2>
+          <section className="pt-2">
+            <div className="mb-2 flex items-baseline justify-between gap-3">
+              <h2 className="eyebrow">Recent proposals</h2>
+              {/* The owner's hard ceiling, where the money is actually spent. */}
+              <span className="tnum text-xs text-ink-faint">
+                {formatUsd(snapshot.spendUsd)} of {formatUsd(snapshot.spendCapUsd)} spent
+              </span>
+            </div>
             {snapshot.history.length === 0 ? (
               <EmptyState title="Nothing generated yet">
                 Every proposal is kept, accepted or not, with the inputs it saw and
                 what the gate made of it.
               </EmptyState>
             ) : (
-              <ul className="space-y-1.5">
-                {snapshot.history.map((proposal) => (
-                  <li
-                    key={proposal.id}
-                    className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-field border border-line bg-surface px-3 py-2 text-sm"
-                  >
-                    <span className="text-ink-faint tabular-nums">#{proposal.id}</span>
-                    <span className="text-ink">
-                      {proposal.scope === "mesocycle" ? "Block" : "Week"}
-                      {proposal.ask ? ` ${proposal.ask.ordinal}` : ""}
-                    </span>
-                    <Tag tone={verdictTone(proposal.verdict)}>{proposal.verdict}</Tag>
-                    {proposal.isFallback ? <Tag tone="bad">fallback</Tag> : null}
-                    {proposal.repairAttempts > 0 ? (
-                      <Tag tone="warn">
-                        {`${proposal.repairAttempts} repair${proposal.repairAttempts === 1 ? "" : "s"}`}
-                      </Tag>
-                    ) : null}
-                    <span className="ml-auto text-xs text-ink-faint">
-                      {proposal.ask ? formatDay(proposal.ask.startDate) : ""}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <Card className="py-1 sm:py-1">
+                <ul>
+                  {snapshot.history.map((proposal) => (
+                    <li
+                      key={proposal.id}
+                      className="flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1 border-t border-line py-2 text-sm first:border-t-0"
+                    >
+                      <span className="tnum w-8 text-ink-faint">#{proposal.id}</span>
+                      <span className="text-ink">
+                        {proposal.scope === "mesocycle" ? "Block" : "Week"}
+                        {proposal.ask ? ` ${proposal.ask.ordinal}` : ""}
+                      </span>
+                      <Tag tone={verdictTone(proposal.verdict)}>{proposal.verdict}</Tag>
+                      {proposal.isFallback ? <Tag tone="bad">fallback</Tag> : null}
+                      {proposal.repairAttempts > 0 ? (
+                        <Tag tone="warn">
+                          {`${proposal.repairAttempts} repair${proposal.repairAttempts === 1 ? "" : "s"}`}
+                        </Tag>
+                      ) : null}
+                      <span className="ml-auto text-xs text-ink-faint">
+                        {proposal.ask ? formatDay(proposal.ask.startDate) : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
             )}
           </section>
         </div>
@@ -335,7 +325,7 @@ function namesOf(directory: Directory): Record<string, string> {
 }
 
 function verdictTone(verdict: string) {
-  if (verdict === "accepted") return "accent" as const;
+  if (verdict === "accepted") return "good" as const;
   if (verdict === "edited") return "cool" as const;
   if (verdict === "rejected") return "bad" as const;
   if (verdict === "pending") return "warn" as const;

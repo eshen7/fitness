@@ -65,7 +65,7 @@ export function RecomputeInsights({ children }: { children: ReactNode }) {
           type="button"
           onClick={recompute}
           disabled={pending}
-          className="-mr-3 inline-flex h-11 min-w-11 shrink-0 items-center justify-center rounded-field px-3 text-xs font-medium text-ink-faint transition hover:text-ink disabled:opacity-50"
+          className="-mr-3 inline-flex h-11 min-w-11 shrink-0 items-center justify-center press rounded-field px-3 text-xs font-medium text-ink-faint hover:text-ink disabled:opacity-50"
         >
           {pending ? "Recomputing" : "Recompute"}
         </button>

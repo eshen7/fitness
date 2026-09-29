@@ -21,11 +21,11 @@ function Stat({
 }) {
   return (
     <div>
-      <p className="text-xs text-ink-faint">{label}</p>
-      <p className="tnum mt-0.5 font-display text-lg font-semibold text-ink">
+      <p className="eyebrow">{label}</p>
+      <p className="numeral mt-1.5 text-2xl leading-none text-ink">
         {value === null ? "-" : value}
         {value !== null && unit ? (
-          <span className="ml-1 text-xs font-normal text-ink-faint">{unit}</span>
+          <span className="ml-1 font-sans text-xs font-normal text-ink-faint">{unit}</span>
         ) : null}
       </p>
     </div>
@@ -56,19 +56,21 @@ export default async function ReadinessPage({
   return (
     <>
       <PageHeader
+        back={{ href: "/log", label: "Log" }}
         title="Readiness"
-        subtitle={`${formatDay(day)}. One check-in per day, editable.`}
+        eyebrow={formatDay(day)}
+        subtitle="How the body feels before the numbers say so. One check-in a day, and you can change it until tomorrow."
       />
 
       {row?.whoopFilled ? (
-        <Card className="mb-4">
+        <Card className="mb-5">
           <div className="flex items-start justify-between gap-2">
-            <h2 className="text-sm font-semibold text-ink">From WHOOP</h2>
+            <h2 className="font-display text-xl leading-tight font-bold text-ink">From WHOOP</h2>
             {row.dayStrain === null ? null : (
               <Tag tone="cool">strain {Number(row.dayStrain).toFixed(1)}</Tag>
             )}
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <Stat label="Recovery" value={row.recoveryScore} unit="%" />
             <Stat
               label="HRV"

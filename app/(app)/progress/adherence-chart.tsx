@@ -105,7 +105,7 @@ export function AdherenceChart({ sessions }: { sessions: SessionOutcome[] }) {
         </p>
       ) : (
         <>
-          <p className="mb-1.5 text-[11px] font-medium text-ink-muted">
+          <p className="eyebrow mb-2">
             Sets completed, percent of prescribed
           </p>
           <Plot
@@ -136,7 +136,7 @@ export function AdherenceChart({ sessions }: { sessions: SessionOutcome[] }) {
             />
           </Plot>
 
-          <p className="mt-4 mb-1.5 text-[11px] font-medium text-ink-muted">
+          <p className="eyebrow mt-4 mb-2">
             RPE, reported against target
           </p>
           <Plot

@@ -59,7 +59,7 @@ export function ScoreRow({
               role="radio"
               aria-checked={selected}
               onClick={() => onChange(score)}
-              className={`tnum h-11 rounded-field border text-sm font-medium transition ${
+              className={`press numeral h-11 rounded-field border text-base ${
                 selected
                   ? warn
                     ? "border-warn bg-warn/15 text-warn"
@@ -77,10 +77,10 @@ export function ScoreRow({
           aria-checked={value === null}
           onClick={() => onChange(null)}
           title="Not checked"
-          className={`h-11 rounded-field border text-xs font-medium transition ${
+          className={`press h-11 rounded-field border text-xs font-medium ${
             value === null
               ? "border-ink-faint bg-surface-raised text-ink-muted"
-              : "border-line-strong border-dashed bg-transparent text-ink-faint hover:border-ink-faint"
+              : "border-line-strong bg-transparent text-ink-faint hover:border-ink-faint"
           }`}
         >
           Skip

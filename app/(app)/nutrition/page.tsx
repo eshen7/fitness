@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/page-header";
-import { Card } from "@/components/ui";
+import { Card, Notice } from "@/components/ui";
 import { formatUsd } from "@/lib/ai/pricing";
 import { formatDay } from "@/lib/days";
 import { nutritionSnapshot } from "@/lib/nutrition/queries";
@@ -28,23 +28,24 @@ export default async function NutritionPage() {
     <>
       <PageHeader
         title="Food"
-        subtitle={`${formatDay(snapshot.day)} · plain language in, cached macros out`}
+        eyebrow={formatDay(snapshot.day)}
+        subtitle="Say what you ate the way you would say it. A food eaten before costs nothing to log again."
       >
-        <span className="text-xs text-ink-faint tabular-nums">
+        <span className="tnum text-xs text-ink-faint">
           {formatUsd(snapshot.spendUsd)} of {formatUsd(snapshot.spendCapUsd)} spent
         </span>
       </PageHeader>
 
       <div className="space-y-5">
         {!snapshot.hasKey ? (
-          <Card>
-            <p className="text-sm text-ink-muted">
-              <span className="font-medium text-warn">No API key.</span> A food never
+          <Notice tone="warn">
+            <p>
+              <span className="font-semibold text-ink">No API key.</span> A food never
               seen before needs <code className="text-xs">OPENAI_API_KEY</code> in the
               environment to be estimated. Anything already in the cache still logs
               normally, which is most of a repeating diet.
             </p>
-          </Card>
+          </Notice>
         ) : null}
 
         <Card>
@@ -58,7 +59,7 @@ export default async function NutritionPage() {
         />
 
         <section>
-          <h2 className="mb-2.5 text-base font-semibold text-ink">Logged today</h2>
+          <h2 className="eyebrow mb-2">Logged today</h2>
           <DayLog meals={snapshot.meals} hasHistory={snapshot.hasHistory} />
         </section>
 

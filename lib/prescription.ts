@@ -45,17 +45,37 @@ export function describePrescription(
   unitSystem: UnitSystem = "metric",
   oneRmKg?: number | null,
 ) {
+  const volume = prescriptionVolume(item);
+  const load = prescriptionLoad(item, unitSystem, oneRmKg);
+  return load ? `${volume} at ${load}` : volume;
+}
+
+/**
+ * The volume half of `describePrescription` - `4 x 8`, `3 x 45s`, `3 sets` -
+ * which the screens set large, because it is the part read from across a rack.
+ */
+export function prescriptionVolume(item: PlannedSet) {
+  return item.reps != null
+    ? `${item.sets} x ${item.reps}`
+    : item.holdSeconds != null
+      ? `${item.sets} x ${item.holdSeconds}s`
+      : `${item.sets} sets`;
+}
+
+/**
+ * The load half of `describePrescription` - `145 kg (85% 1RM), RPE 8` - or null
+ * for a prescription that is volume alone. Same rules for a missing max.
+ */
+export function prescriptionLoad(
+  item: PlannedSet,
+  unitSystem: UnitSystem = "metric",
+  oneRmKg?: number | null,
+): string | null {
   const measure = (value: number, dimension: "mass" | "length") => {
     const shown =
       unitSystem === "metric" ? value : round1(toDisplay(value, dimension, unitSystem));
     return `${shown} ${displayUnit(dimension, unitSystem)}`;
   };
-  const volume =
-    item.reps != null
-      ? `${item.sets} x ${item.reps}`
-      : item.holdSeconds != null
-        ? `${item.sets} x ${item.holdSeconds}s`
-        : `${item.sets} sets`;
   const load = [
     item.loadPctOf1rm == null
       ? null
@@ -68,7 +88,7 @@ export function describePrescription(
     item.boxHeightCm != null ? `${measure(item.boxHeightCm, "length")} box` : null,
     item.targetRpe != null ? `RPE ${item.targetRpe}` : null,
   ].filter(Boolean);
-  return load.length ? `${volume} at ${load.join(", ")}` : volume;
+  return load.length ? load.join(", ") : null;
 }
 
 /** Rest, coupling and tempo: the normalizer's fields, shown but not edited. */

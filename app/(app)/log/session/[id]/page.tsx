@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
-import { Tag } from "@/components/ui";
+import { DetailLine, Tag } from "@/components/ui";
 import { listExercises } from "@/lib/exercises/queries";
 import { sessionKindLabels } from "@/lib/labels";
 import {
@@ -68,13 +68,20 @@ export default async function SessionPage({ params }: { params: Params }) {
   return (
     <>
       <PageHeader
+        back={{ href: "/log", label: "Log" }}
         title={sessionName(session)}
-        subtitle={`${session.title ? `${sessionKindLabels.of(session.kind)} · ` : ""}${formatDay(session.day)}${
-          session.startedAt ? ` · started ${formatTime(session.startedAt)}` : ""
-        }`}
+        eyebrow={
+          <DetailLine
+            parts={[
+              ...(session.title ? [sessionKindLabels.of(session.kind)] : []),
+              formatDay(session.day),
+              ...(session.startedAt ? [`Started ${formatTime(session.startedAt)}`] : []),
+            ]}
+          />
+        }
       >
         {finished ? (
-          <Tag tone="cool">
+          <Tag tone={session.completedAt ? "good" : "bad"}>
             {session.completedAt
               ? `Finished ${formatTime(session.completedAt)}`
               : "Skipped"}

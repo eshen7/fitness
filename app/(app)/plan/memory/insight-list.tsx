@@ -46,7 +46,7 @@ export function InsightList({ insights }: { insights: StoredInsight[] }) {
         if (group.length === 0) return null;
         return (
           <section key={family}>
-            <h3 className="mb-1.5 text-xs font-medium tracking-wide text-ink-faint uppercase">
+            <h3 className="eyebrow mb-1.5">
               {insightFamilyLabels.of(family)}
             </h3>
             <ul className="space-y-1.5">
@@ -102,7 +102,7 @@ function Asserted({ insight }: { insight: StoredInsight }) {
 function Withheld({ insight }: { insight: StoredInsight }) {
   const short = insight.n < insight.minN;
   return (
-    <div className="rounded-field border border-line border-dashed bg-surface/40 px-3 py-2.5">
+    <div className="border-l-2 border-line-strong py-0.5 pl-4">
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
         <p className="min-w-0 text-sm text-ink-muted">{insight.subject}</p>
         {short ? (

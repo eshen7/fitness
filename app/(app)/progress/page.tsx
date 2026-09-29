@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
+import { TextLink } from "@/components/ui";
 import { assertableInsightCount } from "@/lib/analytics/persist";
 import { getUnitSystem } from "@/lib/log/queries";
 import {
@@ -47,29 +47,20 @@ export default async function ProgressPage() {
     <>
       <PageHeader
         title="Progress"
-        subtitle="Jump, tendon load, strength, adherence."
+        subtitle="Judge a block by where the jump lands after the back-off, not by the dip inside it."
       >
         {/*
           The charts show what happened; the insight suite says which of it is more
           than noise. That distinction is the reason the statements live on their own
           screen instead of as captions here.
         */}
-        {/*
-          Accent and an arrow, because `PageHeader` wraps its children under the
-          subtitle at phone widths: a grey sentence on its own line there is
-          indistinguishable from the subtitle it sits below.
-        */}
-        <Link
-          href="/plan/memory"
-          className="-my-2 inline-flex min-h-11 flex-wrap items-center text-sm font-medium text-accent underline-offset-2 hover:underline"
-        >
+        <TextLink href="/plan/memory">
           {insights === 0
             ? "What the numbers support"
             : `${insights} statement${insights === 1 ? "" : "s"} the numbers support`}
-          <span aria-hidden className="ml-1">→</span>
-        </Link>
+        </TextLink>
       </PageHeader>
-      <div className="space-y-4">
+      <div className="space-y-5">
         <JumpChart
           sittings={sittings}
           blocks={blocks}

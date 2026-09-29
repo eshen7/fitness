@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Button, EmptyState } from "./ui";
+import { ButtonLink, EmptyState } from "./ui";
 
 /**
  * Shared body for both not-found boundaries.
@@ -12,17 +11,15 @@ import { Button, EmptyState } from "./ui";
 export function NotFoundBody() {
   return (
     <>
-      <EmptyState title="That page does not exist.">
+      <EmptyState title="That page does not exist">
         The link may be stale, or the URL may have a typo in it. Exercise slugs
         are immutable once seeded, so a link that worked before still works.
       </EmptyState>
-      <div className="mt-4 flex justify-center gap-2">
-        <Link href="/library">
-          <Button variant="secondary">Library</Button>
-        </Link>
-        <Link href="/today">
-          <Button>Today</Button>
-        </Link>
+      <div className="mt-5 flex gap-2">
+        <ButtonLink href="/today">Today</ButtonLink>
+        <ButtonLink href="/library" variant="secondary">
+          Library
+        </ButtonLink>
       </div>
     </>
   );
