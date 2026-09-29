@@ -249,12 +249,15 @@ async function seedMeasurements(
     });
   }
 
-  // Bodyweight every third day, following the energy balance the food log below
+  // Bodyweight every morning, following the energy balance the food log below
   // records - up about a kilo and a half across the season, gaining in accumulation
   // and giving some back in each taper - with day-to-day water noise on top, because
   // everything that divides by bodyweight has to have something worth smoothing.
+  // Daily rather than sparser, because the maintenance estimate reads a rate of gain
+  // off each week of the trend, and at one reading in three the noise decides
+  // whether that rate is plausible about as often as the energy balance does.
   const totalDays = BLOCKS.reduce((sum, block) => sum + block.weeks * 7, 0);
-  for (let d = 0; d <= totalDays; d += 3) {
+  for (let d = 0; d <= totalDays; d += 1) {
     if (addDays(START, d) > today) break;
     const trend = trendKgOn(addDays(START, d));
     rows.push({

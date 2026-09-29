@@ -1,4 +1,5 @@
 import {
+  MAINTENANCE_KCAL_PER_KG,
   MIN_INTAKE_WEEKS,
   MIN_LOGGED_DAYS_PER_WEEK,
   type MeasuredMaintenance,
@@ -61,17 +62,7 @@ export function unhealthySites(tendon: readonly TendonState[]): TendonState[] {
 // The numbers
 // -----------------------------------------------------------------------------
 
-/**
- * Maintenance calories per kilogram, for when nothing better is known.
- *
- * A placeholder on purpose. True maintenance is measured from logged intake against
- * trend bodyweight change by `measuredMaintenance` in `lib/analytics/nutrition.ts`,
- * and this textbook multiplier for an athlete training most days only stands in
- * until the history can support that. The rationale line says which of the two
- * produced the number, so a target from before the measurement is not mistaken for
- * one after it.
- */
-export const MAINTENANCE_KCAL_PER_KG = 33;
+export { MAINTENANCE_KCAL_PER_KG };
 
 /** Surplus and deficit as a share of maintenance. */
 export const SURPLUS_FRACTION = 0.1;
@@ -135,6 +126,8 @@ export type TargetProposal = {
   maintenanceKcal: number;
   /** The weeks of logged intake maintenance was measured from, or null for the default. */
   maintenanceWeeks: number | null;
+  /** True when the history measured a maintenance that was not reliable enough to use. */
+  maintenanceUnreliable: boolean;
   /** Set only when a cut was asked for and not allowed. */
   cutRefusedBecause: string | null;
   rationale: string;
@@ -152,7 +145,8 @@ export type TargetProposal = {
  */
 export function proposeTargets(input: TargetInputs): TargetProposal {
   const { bodyweightKg, blockType, goal } = input;
-  const measured = input.maintenance ?? null;
+  const measured = input.maintenance?.reliable ? input.maintenance : null;
+  const maintenanceUnreliable = input.maintenance?.reliable === false;
   const maintenanceKcal =
     measured?.kcal ?? Math.round(bodyweightKg * MAINTENANCE_KCAL_PER_KG);
 
@@ -194,12 +188,14 @@ export function proposeTargets(input: TargetInputs): TargetProposal {
     direction,
     maintenanceKcal,
     maintenanceWeeks: measured?.weeks ?? null,
+    maintenanceUnreliable,
     cutRefusedBecause: refusal,
     rationale: rationaleFor({
       direction,
       blockType,
       maintenanceKcal,
       maintenanceWeeks: measured?.weeks ?? null,
+      maintenanceUnreliable,
       refusal,
     }),
   };
@@ -243,10 +239,12 @@ function siteWords(site: TendonSite) {
  * also needs intake to rise with weight gain, and says nothing until it does.
  */
 export function maintenanceBasis(
-  proposal: Pick<TargetProposal, "maintenanceKcal" | "maintenanceWeeks">,
+  proposal: Pick<TargetProposal, "maintenanceKcal" | "maintenanceWeeks" | "maintenanceUnreliable">,
 ): string {
-  return proposal.maintenanceWeeks !== null
-    ? `Maintenance ${proposal.maintenanceKcal} kcal, measured from ${proposal.maintenanceWeeks} weeks of logged intake against the bodyweight trend.`
+  if (proposal.maintenanceWeeks !== null)
+    return `Maintenance ${proposal.maintenanceKcal} kcal, measured from ${proposal.maintenanceWeeks} weeks of logged intake against the bodyweight trend.`;
+  return proposal.maintenanceUnreliable
+    ? `Maintenance ${proposal.maintenanceKcal} kcal, the ${MAINTENANCE_KCAL_PER_KG} kcal/kg default, since the logged intake does not yet measure it reliably enough to use.`
     : `Maintenance ${proposal.maintenanceKcal} kcal, the ${MAINTENANCE_KCAL_PER_KG} kcal/kg default until at least ${inWords(MIN_INTAKE_WEEKS)} weeks of logged intake, ${inWords(MIN_LOGGED_DAYS_PER_WEEK)} days in each, can measure it.`;
 }
 
@@ -282,6 +280,7 @@ function rationaleFor(input: {
   blockType: MesocycleType | null;
   maintenanceKcal: number;
   maintenanceWeeks: number | null;
+  maintenanceUnreliable: boolean;
   refusal: string | null;
 }) {
   const basis = maintenanceBasis(input);

@@ -174,7 +174,7 @@ describe("proposeTargets", () => {
       bodyweightKg: BODYWEIGHT,
       blockType: null,
       tendon: healthy,
-      maintenance: { kcal: 3100, weeks: 7 },
+      maintenance: { kcal: 3100, weeks: 7, reliable: true },
       goal: "hold",
     });
     expect(measured.maintenanceKcal).toBe(3100);
@@ -202,7 +202,7 @@ describe("proposeTargets", () => {
       bodyweightKg: BODYWEIGHT,
       blockType: null,
       tendon: healthy,
-      maintenance: { kcal: 800, weeks: 6 },
+      maintenance: { kcal: 800, weeks: 6, reliable: true },
       goal: "hold",
     });
     expect(target.carbsG).toBe(0);
