@@ -8,8 +8,11 @@ import {
   inArray,
   isNotNull,
   isNull,
+  ne,
+  sql,
 } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import type { LoggerOuting, PlanLine } from "@/lib/log/plan";
 import type { BodyKind, TendonSite, TestKind, UnitSystem } from "@/lib/taxonomy";
 import { TENDON_SITES, TEST_KINDS } from "@/lib/taxonomy";
 import { dayMinus, dayOf, today } from "@/lib/time";
@@ -252,6 +255,8 @@ export type LoggedSetRow = {
   id: number;
   /** Null for a set written before the queue existed, or straight from the server. */
   clientId: string | null;
+  /** The prescription this set carried out, null for off-plan work. */
+  prescribedSetId: number | null;
   exerciseId: number;
   exerciseName: string;
   exerciseSlug: string;
@@ -272,6 +277,7 @@ export async function loggedSetsForSession(sessionId: number) {
     .select({
       id: loggedSets.id,
       clientId: loggedSets.clientId,
+      prescribedSetId: loggedSets.prescribedSetId,
       exerciseId: loggedSets.exerciseId,
       exerciseName: exercises.name,
       exerciseSlug: exercises.slug,
@@ -301,48 +307,126 @@ export async function loggedSetsForSession(sessionId: number) {
   );
 }
 
-export type LastSet = {
-  reps: number | null;
-  loadKg: number | null;
-  holdSeconds: number | null;
-  boxHeightCm: number | null;
-  rpe: number | null;
-  performedAt: Date;
-};
+/**
+ * The session's plan, one row per prescription line, in the order it is done.
+ *
+ * Block position then position within the block, which is the order the
+ * normalizer wrote: highest intensity and most coordination-demanding work first.
+ * Empty for an ad-hoc session. Every field is as the plan stores it; a load given
+ * as a percentage of 1RM stays one.
+ */
+export async function plannedSetsForSession(sessionId: number): Promise<PlanLine[]> {
+  const { prescribedSets, sessionBlocks } = schema;
+  const rows = await getDb()
+    .select({
+      id: prescribedSets.id,
+      blockLabel: sessionBlocks.label,
+      exerciseId: prescribedSets.exerciseId,
+      sets: prescribedSets.sets,
+      reps: prescribedSets.reps,
+      holdSeconds: prescribedSets.holdSeconds,
+      loadKg: prescribedSets.loadKg,
+      loadPctOf1rm: prescribedSets.loadPctOf1rm,
+      boxHeightCm: prescribedSets.boxHeightCm,
+      targetRpe: prescribedSets.targetRpe,
+      restSeconds: prescribedSets.restSeconds,
+      couplingClass: prescribedSets.couplingClass,
+      tempo: prescribedSets.tempo,
+      cueOverride: prescribedSets.cueOverride,
+    })
+    .from(prescribedSets)
+    .innerJoin(sessionBlocks, eq(sessionBlocks.id, prescribedSets.blockId))
+    .where(eq(sessionBlocks.sessionId, sessionId))
+    .orderBy(asc(sessionBlocks.position), asc(prescribedSets.position));
+
+  return rows.map((row) => ({
+    ...row,
+    holdSeconds: row.holdSeconds === null ? null : Number(row.holdSeconds),
+    loadKg: row.loadKg === null ? null : Number(row.loadKg),
+    boxHeightCm: row.boxHeightCm === null ? null : Number(row.boxHeightCm),
+    targetRpe: row.targetRpe === null ? null : Number(row.targetRpe),
+    shockMethod: null,
+  }));
+}
 
 /**
- * The last set logged for every exercise, which is what the logger prefills from.
+ * Every exercise's earlier outings, which is what the logger prefills from: the
+ * latest set of each prescription shape it was logged against, plus the latest
+ * one logged off plan, newest first.
+ *
+ * Per shape rather than one per exercise, so a top set and its back-off each
+ * find their own last load instead of whichever of the two was logged last. The
+ * session being logged is left out, since its own sets are already on the device.
  *
  * Repeating last week's numbers is the common case, and typing them again on a
  * phone between sets is the single thing most likely to stop a set being logged at
  * all. One query for the whole directory rather than one per selection, so the
  * prefill is already on the device when the connection is not.
  */
-export async function lastSetsByExercise() {
-  const { loggedSets } = schema;
+export async function lastSetsByExercise(excludeSessionId: number) {
+  const { loggedSets, prescribedSets } = schema;
+  const linked = sql<boolean>`${prescribedSets.id} is not null`;
   const rows = await getDb()
-    .selectDistinctOn([loggedSets.exerciseId], {
-      exerciseId: loggedSets.exerciseId,
-      reps: loggedSets.reps,
-      loadKg: loggedSets.loadKg,
-      holdSeconds: loggedSets.holdSeconds,
-      boxHeightCm: loggedSets.boxHeightCm,
-      rpe: loggedSets.rpe,
-      performedAt: loggedSets.performedAt,
-    })
+    .selectDistinctOn(
+      [
+        loggedSets.exerciseId,
+        linked,
+        prescribedSets.reps,
+        prescribedSets.holdSeconds,
+        prescribedSets.loadPctOf1rm,
+        prescribedSets.targetRpe,
+        prescribedSets.boxHeightCm,
+      ],
+      {
+        exerciseId: loggedSets.exerciseId,
+        reps: loggedSets.reps,
+        loadKg: loggedSets.loadKg,
+        holdSeconds: loggedSets.holdSeconds,
+        boxHeightCm: loggedSets.boxHeightCm,
+        rpe: loggedSets.rpe,
+        performedAt: loggedSets.performedAt,
+        linked,
+        shapeReps: prescribedSets.reps,
+        shapeHoldSeconds: prescribedSets.holdSeconds,
+        shapeLoadPctOf1rm: prescribedSets.loadPctOf1rm,
+        shapeTargetRpe: prescribedSets.targetRpe,
+        shapeBoxHeightCm: prescribedSets.boxHeightCm,
+      },
+    )
     .from(loggedSets)
-    .orderBy(loggedSets.exerciseId, desc(loggedSets.performedAt));
+    .leftJoin(prescribedSets, eq(prescribedSets.id, loggedSets.prescribedSetId))
+    .where(ne(loggedSets.sessionId, excludeSessionId))
+    .orderBy(
+      loggedSets.exerciseId,
+      linked,
+      prescribedSets.reps,
+      prescribedSets.holdSeconds,
+      prescribedSets.loadPctOf1rm,
+      prescribedSets.targetRpe,
+      prescribedSets.boxHeightCm,
+      desc(loggedSets.performedAt),
+    );
 
-  const byExercise: Record<number, LastSet> = {};
+  const optional = (value: string | null) => (value === null ? null : Number(value));
+  rows.sort((a, b) => b.performedAt.getTime() - a.performedAt.getTime());
+  const byExercise: Record<number, LoggerOuting[]> = {};
   for (const row of rows) {
-    byExercise[row.exerciseId] = {
+    (byExercise[row.exerciseId] ??= []).push({
       reps: row.reps,
-      loadKg: row.loadKg === null ? null : Number(row.loadKg),
-      holdSeconds: row.holdSeconds === null ? null : Number(row.holdSeconds),
-      boxHeightCm: row.boxHeightCm === null ? null : Number(row.boxHeightCm),
-      rpe: row.rpe === null ? null : Number(row.rpe),
-      performedAt: row.performedAt,
-    };
+      loadKg: optional(row.loadKg),
+      holdSeconds: optional(row.holdSeconds),
+      boxHeightCm: optional(row.boxHeightCm),
+      rpe: optional(row.rpe),
+      shape: row.linked
+        ? {
+            reps: row.shapeReps,
+            holdSeconds: optional(row.shapeHoldSeconds),
+            loadPctOf1rm: row.shapeLoadPctOf1rm,
+            targetRpe: optional(row.shapeTargetRpe),
+            boxHeightCm: optional(row.shapeBoxHeightCm),
+          }
+        : null,
+    });
   }
   return byExercise;
 }

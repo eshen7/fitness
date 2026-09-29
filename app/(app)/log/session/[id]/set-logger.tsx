@@ -12,6 +12,17 @@ import {
 import { Button, Card, Field, Input, Select, Tag, Textarea } from "@/components/ui";
 import { deleteLoggedSet, finishSession } from "@/lib/log/actions";
 import {
+  buildLoggedSet,
+  carriesOut,
+  EMPTY_FIELDS,
+  nextLine,
+  planProgress,
+  prefill,
+  type LoggerFields,
+  type LoggerOuting,
+  type PlanLine,
+} from "@/lib/log/plan";
+import {
   acknowledgeQueue,
   dequeue,
   enqueue,
@@ -21,14 +32,14 @@ import {
   subscribeQueue,
 } from "@/lib/log/queue";
 import type { LoggedSetRow } from "@/lib/log/queries";
-import type { LoggedSetInput } from "@/lib/log/schemas";
+import { describePrescription, prescriptionDetail } from "@/lib/prescription";
 import type {
   Equipment,
   MovementPattern,
   MuscleGroup,
   UnitSystem,
 } from "@/lib/taxonomy";
-import { displayUnit, round1, toCanonical, toDisplay } from "@/lib/units";
+import { displayUnit, round1, toDisplay } from "@/lib/units";
 
 export type LoggerExercise = {
   id: number;
@@ -41,20 +52,13 @@ export type LoggerExercise = {
   cues: string[];
 };
 
-export type LoggerLastSet = {
-  reps: number | null;
-  loadKg: number | null;
-  holdSeconds: number | null;
-  boxHeightCm: number | null;
-  rpe: number | null;
-};
-
 /** A set as the list renders it, from the server or still on the device. */
 type Entry = {
   key: string;
   clientId: string | null;
   id: number | null;
   exerciseId: number;
+  prescribedSetId: number | null;
   setIndex: number;
   reps: number | null;
   holdSeconds: number | null;
@@ -65,18 +69,25 @@ type Entry = {
   pending: boolean;
 };
 
-const EMPTY_FIELDS = {
-  reps: "",
-  load: "",
-  hold: "",
-  box: "",
-  rpe: "",
-  quality: null as number | null,
-};
+/**
+ * What the form is logging.
+ *
+ * `plan` follows the session: the current exercise is always the first planned
+ * line with sets left, so logging the last set of one line moves on to the next
+ * without a tap. A pick is the owner stepping off that path, to a line out of
+ * order, an extra set on a finished one, or an exercise the plan never named.
+ */
+type Mode =
+  | { kind: "plan" }
+  | { kind: "picker" }
+  | { kind: "pick"; exerciseId: number; lineId: number | null };
+
+type Current = { exerciseId: number; line: PlanLine | null };
 
 export function SetLogger({
   sessionId,
   exercises,
+  plan,
   serverSets,
   lastSets,
   unitSystem,
@@ -84,8 +95,10 @@ export function SetLogger({
 }: {
   sessionId: number;
   exercises: LoggerExercise[];
+  /** The session's prescription lines in order; empty for an ad-hoc session. */
+  plan: PlanLine[];
   serverSets: LoggedSetRow[];
-  lastSets: Record<number, LoggerLastSet>;
+  lastSets: Record<number, LoggerOuting[]>;
   unitSystem: UnitSystem;
   finished: boolean;
 }) {
@@ -99,15 +112,23 @@ export function SetLogger({
   /** Only what this form rejected. Flush outcomes come from the queue itself. */
   const [formError, setFormError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [exerciseId, setExerciseId] = useState<number | null>(null);
-  const [fields, setFields] = useState(EMPTY_FIELDS);
+  const [mode, setMode] = useState<Mode>(
+    plan.length ? { kind: "plan" } : { kind: "picker" },
+  );
+  /** The fields, and the exercise and line they were filled for. */
+  const [form, setForm] = useState<{ key: string | null; fields: LoggerFields }>({
+    key: null,
+    fields: EMPTY_FIELDS,
+  });
+  const fields = form.fields;
+  const setFields = (update: (current: LoggerFields) => LoggerFields) =>
+    setForm((current) => ({ ...current, fields: update(current.fields) }));
   const [sessionRpe, setSessionRpe] = useState("");
   const [sessionNotes, setSessionNotes] = useState("");
   const [busy, start] = useTransition();
 
   const massUnit = displayUnit("mass", unitSystem);
   const lengthUnit = displayUnit("length", unitSystem);
-  const exercise = exercises.find((row) => row.id === exerciseId) ?? null;
 
   // The outcome lands in the queue store, so all this has to do is pull the
   // server's copy of the session forward once something was actually written.
@@ -129,11 +150,13 @@ export function SetLogger({
 
   const matches = useMemo(() => {
     const text = query.trim().toLowerCase();
-    if (!text) return exercises.slice(0, 8);
+    // With a plan above it, the search is the way off the plan rather than the way
+    // into the session, so it lists nothing until asked.
+    if (!text) return plan.length ? [] : exercises.slice(0, 8);
     return exercises
       .filter((row) => row.name.toLowerCase().includes(text))
       .slice(0, 8);
-  }, [exercises, query]);
+  }, [exercises, plan.length, query]);
 
   const entries = useMemo<Entry[]>(() => {
     const confirmed = new Set(
@@ -144,6 +167,7 @@ export function SetLogger({
       clientId: row.clientId,
       id: row.id,
       exerciseId: row.exerciseId,
+      prescribedSetId: row.prescribedSetId,
       setIndex: row.setIndex,
       reps: row.reps,
       holdSeconds: row.holdSeconds,
@@ -165,6 +189,7 @@ export function SetLogger({
         clientId: item.clientId,
         id: null,
         exerciseId: item.exerciseId,
+        prescribedSetId: item.prescribedSetId ?? null,
         setIndex: item.setIndex,
         reps: item.reps ?? null,
         holdSeconds: item.holdSeconds ?? null,
@@ -188,6 +213,46 @@ export function SetLogger({
     return groups;
   }, [entries]);
 
+  // Counted over queued sets as well as stored ones, so a line finished in a dead
+  // spot reads as finished and the next set is not linked to it a fourth time.
+  const progress = useMemo(() => planProgress(plan, entries), [plan, entries]);
+  const upNext = nextLine(progress);
+
+  const current: Current | null =
+    mode.kind === "pick"
+      ? {
+          exerciseId: mode.exerciseId,
+          line: plan.find((line) => line.id === mode.lineId) ?? null,
+        }
+      : mode.kind === "plan" && upNext
+        ? { exerciseId: upNext.exerciseId, line: upNext }
+        : null;
+  const exercise = current
+    ? (exercises.find((row) => row.id === current.exerciseId) ?? null)
+    : null;
+  const lineProgress = current?.line
+    ? progress.find(({ line }) => line.id === current.line!.id)
+    : undefined;
+  /** Null while the form is on an unplanned exercise or past the line's sets. */
+  const linkedTo = carriesOut(progress, current?.line?.id ?? null);
+
+  // The fields refill whenever the form moves to a different exercise or line,
+  // including when the plan moves on by itself after the last set of a line.
+  // Adjusted during render rather than in an effect, so the new exercise never
+  // shows for a frame with the old one's numbers in it.
+  const formKey = current ? `${current.exerciseId}:${current.line?.id ?? "-"}` : null;
+  if (current && form.key !== formKey) {
+    setForm({
+      key: formKey,
+      fields: prefill({
+        line: current.line,
+        sessionSets: byExercise.get(current.exerciseId) ?? [],
+        outings: lastSets[current.exerciseId] ?? [],
+        unitSystem,
+      }),
+    });
+  }
+
   /**
    * Ground contacts today, counted in reps rather than in sets.
    *
@@ -202,70 +267,55 @@ export function SetLogger({
     return total + (entry.reps ?? 1);
   }, 0);
 
-  /** Picking an exercise prefills from this session, then from its last outing. */
-  function pick(id: number) {
-    setExerciseId(id);
+  /** A planned line, done or not: a finished one takes extra sets, unlinked. */
+  function pickLine(line: PlanLine) {
+    setMode({ kind: "pick", exerciseId: line.exerciseId, lineId: line.id });
     setQuery("");
-    const inSession = byExercise.get(id)?.at(-1);
-    const last: LoggerLastSet | undefined = inSession
-      ? {
-          reps: inSession.reps,
-          loadKg: inSession.loadKg,
-          holdSeconds: inSession.holdSeconds,
-          boxHeightCm: inSession.boxHeightCm,
-          rpe: inSession.rpe,
-        }
-      : lastSets[id];
-    setFields({
-      reps: last?.reps?.toString() ?? "",
-      load:
-        last?.loadKg == null
-          ? ""
-          : String(round1(toDisplay(last.loadKg, "mass", unitSystem))),
-      hold: last?.holdSeconds?.toString() ?? "",
-      box:
-        last?.boxHeightCm == null
-          ? ""
-          : String(round1(toDisplay(last.boxHeightCm, "length", unitSystem))),
-      // RPE is not carried over: it is how the set that just happened felt, and a
-      // prefilled one would be a guess dressed up as a measurement.
-      rpe: "",
-      quality: null,
-    });
+  }
+
+  /**
+   * An exercise from the search. One the plan still has sets of is logged
+   * against that line, since finding it by name rather than in the plan list
+   * does not make it any less the prescribed work.
+   */
+  function pickExercise(id: number) {
+    const open = progress.find(
+      ({ line, done }) => line.exerciseId === id && done < line.sets,
+    );
+    setMode({ kind: "pick", exerciseId: id, lineId: open?.line.id ?? null });
+    setQuery("");
   }
 
   function logSet() {
-    if (!exercise) return;
-    const number = (value: string) => {
-      const parsed = Number(value.trim());
-      return value.trim() && Number.isFinite(parsed) ? parsed : null;
-    };
-    const reps = number(fields.reps);
-    const hold = number(fields.hold);
-    if (reps === null && hold === null) {
-      setFormError("A set needs either reps or a hold time.");
-      return;
-    }
-
-    const load = number(fields.load);
-    const box = number(fields.box);
-    const item: LoggedSetInput = {
+    if (!exercise || !current) return;
+    const item = buildLoggedSet({
       clientId: crypto.randomUUID(),
       sessionId,
       exerciseId: exercise.id,
+      prescribedSetId: linkedTo,
       setIndex: (byExercise.get(exercise.id)?.length ?? 0) + 1,
-      reps,
-      holdSeconds: hold,
-      loadKg: load === null ? null : toCanonical(load, "mass", unitSystem),
-      boxHeightCm: box === null ? null : toCanonical(box, "length", unitSystem),
-      rpe: number(fields.rpe),
-      qualityRating: fields.quality,
-      performedAt: new Date().toISOString(),
-    };
+      fields,
+      unitSystem,
+      performedAt: new Date(),
+    });
+    if ("error" in item) {
+      setFormError(item.error);
+      return;
+    }
 
     enqueue(item);
     setFormError(null);
     setFields((current) => ({ ...current, rpe: "", quality: null }));
+    // A picked line that this set finished hands back to the plan, which then
+    // opens on whatever is next rather than inviting a set past the prescription.
+    if (
+      mode.kind === "pick" &&
+      lineProgress &&
+      linkedTo !== null &&
+      lineProgress.done + 1 >= lineProgress.line.sets
+    ) {
+      setMode({ kind: "plan" });
+    }
     flush();
   }
 
@@ -288,6 +338,27 @@ export function SetLogger({
       else setFormError(result.message);
     });
   }
+
+  /** The plan as the picker lists it: lines under their block, in order. */
+  const planBlocks: { label: string; rows: typeof progress }[] = [];
+  for (const row of progress) {
+    const last = planBlocks.at(-1);
+    if (last && last.label === row.line.blockLabel) last.rows.push(row);
+    else planBlocks.push({ label: row.line.blockLabel, rows: [row] });
+  }
+
+  const setLabel = current?.line
+    ? linkedTo !== null && lineProgress
+      ? `${current.line.blockLabel} · Set ${lineProgress.done + 1} of ${current.line.sets}`
+      : `Extra set · the plan's ${current.line.sets} are done`
+    : plan.length
+      ? "Not in the plan"
+      : `Set ${(byExercise.get(current?.exerciseId ?? 0)?.length ?? 0) + 1}`;
+  // The plan's own cue for this line leads, since it was written for this session.
+  const cues = [
+    ...(current?.line?.cueOverride ? [current.line.cueOverride] : []),
+    ...(exercise?.cues ?? []),
+  ].slice(0, 3);
 
   const showReps = exercise?.movementPattern !== "isometric_hold";
   const showHold = exercise?.movementPattern === "isometric_hold";
@@ -326,30 +397,46 @@ export function SetLogger({
 
       {!finished ? (
         <Card>
-          {exercise ? (
+          {current && exercise ? (
             <>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 className="font-display text-lg font-semibold text-ink">
                     {exercise.name}
                   </h2>
-                  <p className="mt-0.5 text-xs text-ink-faint">
-                    Set {(byExercise.get(exercise.id)?.length ?? 0) + 1}
+                  <p className="mt-0.5 text-xs text-ink-faint tabular-nums">
+                    {setLabel}
                     {exercise.highImpact ? " · counts as a contact" : ""}
                   </p>
                 </div>
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => setExerciseId(null)}
+                  onClick={() => setMode({ kind: "picker" })}
                 >
                   Change
                 </Button>
               </div>
 
-              {exercise.cues.length ? (
+              {current.line ? (
+                <div className="mt-3 rounded-field border border-line bg-surface-sunken px-3 py-2">
+                  <p className="text-xs font-medium tracking-wide text-ink-faint uppercase">
+                    Target
+                  </p>
+                  <p className="mt-0.5 text-sm text-ink tabular-nums">
+                    {describePrescription(current.line, unitSystem)}
+                  </p>
+                  {prescriptionDetail(current.line) ? (
+                    <p className="mt-0.5 text-xs text-ink-faint">
+                      {prescriptionDetail(current.line)}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {cues.length ? (
                 <ul className="mt-3 space-y-1 text-xs text-ink-muted">
-                  {exercise.cues.slice(0, 3).map((cue) => (
+                  {cues.map((cue) => (
                     <li key={cue} className="flex gap-2">
                       <span aria-hidden="true" className="text-ink-faint">
                         ·
@@ -484,7 +571,58 @@ export function SetLogger({
             </>
           ) : (
             <>
-              <h2 className="text-sm font-semibold text-ink">Exercise</h2>
+              {plan.length ? (
+                <>
+                  <h2 className="text-sm font-semibold text-ink">Plan</h2>
+                  {upNext ? null : (
+                    <p className="mt-1 text-xs text-ink-faint">
+                      Every planned set is logged. Anything more goes in as extra
+                      work, outside the prescription.
+                    </p>
+                  )}
+                  <div className="mt-3 space-y-3">
+                    {planBlocks.map(({ label, rows }, index) => (
+                      <div key={`${label}-${index}`}>
+                        <p className="text-xs font-medium tracking-wide text-ink-muted uppercase">
+                          {label}
+                        </p>
+                        <ul className="mt-1.5 space-y-1.5">
+                          {rows.map(({ line, done }) => (
+                            <li key={line.id}>
+                              <button
+                                type="button"
+                                onClick={() => pickLine(line)}
+                                className="flex min-h-11 w-full items-center justify-between gap-3 rounded-field border border-line-strong bg-surface-sunken px-3 py-2 text-left transition hover:border-ink-faint"
+                              >
+                                <span className="min-w-0">
+                                  <span className="block text-sm text-ink">
+                                    {exercises.find((row) => row.id === line.exerciseId)
+                                      ?.name ?? `Exercise ${line.exerciseId}`}
+                                  </span>
+                                  <span className="block text-xs text-ink-muted tabular-nums">
+                                    {describePrescription(line, unitSystem)}
+                                  </span>
+                                </span>
+                                <Tag tone={done >= line.sets ? "accent" : "neutral"}>
+                                  {done >= line.sets ? "done" : `${done} of ${line.sets}`}
+                                </Tag>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                  <h2 className="mt-5 text-sm font-semibold text-ink">
+                    Something else
+                  </h2>
+                  <p className="mt-1 text-xs text-ink-faint">
+                    An exercise the plan does not name is logged as extra work.
+                  </p>
+                </>
+              ) : (
+                <h2 className="text-sm font-semibold text-ink">Exercise</h2>
+              )}
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -498,7 +636,7 @@ export function SetLogger({
                   <li key={row.id}>
                     <button
                       type="button"
-                      onClick={() => pick(row.id)}
+                      onClick={() => pickExercise(row.id)}
                       className="flex min-h-11 w-full items-center justify-between gap-3 rounded-field border border-line-strong bg-surface-sunken px-3 py-2 text-left text-sm text-ink transition hover:border-ink-faint"
                     >
                       <span>{row.name}</span>
@@ -513,7 +651,7 @@ export function SetLogger({
                     </button>
                   </li>
                 ))}
-                {matches.length === 0 ? (
+                {matches.length === 0 && query.trim() ? (
                   <li className="px-1 py-2 text-sm text-ink-faint">
                     Nothing matches. The directory is a closed set: add it in the
                     library first so it carries its attributes.
@@ -581,6 +719,9 @@ export function SetLogger({
                             : null}
                         </span>
                         <span className="flex shrink-0 items-center gap-2">
+                          {plan.length && entry.prescribedSetId === null ? (
+                            <Tag tone="cool">extra</Tag>
+                          ) : null}
                           {entry.pending ? <Tag>unsent</Tag> : null}
                           <button
                             type="button"

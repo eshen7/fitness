@@ -7,17 +7,24 @@ import {
   getUnitSystem,
   lastSetsByExercise,
   loggedSetsForSession,
+  plannedSetsForSession,
   sessionById,
 } from "@/lib/log/queries";
+import type { SessionKind } from "@/lib/taxonomy";
 import { formatDay, formatTime } from "@/lib/time";
 import { SetLogger, type LoggerExercise } from "./set-logger";
 
 type Params = Promise<{ id: string }>;
 
+/** A generated session has a name; an ad-hoc one is known by its kind. */
+function sessionName(session: { title: string | null; kind: SessionKind }) {
+  return session.title ?? `${sessionKindLabels.of(session.kind)} session`;
+}
+
 export async function generateMetadata({ params }: { params: Params }) {
   const { id } = await params;
   const session = await sessionById(Number(id));
-  return { title: session ? `${sessionKindLabels.of(session.kind)} session` : "Not found" };
+  return { title: session ? sessionName(session) : "Not found" };
 }
 
 export default async function SessionPage({ params }: { params: Params }) {
@@ -27,16 +34,22 @@ export default async function SessionPage({ params }: { params: Params }) {
   const session = await sessionById(id);
   if (!session) notFound();
 
-  const [rows, sets, lastSets, unitSystem] = await Promise.all([
-    // Available only: the logger offers what the pre-filter would offer, so a
-    // retired exercise cannot quietly come back through the log.
-    listExercises({ include: "available" }),
+  const [rows, plan, sets, lastSets, unitSystem] = await Promise.all([
+    listExercises(),
+    plannedSetsForSession(id),
     loggedSetsForSession(id),
-    lastSetsByExercise(),
+    lastSetsByExercise(id),
     getUnitSystem(),
   ]);
 
-  const exercises: LoggerExercise[] = rows.map((row) => ({
+  // Available ones, plus whatever the plan prescribes: the search offers what the
+  // pre-filter would offer, so a retired exercise cannot quietly come back through
+  // the log, but a line already in the plan is logged whatever happened to the
+  // directory since the week was generated.
+  const planned = new Set(plan.map((line) => line.exerciseId));
+  const exercises: LoggerExercise[] = rows
+    .filter((row) => row.available || planned.has(row.id))
+    .map((row) => ({
     id: row.id,
     name: row.name,
     movementPattern: row.movementPattern,
@@ -52,8 +65,8 @@ export default async function SessionPage({ params }: { params: Params }) {
   return (
     <>
       <PageHeader
-        title={sessionKindLabels.of(session.kind)}
-        subtitle={`${formatDay(session.day)}${
+        title={sessionName(session)}
+        subtitle={`${session.title ? `${sessionKindLabels.of(session.kind)} · ` : ""}${formatDay(session.day)}${
           session.startedAt ? ` · started ${formatTime(session.startedAt)}` : ""
         }`}
       >
@@ -71,6 +84,7 @@ export default async function SessionPage({ params }: { params: Params }) {
       <SetLogger
         sessionId={id}
         exercises={exercises}
+        plan={plan}
         serverSets={sets}
         lastSets={lastSets}
         unitSystem={unitSystem}
